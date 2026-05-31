@@ -342,32 +342,69 @@ export const adminDeleteDoc = async (subId, docType) => {
 
 // --- ADMIN USERS LIST SERVICES ---
 export const getUsersList = async () => {
-  const subs = await callApiGet("getSubmissions");
-  const users = await callApiGet("getUsers");
+  const subs = await callApiGet("getSubmissions") || [];
+  const users = await callApiGet("getUsers") || [];
   
   const seenAadhar = new Set();
   const uniqueUsers = [];
   
-  // Compile list of unique active users based on their submissions list
-  for (const sub of (subs || [])) {
-    if (sub.aadhar && !seenAadhar.has(sub.aadhar)) {
-      seenAadhar.add(sub.aadhar);
-      const userProfile = (users || []).find(u => u.aadhar === sub.aadhar) || {};
-      uniqueUsers.push({
-        aadhar: sub.aadhar,
-        phone: sub.phone,
-        dob: sub.dob,
-        last_active: sub.submitted_at,
-        name: userProfile.name || 'Citizen User',
-        photo_url: userProfile.photo_url || null,
-        aadhar_url_1: userProfile.aadhar_url_1 || null,
-        aadhar_url_2: userProfile.aadhar_url_2 || null,
-        smart_card_url_1: userProfile.smart_card_url_1 || null,
-        smart_card_url_2: userProfile.smart_card_url_2 || null,
-        voter_id_url_1: userProfile.voter_id_url_1 || null,
-        voter_id_url_2: userProfile.voter_id_url_2 || null,
-        signature_url_1: userProfile.signature_url_1 || null
-      });
+  // 1. Process all registered users first (so everyone shows up!)
+  for (const u of users) {
+    if (u.aadhar) {
+      const cleanAadhar = u.aadhar.toString().trim();
+      if (!seenAadhar.has(cleanAadhar)) {
+        seenAadhar.add(cleanAadhar);
+        
+        // Find their latest submission to determine last_active date
+        const userSubs = subs.filter(s => s.aadhar && s.aadhar.toString().trim() === cleanAadhar);
+        let lastActive = u.created_at || new Date().toISOString();
+        if (userSubs.length > 0) {
+          // Sort submissions descending by date
+          userSubs.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+          lastActive = userSubs[0].submitted_at;
+        }
+        
+        uniqueUsers.push({
+          aadhar: cleanAadhar,
+          phone: u.phone,
+          dob: u.dob,
+          last_active: lastActive,
+          name: u.name || 'Citizen User',
+          photo_url: u.photo_url || null,
+          aadhar_url_1: u.aadhar_url_1 || null,
+          aadhar_url_2: u.aadhar_url_2 || null,
+          smart_card_url_1: u.smart_card_url_1 || null,
+          smart_card_url_2: u.smart_card_url_2 || null,
+          voter_id_url_1: u.voter_id_url_1 || null,
+          voter_id_url_2: u.voter_id_url_2 || null,
+          signature_url_1: u.signature_url_1 || null
+        });
+      }
+    }
+  }
+  
+  // 2. Append any submission users who are not registered in the Users sheet (fallback)
+  for (const sub of subs) {
+    if (sub.aadhar) {
+      const cleanAadhar = sub.aadhar.toString().trim();
+      if (!seenAadhar.has(cleanAadhar)) {
+        seenAadhar.add(cleanAadhar);
+        uniqueUsers.push({
+          aadhar: cleanAadhar,
+          phone: sub.phone,
+          dob: sub.dob,
+          last_active: sub.submitted_at,
+          name: 'Citizen User',
+          photo_url: null,
+          aadhar_url_1: null,
+          aadhar_url_2: null,
+          smart_card_url_1: null,
+          smart_card_url_2: null,
+          voter_id_url_1: null,
+          voter_id_url_2: null,
+          signature_url_1: null
+        });
+      }
     }
   }
   

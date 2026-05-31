@@ -9,6 +9,63 @@
 // --- GLOBAL CONFIGURATION ---
 var ROOT_FOLDER_NAME = "WhatsBroTNService_Uploads";
 
+// --- ROBUST FORMATTING HELPERS ---
+function formatDateString(val) {
+  if (val === undefined || val === null || val === "") return "";
+  if (val instanceof Date) {
+    try {
+      var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || "GMT";
+      return Utilities.formatDate(val, tz, "yyyy-MM-dd");
+    } catch (e) {
+      try {
+        return Utilities.formatDate(val, "GMT", "yyyy-MM-dd");
+      } catch (err) {
+        // Fallback
+      }
+    }
+  }
+  var str = val.toString().trim();
+  
+  // If already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  
+  // Handle formatted date strings from spreadsheets
+  try {
+    var d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      var tz = "GMT";
+      try { tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(); } catch(e) {}
+      return Utilities.formatDate(d, tz, "yyyy-MM-dd");
+    }
+  } catch (e) {
+    // Fallback
+  }
+  
+  return str;
+}
+
+function formatNumberString(val) {
+  if (val === undefined || val === null || val === "") return "";
+  var str = val.toString().trim();
+  
+  // Handle scientific notation (like 1.23456789012e11)
+  if (str.indexOf("e") !== -1 || str.indexOf("E") !== -1) {
+    var num = Number(val);
+    if (!isNaN(num)) {
+      return num.toFixed(0);
+    }
+  }
+  
+  // Remove trailing .0 if it's formatted as double
+  if (str.endsWith(".0")) {
+    return str.substring(0, str.length - 2);
+  }
+  
+  return str;
+}
+
 // --- API ENTRY POINTS ---
 
 /**
@@ -318,14 +375,20 @@ function duplicateFormAction(id) {
 
 function registerUserAction(userData) {
   var sheet = getSheet("Users");
-  var phoneClean = (userData.phone || "").toString().trim();
-  var dobClean = (userData.dob || "").toString().trim();
-  var aadharClean = userData.aadhar ? userData.aadhar.toString().trim() : "";
+  var phoneClean = userData.phone ? formatNumberString(userData.phone) : "";
+  var dobClean = userData.dob ? formatDateString(userData.dob) : "";
+  var aadharClean = userData.aadhar ? formatNumberString(userData.aadhar) : "";
+  
+  if (!phoneClean || !dobClean) {
+    throw new Error("Phone number and Date of Birth are required for registration.");
+  }
   
   // Enforce Unique constraint: phone + dob
   var existingRows = getRowsFromSheet("Users");
   var isRegistered = existingRows.some(function(u) {
-    return u.phone.toString().trim() === phoneClean && u.dob.toString().trim() === dobClean;
+    var uPhone = u.phone ? formatNumberString(u.phone) : "";
+    var uDob = u.dob ? formatDateString(u.dob) : "";
+    return uPhone === phoneClean && uDob === dobClean;
   });
   if (isRegistered) {
     throw new Error("A user profile with this Phone number and DOB is already registered.");
@@ -334,7 +397,9 @@ function registerUserAction(userData) {
   // Aadhaar unique check if provided
   if (aadharClean) {
     var aadharDuplicate = existingRows.some(function(u) {
-      return u.aadhar && u.aadhar.toString().trim() === aadharClean && u.dob.toString().trim() === dobClean;
+      var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
+      var uDob = u.dob ? formatDateString(u.dob) : "";
+      return uAadhar === aadharClean && uDob === dobClean;
     });
     if (aadharDuplicate) {
       throw new Error("A user profile with this Aadhaar number and DOB is already registered.");
@@ -346,9 +411,9 @@ function registerUserAction(userData) {
     id: userId,
     name: userData.name || "",
     name_tamil: userData.name_tamil || "",
-    dob: dobClean,
-    phone: phoneClean,
-    aadhar: aadharClean,
+    dob: "'" + dobClean,
+    phone: "'" + phoneClean,
+    aadhar: aadharClean ? "'" + aadharClean : "",
     gender: userData.gender || "",
     marital_status: userData.marital_status || "",
     father_name: userData.father_name || "",
@@ -377,24 +442,33 @@ function registerUserAction(userData) {
   };
   
   appendObjectToSheet(sheet, newUser);
+  
+  // Strip quotes for returned object
+  newUser.dob = dobClean;
+  newUser.phone = phoneClean;
+  newUser.aadhar = aadharClean;
   return newUser;
 }
 
 function loginUserAction(loginData) {
-  var phoneClean = (loginData.phone || "").toString().trim();
-  var dobClean = (loginData.dob || "").toString().trim();
-  var aadharClean = loginData.aadhar ? loginData.aadhar.toString().trim() : "";
+  var phoneClean = loginData.phone ? formatNumberString(loginData.phone) : "";
+  var dobClean = loginData.dob ? formatDateString(loginData.dob) : "";
+  var aadharClean = loginData.aadhar ? formatNumberString(loginData.aadhar) : "";
   
   var users = getRowsFromSheet("Users");
   var matchedUser = null;
   
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
-    if (u.dob.toString().trim() === dobClean) {
-      if (phoneClean && u.phone.toString().trim() === phoneClean) {
+    var uDob = u.dob ? formatDateString(u.dob) : "";
+    var uPhone = u.phone ? formatNumberString(u.phone) : "";
+    var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
+    
+    if (uDob === dobClean) {
+      if (phoneClean && uPhone === phoneClean) {
         matchedUser = u;
         break;
-      } else if (aadharClean && u.aadhar && u.aadhar.toString().trim() === aadharClean) {
+      } else if (aadharClean && uAadhar === aadharClean) {
         matchedUser = u;
         break;
       }
@@ -405,7 +479,17 @@ function loginUserAction(loginData) {
     throw new Error("No user profile found matching these credentials. Please check DOB and details.");
   }
   
-  return matchedUser;
+  // Format matching fields in returned object
+  var cleanedUser = {};
+  var keys = Object.keys(matchedUser);
+  keys.forEach(function(k) {
+    cleanedUser[k] = matchedUser[k];
+  });
+  cleanedUser.phone = formatNumberString(matchedUser.phone);
+  cleanedUser.dob = formatDateString(matchedUser.dob);
+  cleanedUser.aadhar = formatNumberString(matchedUser.aadhar);
+  
+  return cleanedUser;
 }
 
 function updateUserProfileAction(userId, profileData) {
@@ -419,12 +503,32 @@ function updateUserProfileAction(userId, profileData) {
   var keys = Object.keys(profileData);
   keys.forEach(function(key) {
     if (profileData[key] !== undefined && key !== "id") {
-      existingUser[key] = profileData[key];
+      var val = profileData[key];
+      if (key === "phone") {
+        existingUser[key] = "'" + formatNumberString(val);
+      } else if (key === "dob") {
+        existingUser[key] = "'" + formatDateString(val);
+      } else if (key === "aadhar") {
+        existingUser[key] = val ? "'" + formatNumberString(val) : "";
+      } else {
+        existingUser[key] = val;
+      }
     }
   });
   
   updateRowObject(sheet, rowIndex, existingUser);
-  return existingUser;
+  
+  // Return cleaned user object
+  var cleanedUser = {};
+  var rKeys = Object.keys(existingUser);
+  rKeys.forEach(function(k) {
+    cleanedUser[k] = existingUser[k];
+  });
+  cleanedUser.phone = formatNumberString(existingUser.phone);
+  cleanedUser.dob = formatDateString(existingUser.dob);
+  cleanedUser.aadhar = formatNumberString(existingUser.aadhar);
+  
+  return cleanedUser;
 }
 
 // --- 4. SUBMISSIONS & DATA COLLECTION ACTIONS ---
@@ -433,14 +537,14 @@ function submitFormResponseAction(payload) {
   var sheet = getSheet("Submissions");
   var subId = payload.id || "sub-" + Math.random().toString(36).substring(2, 10);
   
-  var phone = (payload.phone || "").toString().trim();
-  var dob = (payload.dob || "").toString().trim();
-  var aadhar = payload.aadhar ? payload.aadhar.toString().trim() : "";
+  var phoneClean = payload.phone ? formatNumberString(payload.phone) : "";
+  var dobClean = payload.dob ? formatDateString(payload.dob) : "";
+  var aadharClean = payload.aadhar ? formatNumberString(payload.aadhar) : "";
   
   // Find linked user_id if they have a registered profile
   var userId = "";
   try {
-    var loggedUser = loginUserAction({ phone: phone, dob: dob, aadhar: aadhar });
+    var loggedUser = loginUserAction({ phone: phoneClean, dob: dobClean, aadhar: aadharClean });
     userId = loggedUser.id;
   } catch (e) {
     // User not registered, leave user_id blank
@@ -453,9 +557,9 @@ function submitFormResponseAction(payload) {
     id: subId,
     form_id: payload.form_id,
     user_id: userId,
-    phone: phone,
-    dob: dob,
-    aadhar: aadhar,
+    phone: "'" + phoneClean,
+    dob: "'" + dobClean,
+    aadhar: aadharClean ? "'" + aadharClean : "",
     responses: responsesString,
     uploaded_docs: typeof payload.uploaded_docs === "string" ? payload.uploaded_docs : JSON.stringify(payload.uploaded_docs || {}),
     payment_status: payload.payment_status || "unpaid",
@@ -495,6 +599,10 @@ function submitFormResponseAction(payload) {
     updateRowObject(sheet, rowIndex, existingSub);
   }
   
+  // Clean returned object
+  newSubmission.phone = phoneClean;
+  newSubmission.dob = dobClean;
+  newSubmission.aadhar = aadharClean;
   return newSubmission;
 }
 
@@ -509,12 +617,31 @@ function adminUpdateSubmissionAction(id, updateData) {
   var keys = Object.keys(updateData);
   keys.forEach(function(key) {
     if (updateData[key] !== undefined && key !== "id") {
-      existingSub[key] = updateData[key];
+      var val = updateData[key];
+      if (key === "phone") {
+        existingSub[key] = "'" + formatNumberString(val);
+      } else if (key === "dob") {
+        existingSub[key] = "'" + formatDateString(val);
+      } else if (key === "aadhar") {
+        existingSub[key] = val ? "'" + formatNumberString(val) : "";
+      } else {
+        existingSub[key] = val;
+      }
     }
   });
   
   updateRowObject(sheet, rowIndex, existingSub);
-  return existingSub;
+  
+  // Clean returned object
+  var cleanedSub = {};
+  var rKeys = Object.keys(existingSub);
+  rKeys.forEach(function(k) {
+    cleanedSub[k] = existingSub[k];
+  });
+  cleanedSub.phone = formatNumberString(existingSub.phone);
+  cleanedSub.dob = formatDateString(existingSub.dob);
+  cleanedSub.aadhar = formatNumberString(existingSub.aadhar);
+  return cleanedSub;
 }
 
 function submitInfoRequestResponseAction(id, payload) {
@@ -538,6 +665,9 @@ function deleteSubmissionAction(id) {
 }
 
 function deleteUserAndSubmissionsAction(aadhar) {
+  var aadharClean = aadhar ? formatNumberString(aadhar) : "";
+  if (!aadharClean) return { aadhar: "", success: false, error: "No Aadhaar provided" };
+
   // 1. Delete all submissions matching this Aadhaar card
   var subSheet = getSheet("Submissions");
   var subData = subSheet.getDataRange().getValues();
@@ -546,7 +676,9 @@ function deleteUserAndSubmissionsAction(aadhar) {
   
   if (aadharColIndex !== -1) {
     for (var r = subData.length - 1; r >= 1; r--) {
-      if (subData[r][aadharColIndex].toString().trim() === aadhar.toString().trim()) {
+      var cellVal = subData[r][aadharColIndex];
+      var cellValStr = cellVal !== undefined && cellVal !== null ? formatNumberString(cellVal) : "";
+      if (cellValStr === aadharClean) {
         subSheet.deleteRow(r + 1);
       }
     }
@@ -560,17 +692,29 @@ function deleteUserAndSubmissionsAction(aadhar) {
   
   if (uAadharIndex !== -1) {
     for (var k = userData.length - 1; k >= 1; k--) {
-      if (userData[k][uAadharIndex].toString().trim() === aadhar.toString().trim()) {
+      var uCellVal = userData[k][uAadharIndex];
+      var uCellValStr = uCellVal !== undefined && uCellVal !== null ? formatNumberString(uCellVal) : "";
+      if (uCellValStr === aadharClean) {
         userSheet.deleteRow(k + 1);
       }
     }
   }
   
-  return { aadhar: aadhar, success: true };
+  return { aadhar: aadharClean, success: true };
 }
 
 function getUsersAction() {
-  return getRowsFromSheet("Users");
+  var users = getRowsFromSheet("Users");
+  return users.map(function(u) {
+    var cleaned = {};
+    Object.keys(u).forEach(function(key) {
+      cleaned[key] = u[key];
+    });
+    cleaned.phone = formatNumberString(u.phone);
+    cleaned.dob = formatDateString(u.dob);
+    cleaned.aadhar = formatNumberString(u.aadhar);
+    return cleaned;
+  });
 }
 
 function getSubmissionsAction() {
@@ -580,9 +724,9 @@ function getSubmissionsAction() {
       id: s.id,
       form_id: s.form_id,
       user_id: s.user_id,
-      phone: s.phone,
-      dob: s.dob,
-      aadhar: s.aadhar,
+      phone: formatNumberString(s.phone),
+      dob: formatDateString(s.dob),
+      aadhar: formatNumberString(s.aadhar),
       responses: s.responses,
       uploaded_docs: s.uploaded_docs,
       payment_status: s.payment_status,
@@ -600,18 +744,22 @@ function getSubmissionsAction() {
 
 function getUserStatusAction(phone, dob, aadhar) {
   var submissions = getRowsFromSheet("Submissions");
-  var dobClean = dob ? dob.toString().trim() : "";
-  var phoneClean = phone ? phone.toString().trim() : "";
-  var aadharClean = aadhar ? aadhar.toString().trim() : "";
+  var dobClean = dob ? formatDateString(dob) : "";
+  var phoneClean = phone ? formatNumberString(phone) : "";
+  var aadharClean = aadhar ? formatNumberString(aadhar) : "";
   
   var filtered = submissions.filter(function(sub) {
-    var matchDob = sub.dob.toString().trim() === dobClean;
+    var subDob = sub.dob ? formatDateString(sub.dob) : "";
+    var matchDob = subDob === dobClean;
     if (!matchDob) return false;
     
+    var subPhone = sub.phone ? formatNumberString(sub.phone) : "";
+    var subAadhar = sub.aadhar ? formatNumberString(sub.aadhar) : "";
+    
     if (phoneClean) {
-      return sub.phone.toString().trim() === phoneClean;
+      return subPhone === phoneClean;
     } else if (aadharClean) {
-      return sub.aadhar && sub.aadhar.toString().trim() === aadharClean;
+      return subAadhar === aadharClean;
     }
     return false;
   });
@@ -621,22 +769,43 @@ function getUserStatusAction(phone, dob, aadhar) {
     return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
   });
   
-  return filtered;
+  // Format returned list items
+  return filtered.map(function(s) {
+    var item = {};
+    Object.keys(s).forEach(function(key) {
+      item[key] = s[key];
+    });
+    item.phone = formatNumberString(s.phone);
+    item.dob = formatDateString(s.dob);
+    item.aadhar = formatNumberString(s.aadhar);
+    return item;
+  });
 }
 
 function getUserSubmissionsAction(aadhar) {
   var submissions = getRowsFromSheet("Submissions");
-  var aadharClean = aadhar ? aadhar.toString().trim() : "";
+  var aadharClean = aadhar ? formatNumberString(aadhar) : "";
   
   var filtered = submissions.filter(function(sub) {
-    return sub.aadhar && sub.aadhar.toString().trim() === aadharClean;
+    var subAadhar = sub.aadhar ? formatNumberString(sub.aadhar) : "";
+    return subAadhar === aadharClean;
   });
   
   filtered.sort(function(a, b) {
     return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
   });
   
-  return filtered;
+  // Format returned list items
+  return filtered.map(function(s) {
+    var item = {};
+    Object.keys(s).forEach(function(key) {
+      item[key] = s[key];
+    });
+    item.phone = formatNumberString(s.phone);
+    item.dob = formatDateString(s.dob);
+    item.aadhar = formatNumberString(s.aadhar);
+    return item;
+  });
 }
 
 // --- 5. GOOGLE DRIVE FILE UPLOADS ---
@@ -755,7 +924,7 @@ function getSheet(name) {
 
 function getRowsFromSheet(sheetName) {
   var sheet = getSheet(sheetName);
-  var values = sheet.getDataRange().getValues();
+  var values = sheet.getDataRange().getDisplayValues();
   if (values.length <= 1) return []; // Only headers
   
   var headers = values[0];
@@ -772,8 +941,8 @@ function getRowsFromSheet(sheetName) {
 }
 
 function getRowObject(sheet, rowIndex) {
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  var values = sheet.getRange(rowIndex, 1, 1, headers.length).getDisplayValues()[0];
   var rowObject = {};
   for (var c = 0; c < headers.length; c++) {
     rowObject[headers[c]] = values[c];
@@ -812,14 +981,15 @@ function ensureColumnExists(sheet, colName) {
 }
 
 function findRowIndexById(sheet, id) {
-  var values = sheet.getDataRange().getValues();
+  var values = sheet.getDataRange().getDisplayValues();
   var headers = values[0];
   var idColIndex = headers.indexOf("id");
   if (idColIndex === -1) return -1;
   
   var idStr = id.toString().trim();
   for (var r = 1; r < values.length; r++) {
-    if (values[r][idColIndex].toString().trim() === idStr) {
+    var cellVal = values[r][idColIndex];
+    if (cellVal !== undefined && cellVal !== null && cellVal.toString().trim() === idStr) {
       return r + 1; // 1-indexed row number
     }
   }
