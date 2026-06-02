@@ -837,7 +837,7 @@ h1, h2, h3, h4 {
 
 /* Shimmer text effect for loading indicators */
 .shimmer-text {
-  background: linear-gradient(90deg, #e5e7eb, #6366f1, #e5e7eb);
+  background: linear-gradient(90deg, #a7f3d0, #10b981, #a7f3d0);
   background-size: 200%;
   -webkit-background-clip: text;
   color: transparent;

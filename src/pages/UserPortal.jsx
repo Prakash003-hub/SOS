@@ -945,53 +945,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const renderMintGreenLoader = (label = "LOADING...") => {
     return (
       <div 
-        className="premium-card text-center" 
         style={{ 
-          padding: '48px 24px', 
+          padding: '24px', 
           gridColumn: 'span 2', 
           display: 'flex', 
           flexDirection: 'column', 
           alignItems: 'center', 
           justifyContent: 'center',
-          gap: '16px',
+          gap: '8px',
           width: '100%',
-          background: 'rgba(255, 255, 255, 0.7)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '16px',
-          border: '1px solid rgba(241, 245, 249, 0.8)',
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02)'
+          background: 'transparent',
+          border: 'none',
+          boxShadow: 'none'
         }}
       >
-        <div style={{ 
-          position: 'relative', 
-          width: '64px', 
-          height: '64px', 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }}>
-          <div style={{
-            position: 'absolute',
-            width: '56px',
-            height: '56px',
-            border: '4.5px solid rgba(16, 185, 129, 0.12)',
-            borderRadius: '50%'
-          }}></div>
-          <div style={{
-            position: 'absolute',
-            width: '56px',
-            height: '56px',
-            border: '4.5px solid transparent',
-            borderTopColor: '#10b981',
-            borderRadius: '50%',
-            animation: 'spin-clockwise 0.8s linear infinite'
-          }}></div>
-        </div>
-        
-        <div style={{ textAlign: 'center', marginTop: '4px' }}>
+        <div style={{ textAlign: 'center' }}>
           <div className="shimmer-text" style={{
             margin: 0,
-            fontSize: '1.05rem',
+            fontSize: '1.2rem',
             fontWeight: '900',
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
@@ -1001,7 +972,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           </div>
           <div className="shimmer-text" style={{
             margin: '4px 0 0 0',
-            fontSize: '0.85rem',
+            fontSize: '0.9rem',
             fontWeight: '700',
             letterSpacing: '0.05em'
           }}>
