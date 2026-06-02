@@ -185,6 +185,24 @@ export default function AdminPortal() {
   const [uploadingDocType, setUploadingDocType] = useState(null); // 'receipt' | 'certificate' | 'other' | null
   const [uploadingPostImg, setUploadingPostImg] = useState(false);
 
+  // Server maintenance configuration
+  const [serverConfig, setServerConfig] = useState(() => {
+    const saved = localStorage.getItem('whatsbro_server_config');
+    return saved ? JSON.parse(saved) : { active: true, message: 'Server issues, so pls wait...' };
+  });
+
+  const handleServerToggle = (active) => {
+    const nextConfig = { ...serverConfig, active };
+    localStorage.setItem('whatsbro_server_config', JSON.stringify(nextConfig));
+    setServerConfig(nextConfig);
+  };
+
+  const handleServerMessageChange = (msg) => {
+    const nextConfig = { ...serverConfig, message: msg };
+    localStorage.setItem('whatsbro_server_config', JSON.stringify(nextConfig));
+    setServerConfig(nextConfig);
+  };
+
   // Filters & search
   const [userSearchTerm, setUserSearchTerm] = useState('');
   
@@ -766,6 +784,73 @@ export default function AdminPortal() {
         >
           Logout Admin
         </button>
+      </div>
+
+      {/* Server Status Maintenance Panel */}
+      <div style={{
+        background: '#ffffff',
+        border: '1.5px solid #e2e8f0',
+        borderRadius: '12px',
+        margin: '12px 16px 0 16px',
+        padding: '12px 16px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#1e293b', letterSpacing: '0.02em' }}>SERVER MODE STATUS:</span>
+          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '2px', border: '1px solid #cbd5e1' }}>
+            <button
+              type="button"
+              onClick={() => handleServerToggle(true)}
+              style={{
+                padding: '4px 12px',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.7rem',
+                fontWeight: '700',
+                backgroundColor: serverConfig.active ? '#10b981' : 'transparent',
+                color: serverConfig.active ? 'white' : '#64748b',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              ON (Active)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleServerToggle(false)}
+              style={{
+                padding: '4px 12px',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.7rem',
+                fontWeight: '700',
+                backgroundColor: !serverConfig.active ? '#ef4444' : 'transparent',
+                color: !serverConfig.active ? 'white' : '#64748b',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              OFF (Maintenance)
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '240px' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569', whiteSpace: 'nowrap' }}>Offline Display Notice:</span>
+          <input
+            type="text"
+            value={serverConfig.message}
+            onChange={(e) => handleServerMessageChange(e.target.value)}
+            placeholder="e.g. Server issues, so pls wait..."
+            className="premium-input"
+            style={{ padding: '6px 10px', fontSize: '0.75rem', margin: 0, width: '100%', background: '#f8fafc' }}
+          />
+        </div>
       </div>
       <div style={{ flex: 1, padding: '0 16px' }}>
 

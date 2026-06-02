@@ -152,7 +152,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // Loading & error states
   const [loading, setLoading] = useState(false);
   const [searchingStatus, setSearchingStatus] = useState(false);
-  const [initialFetching, setInitialFetching] = useState(false);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [formsLoading, setFormsLoading] = useState(false);
+  const [jobsLoading, setJobsLoading] = useState(false);
   const [error, setError] = useState('');
   
   // Wizard States
@@ -236,25 +238,49 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   };
 
-  async function fetchPostsAndForms() {
-    setInitialFetching(true);
+  async function fetchPosts() {
+    setPostsLoading(true);
     try {
       const postsData = await getPosts();
-      const formsData = await getForms();
-      const jobsData = await getJobs();
       setPosts(postsData);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to connect to Google Workspace Apps Script Web App to load latest updates.');
+    } finally {
+      setPostsLoading(false);
+    }
+  }
+
+  async function fetchForms() {
+    setFormsLoading(true);
+    try {
+      const formsData = await getForms();
       setForms(formsData);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to connect to Google Workspace Apps Script Web App to load application forms.');
+    } finally {
+      setFormsLoading(false);
+    }
+  }
+
+  async function fetchJobs() {
+    setJobsLoading(true);
+    try {
+      const jobsData = await getJobs();
       setJobs(jobsData);
     } catch (err) {
       console.error(err);
-      setError('Failed to connect to Google Workspace Apps Script Web App. Please ensure your VITE_GOOGLE_SCRIPT_URL environment variable is configured correctly.');
+      setError('Failed to connect to Google Workspace Apps Script Web App to load job alerts.');
     } finally {
-      setInitialFetching(false);
+      setJobsLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchPostsAndForms();
+    fetchPosts();
+    fetchForms();
+    fetchJobs();
   }, []);
 
   useEffect(() => {
@@ -302,8 +328,27 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           if (parsedCustom && typeof parsedCustom === 'object') {
             const customFields = safeJsonParse(selectedForm.fields, []);
             customFields.forEach(f => {
-              if (parsedCustom[f.label] !== undefined) {
-                initialFields[f.id] = parsedCustom[f.label];
+              if (f.type === 'repeated') {
+                // Prefill count
+                if (parsedCustom[f.id] !== undefined) {
+                  initialFields[f.id] = parsedCustom[f.id];
+                } else if (parsedCustom[f.label] !== undefined) {
+                  initialFields[f.id] = parsedCustom[f.label];
+                }
+                // Prefill members
+                const count = parseInt(initialFields[f.id] || parsedCustom[f.id] || parsedCustom[f.label]) || 0;
+                for (let i = 1; i <= count; i++) {
+                  (f.subFields || []).forEach(sub => {
+                    const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
+                    if (parsedCustom[subFieldKey] !== undefined) {
+                      initialFields[subFieldKey] = parsedCustom[subFieldKey];
+                    }
+                  });
+                }
+              } else {
+                if (parsedCustom[f.label] !== undefined) {
+                  initialFields[f.id] = parsedCustom[f.label];
+                }
               }
             });
           }
@@ -675,8 +720,22 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         // Merge custom field responses from this submission
         const customFields = safeJsonParse(selectedForm.fields, []);
         customFields.forEach(f => {
-          if (formData[f.id] !== undefined) {
-            currentCustom[f.label] = formData[f.id];
+          if (f.type === 'repeated') {
+            currentCustom[f.id] = formData[f.id]; // Save the count
+            currentCustom[f.label] = formData[f.id]; // Also save with label as fallback
+            const count = parseInt(formData[f.id]) || 0;
+            for (let i = 1; i <= count; i++) {
+              (f.subFields || []).forEach(sub => {
+                const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
+                if (formData[subFieldKey] !== undefined) {
+                  currentCustom[subFieldKey] = formData[subFieldKey];
+                }
+              });
+            }
+          } else {
+            if (formData[f.id] !== undefined) {
+              currentCustom[f.label] = formData[f.id];
+            }
           }
         });
         
@@ -691,11 +750,23 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       }
 
       // Fetch latest profile state to sync document and custom URLs
+      const phoneVal = currentUser?.phone || formData.phone || '';
+      const dobVal = currentUser?.dob || formData.dob || '';
+      const aadharVal = currentUser?.aadhar || formData.aadhar || '';
+      
+      if (phoneVal && dobVal) {
+        try {
+          const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);
+          setUserApplications(freshApps);
+          setHasSearchedStatus(true);
+        } catch (e) {
+          console.error("Error refreshing applications list on submit:", e);
+        }
+      }
+
       if (currentUser) {
-        const query = await getUserStatus(currentUser.phone, currentUser.dob);
-        // Simply trigger a logout/login sequence or re-load the profile locally
+        // Simply reload the profile locally
         const latestProfile = await loginUser({ dob: currentUser.dob, phone: currentUser.phone }).catch(() => null);
-        
         if (latestProfile && latestProfile.id) {
           onUpdateProfile(latestProfile);
         }
@@ -820,10 +891,155 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     window.location.reload();
   };
 
+  const resumeApplicationDraft = (app) => {
+    const targetForm = forms.find(f => f.id === app.form_id);
+    if (!targetForm) {
+      alert("Form template for this draft is no longer available.");
+      return;
+    }
+    
+    const draftResponses = typeof app.responses === 'string' ? safeJsonParse(app.responses, {}) : (app.responses || {});
+    const newFormData = {};
+    
+    // 1. Map standard fields
+    const reqFieldsKeys = safeJsonParse(targetForm.required_fields, []);
+    reqFieldsKeys.forEach(fieldId => {
+      const label = STANDARD_FIELDS[fieldId]?.label || fieldId;
+      if (draftResponses[label] !== undefined) {
+        newFormData[fieldId] = draftResponses[label];
+      }
+    });
+    
+    // 2. Map custom fields
+    const customFields = safeJsonParse(targetForm.fields, []);
+    customFields.forEach(f => {
+      if (f.type === 'repeated') {
+        const countLabel = f.label || 'Count';
+        if (draftResponses[countLabel] !== undefined) {
+          newFormData[f.id] = draftResponses[countLabel];
+          const count = parseInt(draftResponses[countLabel]) || 0;
+          for (let i = 1; i <= count; i++) {
+            (f.subFields || []).forEach(sub => {
+              const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
+              const subLabel = `${f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} #${i} - ${sub.label}`;
+              if (draftResponses[subLabel] !== undefined) {
+                newFormData[subFieldKey] = draftResponses[subLabel];
+              }
+            });
+          }
+        }
+      } else {
+        if (draftResponses[f.label] !== undefined) {
+          newFormData[f.id] = draftResponses[f.label];
+        }
+      }
+    });
+    
+    // Load into wizard
+    setSelectedForm(targetForm);
+    setFormData(newFormData);
+    setWizardStep(2); // Go directly to Step 2 (Fill/Verify)
+    setSearchParams({ tab: 'apply' }); // Change to apply tab
+  };
+
+  const renderMintGreenLoader = (label = "LOADING...") => {
+    return (
+      <div 
+        className="premium-card text-center" 
+        style={{ 
+          padding: '48px 24px', 
+          gridColumn: 'span 2', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          gap: '16px',
+          width: '100%',
+          background: 'rgba(255, 255, 255, 0.7)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          border: '1px solid rgba(241, 245, 249, 0.8)',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02)'
+        }}
+      >
+        <div style={{ 
+          position: 'relative', 
+          width: '64px', 
+          height: '64px', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center' 
+        }}>
+          <div style={{
+            position: 'absolute',
+            width: '56px',
+            height: '56px',
+            border: '4.5px solid rgba(16, 185, 129, 0.12)',
+            borderRadius: '50%'
+          }}></div>
+          <div style={{
+            position: 'absolute',
+            width: '56px',
+            height: '56px',
+            border: '4.5px solid transparent',
+            borderTopColor: '#10b981',
+            borderRadius: '50%',
+            animation: 'spin-clockwise 0.8s linear infinite'
+          }}></div>
+        </div>
+        
+        <div style={{ textAlign: 'center', marginTop: '4px' }}>
+          <p style={{
+            margin: 0,
+            fontSize: '1rem',
+            fontWeight: '900',
+            color: '#10b981',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            fontFamily: 'system-ui, sans-serif'
+          }}>{label}</p>
+          <p style={{
+            margin: '4px 0 0 0',
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            color: '#10b981',
+            opacity: 0.8,
+            letterSpacing: '0.02em'
+          }}>pls wait.</p>
+        </div>
+      </div>
+    );
+  };
+
   // --- CATEGORIES HELPER ---
   const filteredForms = selectedCategory === 'all'
     ? forms
     : forms.filter(f => f.category.toLowerCase() === selectedCategory.toLowerCase());
+
+  const serverConfig = (() => {
+    try {
+      const saved = localStorage.getItem('whatsbro_server_config');
+      return saved ? JSON.parse(saved) : { active: true, message: 'Server issues, so pls wait...' };
+    } catch(e) {
+      return { active: true, message: 'Server issues, so pls wait...' };
+    }
+  })();
+
+  if (!serverConfig.active) {
+    return (
+      <div style={{ padding: '24px 16px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="premium-card text-center" style={{ borderTop: '6px solid #ef4444', maxWidth: '400px', width: '100%', padding: '32px 24px', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.1)' }}>
+          <AlertCircle size={48} style={{ color: '#ef4444', margin: '0 auto 16px auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
+          <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', marginBottom: '8px' }}>server issues ,so pls wait...</h3>
+          <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px', marginTop: '12px' }}>
+            <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, fontWeight: '600', lineHeight: '1.5' }}>
+              {serverConfig.message || 'The system is undergoing routine upgrades. Please check back later.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -838,17 +1054,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {/* --- TAB 1: HOME POSTS --- */}
         {activeTab === 'home' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
-            {initialFetching ? (
-              <div className="premium-card text-center" style={{ padding: '45px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                <div style={{ position: 'relative', width: '42px', height: '42px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <div style={{ position: 'absolute', width: '40px', height: '40px', border: '3.5px solid transparent', borderTopColor: '#10b981', borderBottomColor: '#10b981', borderRadius: '50%', animation: 'spin-clockwise 1.2s cubic-bezier(0.53, 0.21, 0.29, 0.83) infinite' }}></div>
-                  <div style={{ position: 'absolute', width: '28px', height: '28px', border: '2.5px solid transparent', borderLeftColor: '#6366f1', borderRightColor: '#6366f1', borderRadius: '50%', animation: 'spin-counter-clockwise 1s linear infinite' }}></div>
-                  <div style={{ width: '14px', height: '14px', backgroundColor: '#10b981', borderRadius: '50%', animation: 'core-pulse 2s ease-in-out infinite' }}></div>
-                </div>
-                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Loading latest updates...</p>
-              </div>
+            {postsLoading ? (
+              renderMintGreenLoader("LOADING...")
             ) : posts.length === 0 ? (
-              <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
+              <div className="premium-card text-center" style={{ padding: '40px 20px', gridColumn: 'span 2' }}>
                 <p className="text-muted">No services published yet.</p>
               </div>
             ) : (
@@ -899,17 +1108,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {/* --- TAB 1B: JOB ALERTS --- */}
         {activeTab === 'jobs' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
-            {initialFetching ? (
-              <div className="premium-card text-center" style={{ padding: '45px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                <div style={{ position: 'relative', width: '42px', height: '42px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <div style={{ position: 'absolute', width: '40px', height: '40px', border: '3.5px solid transparent', borderTopColor: '#10b981', borderBottomColor: '#10b981', borderRadius: '50%', animation: 'spin-clockwise 1.2s cubic-bezier(0.53, 0.21, 0.29, 0.83) infinite' }}></div>
-                  <div style={{ position: 'absolute', width: '28px', height: '28px', border: '2.5px solid transparent', borderLeftColor: '#6366f1', borderRightColor: '#6366f1', borderRadius: '50%', animation: 'spin-counter-clockwise 1s linear infinite' }}></div>
-                  <div style={{ width: '14px', height: '14px', backgroundColor: '#10b981', borderRadius: '50%', animation: 'core-pulse 2s ease-in-out infinite' }}></div>
-                </div>
-                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Loading active job alerts...</p>
-              </div>
+            {jobsLoading ? (
+              renderMintGreenLoader("LOADING...")
             ) : jobs.length === 0 ? (
-              <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
+              <div className="premium-card text-center" style={{ padding: '40px 20px', gridColumn: 'span 2' }}>
                 <p className="text-muted">No job alerts published yet.</p>
               </div>
             ) : (
@@ -974,15 +1176,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   <option value="others">Others</option>
                 </select>
  
-                {initialFetching ? (
-                  <div className="premium-card text-center" style={{ padding: '45px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ position: 'relative', width: '42px', height: '42px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                      <div style={{ position: 'absolute', width: '40px', height: '40px', border: '3.5px solid transparent', borderTopColor: '#10b981', borderBottomColor: '#10b981', borderRadius: '50%', animation: 'spin-clockwise 1.2s cubic-bezier(0.53, 0.21, 0.29, 0.83) infinite' }}></div>
-                      <div style={{ position: 'absolute', width: '28px', height: '28px', border: '2.5px solid transparent', borderLeftColor: '#6366f1', borderRightColor: '#6366f1', borderRadius: '50%', animation: 'spin-counter-clockwise 1s linear infinite' }}></div>
-                      <div style={{ width: '14px', height: '14px', backgroundColor: '#10b981', borderRadius: '50%', animation: 'core-pulse 2s ease-in-out infinite' }}></div>
-                    </div>
-                    <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Loading available application forms...</p>
-                  </div>
+                {formsLoading ? (
+                  renderMintGreenLoader("LOADING...")
                 ) : filteredForms.length === 0 ? (
                   <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
                     <p className="text-muted">No form templates found in this category.</p>
@@ -1499,6 +1694,21 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               responsesPack,
                               "draft"
                             );
+                            
+                            // Synchronize status list immediately in-memory
+                            const phoneVal = formData.phone || currentUser?.phone || '';
+                            const dobVal = formData.dob || currentUser?.dob || '';
+                            const aadharVal = formData.aadhar || currentUser?.aadhar || '';
+                            if (phoneVal && dobVal) {
+                              try {
+                                const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);
+                                setUserApplications(freshApps);
+                                setHasSearchedStatus(true);
+                              } catch (e) {
+                                console.error("Error refreshing applications list on draft save:", e);
+                              }
+                            }
+                            
                             alert('Draft saved successfully! You can search/resume your draft using your phone/aadhar in the status tab.');
                           } catch (err) {
                             console.error(err);
@@ -2060,6 +2270,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           {app.payment_status === 'rejected' ? (
                             <span className="badge badge-danger" style={{ backgroundColor: '#ef4444' }}>Rejected</span>
+                          ) : app.payment_status === 'draft' ? (
+                            <span className="badge" style={{ backgroundColor: '#64748b', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>Draft</span>
                           ) : app.uploaded_pdf_url ? (
                             <span className="badge badge-success" style={{ backgroundColor: '#10b981' }}>Received</span>
                           ) : app.info_request_label && !app.info_request_response ? (
@@ -2470,6 +2682,43 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           </div>
                         );
                       })()}
+
+                      {/* Resume Application for Drafts */}
+                      {app.payment_status === 'draft' && (
+                        <div style={{ 
+                          background: '#f8fafc', 
+                          border: '1.5px solid #e2e8f0', 
+                          borderRadius: '12px', 
+                          padding: '16px', 
+                          margin: '16px 0 0 0',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}>
+                          <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0, fontWeight: '600', lineHeight: '1.4' }}>
+                            This application has been saved as a draft. You can resume filling out the form and submit it when ready.
+                          </p>
+                          <button
+                            onClick={() => resumeApplicationDraft(app)}
+                            className="premium-btn premium-btn-success"
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              gap: '8px', 
+                              padding: '10px 16px', 
+                              width: '100%', 
+                              fontSize: '0.8rem', 
+                              fontWeight: '800',
+                              borderRadius: '8px',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Resume Application <ChevronRight size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}

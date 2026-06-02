@@ -214,7 +214,7 @@ export const submitFormResponse = async (formId, phone, dob, aadhar, responses, 
     dob,
     aadhar,
     responses,
-    payment_status: "unpaid",
+    payment_status: status === "draft" ? "draft" : "unpaid",
     progress_percent: 10,
     progress_desc: status === "draft" 
       ? "Application saved as Draft. Fill remaining details and submit when ready."
