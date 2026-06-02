@@ -53,6 +53,7 @@ function PortalLayout() {
   const handleLogout = () => {
     localStorage.removeItem('whatsbro_user');
     setCurrentUser(null);
+    window.location.replace('/user');
   };
 
   const handleUpdateProfile = (updatedUser) => {

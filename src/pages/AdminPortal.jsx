@@ -437,6 +437,9 @@ export default function AdminPortal() {
       fieldsCopy[index][key] = val.split(',').map(o => o.trim()).filter(Boolean);
     } else {
       fieldsCopy[index][key] = val;
+      if (key === 'type' && val === 'repeated') {
+        fieldsCopy[index].subFields = fieldsCopy[index].subFields || [];
+      }
     }
     setFormBuilder({ ...formBuilder, fields: fieldsCopy });
   };
@@ -675,10 +678,14 @@ export default function AdminPortal() {
     }
   };
 
-  // Filters users based on Search Term (Aadhaar or Phone matches)
-  const filteredUsers = users.filter(u => 
-    u.phone.includes(userSearchTerm) || u.aadhar.includes(userSearchTerm)
-  );
+  // Filters users based on Search Term (Aadhaar, Phone, or Name matches) and sorts by last_active descending
+  const filteredUsers = users
+    .filter(u => 
+      u.phone.includes(userSearchTerm) || 
+      u.aadhar.includes(userSearchTerm) ||
+      (u.name && u.name.toLowerCase().includes(userSearchTerm.toLowerCase()))
+    )
+    .sort((a, b) => new Date(b.last_active) - new Date(a.last_active));
 
   if (!isAdminLoggedIn) {
     return (
@@ -1440,6 +1447,7 @@ export default function AdminPortal() {
                             <option value="tel">Phone/Mobile Input</option>
                             <option value="checkbox">Multiple Checkbox Options</option>
                             <option value="radio">Radio Button Selection</option>
+                            <option value="repeated">Repeated Dynamic Inputs (0-8 Loop)</option>
                           </select>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-end', height: '36px' }}>
@@ -1464,6 +1472,94 @@ export default function AdminPortal() {
                             className="premium-input"
                             style={{ padding: '8px' }}
                           />
+                        </div>
+                      )}
+
+                      {field.type === 'repeated' && (
+                        <div style={{ marginTop: '10px', padding: '12px', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Configure Sub-Fields (0-8 Loop)</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = [...formBuilder.fields];
+                                const sub = list[idx].subFields || [];
+                                list[idx].subFields = [...sub, { id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`, label: '', type: 'text', required: true, options: [] }];
+                                setFormBuilder({ ...formBuilder, fields: list });
+                              }}
+                              className="premium-btn premium-btn-success"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem', width: 'auto' }}
+                            >
+                              + Add Sub-Field
+                            </button>
+                          </div>
+                          {(!field.subFields || field.subFields.length === 0) ? (
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, fontStyle: 'italic' }}>No sub-fields added yet. Click "+ Add Sub-Field" to create fields to repeat.</p>
+                          ) : (
+                            field.subFields.map((subField, sIdx) => (
+                              <div key={subField.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', background: '#ffffff', borderRadius: '6px', border: '1px solid #cbd5e1', marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--primary)' }}>Sub-Field #{sIdx + 1}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields = list[idx].subFields.filter((_, i) => i !== sIdx);
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Sub-Field Label (e.g. Member Name)"
+                                    value={subField.label}
+                                    onChange={(e) => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields[sIdx].label = e.target.value;
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    className="premium-input"
+                                    style={{ padding: '6px', fontSize: '0.75rem', flex: 2 }}
+                                    required
+                                  />
+                                  <select
+                                    value={subField.type}
+                                    onChange={(e) => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields[sIdx].type = e.target.value;
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    className="premium-input"
+                                    style={{ padding: '6px', fontSize: '0.75rem', flex: 1.5 }}
+                                  >
+                                    <option value="text">Text Input</option>
+                                    <option value="number">Number Box</option>
+                                    <option value="date">Date picker</option>
+                                    <option value="select">Dropdown Select</option>
+                                  </select>
+                                </div>
+                                {subField.type === 'select' && (
+                                  <input
+                                    type="text"
+                                    placeholder="Options (comma-separated)"
+                                    value={subField.options ? subField.options.join(', ') : ''}
+                                    onChange={(e) => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields[sIdx].options = e.target.value.split(',').map(x => x.trim()).filter(Boolean);
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    className="premium-input"
+                                    style={{ padding: '6px', fontSize: '0.75rem' }}
+                                    required
+                                  />
+                                )}
+                              </div>
+                            ))
+                          )}
                         </div>
                       )}
                     </div>
@@ -1551,6 +1647,7 @@ export default function AdminPortal() {
 
                 <div style={{ border: '1px solid var(--border-light)', borderRadius: '10px', overflow: 'hidden' }}>
                   <div className="admin-table-header" style={{ display: 'flex', background: '#f1f5f9', padding: '10px 16px', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-light-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                    <span style={{ flex: 1.5 }}>USER NAME</span>
                     <span style={{ flex: 2 }}>AADHAAR CARD NO</span>
                     <span style={{ flex: 1.5 }}>PHONE NUMBER</span>
                     <span style={{ flex: 1.5 }}>DATE OF BIRTH</span>
@@ -1565,7 +1662,10 @@ export default function AdminPortal() {
                   ) : (
                     filteredUsers.map((user) => (
                       <div key={user.aadhar} className="admin-user-row" style={{ fontSize: '0.85rem' }}>
-                        <span style={{ flex: 2, fontWeight: 700 }}>
+                        <span style={{ flex: 1.5, fontWeight: 700, color: 'var(--primary)' }}>
+                          {user.name || 'Citizen User'}
+                        </span>
+                        <span style={{ flex: 2, fontWeight: 600 }}>
                           {user.aadhar.replace(/(\d{4})/g, '$1 ').trim()}
                         </span>
                         <span style={{ flex: 1.5, color: '#475569' }}>{user.phone}</span>
@@ -1647,7 +1747,7 @@ export default function AdminPortal() {
                         <Download size={10} /> Export to CSV
                       </button>
                     </div>
-                    {userSubmissions.map((sub) => {
+                    {[...userSubmissions].sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)).map((sub) => {
                       const associatedFormName = forms.find(f => f.id === sub.form_id)?.title || 'Custom Application';
                       const isDone = parseInt(sub.progress_percent) === 100;
                       const isSelected = activeSubmission?.id === sub.id;

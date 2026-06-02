@@ -577,15 +577,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       // 1. Package response answers (split standard fields and custom fields)
       const reqFieldsKeys = safeJsonParse(selectedForm.required_fields, []);
       const customFields = safeJsonParse(selectedForm.fields, []);
-      
       const responsesPack = {};
       
-      // Save responses for both standard selected fields and custom questions
       reqFieldsKeys.forEach(fieldId => {
         responsesPack[STANDARD_FIELDS[fieldId]?.label || fieldId] = formData[fieldId] || '';
       });
+      
       customFields.forEach(f => {
-        responsesPack[f.label] = formData[f.id] || '';
+        if (f.type === 'repeated') {
+          const count = parseInt(formData[f.id]) || 0;
+          responsesPack[f.label || 'Count'] = count;
+          for (let i = 1; i <= count; i++) {
+            (f.subFields || []).forEach(sub => {
+              const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
+              const subLabel = `${f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} #${i} - ${sub.label}`;
+              responsesPack[subLabel] = formData[subFieldKey] || '';
+            });
+          }
+        } else {
+          responsesPack[f.label] = formData[f.id] || '';
+        }
       });
 
       // 2. Prepare pre-existing documents payload to avoid duplicate uploads
@@ -779,19 +790,20 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     const tn = encodeURIComponent(`TN_sevai_Pay_${submissionId}`);
     const tr = `TN_sevai_Pay_${submissionId}`;
     
-    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    // Direct Google Pay deep link using tez:// (native protocol for Google Pay Tez in India)
+    const payUrl = `tez://upi/pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
     
-    let payUrl = `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
-    
-    if (/android/i.test(userAgent)) {
-      // Android: Google Pay deep link via Chrome Intent
-      payUrl = `intent://pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
-    } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-      // iOS: Google Pay deep link via custom scheme
-      payUrl = `gpay://upi/pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
-    }
-    
+    // Attempt to open Google Pay directly
     window.location.href = payUrl;
+    
+    // Smart Fallback: If Google Pay is not installed, the browser remains in focus.
+    // After 1.5 seconds, we fall back to the generic upi:// scheme to trigger the system's
+    // UPI app chooser, completely avoiding any Google Play Store redirects!
+    setTimeout(() => {
+      if (document.hasFocus()) {
+        window.location.href = `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
+      }
+    }, 1500);
   };
 
   const printReceipt = () => {
@@ -827,9 +839,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {activeTab === 'home' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
             {initialFetching ? (
-              <div className="premium-card text-center" style={{ padding: '40px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid rgba(16, 185, 129, 0.15)', borderTop: '3px solid #10b981', borderRadius: '50%', animation: 'spin-anim 0.8s linear infinite' }}></div>
-                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading latest updates...</p>
+              <div className="premium-card text-center" style={{ padding: '45px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <div style={{ position: 'relative', width: '42px', height: '42px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div style={{ position: 'absolute', width: '40px', height: '40px', border: '3.5px solid transparent', borderTopColor: '#10b981', borderBottomColor: '#10b981', borderRadius: '50%', animation: 'spin-clockwise 1.2s cubic-bezier(0.53, 0.21, 0.29, 0.83) infinite' }}></div>
+                  <div style={{ position: 'absolute', width: '28px', height: '28px', border: '2.5px solid transparent', borderLeftColor: '#6366f1', borderRightColor: '#6366f1', borderRadius: '50%', animation: 'spin-counter-clockwise 1s linear infinite' }}></div>
+                  <div style={{ width: '14px', height: '14px', backgroundColor: '#10b981', borderRadius: '50%', animation: 'core-pulse 2s ease-in-out infinite' }}></div>
+                </div>
+                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Loading latest updates...</p>
               </div>
             ) : posts.length === 0 ? (
               <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
@@ -884,9 +900,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {activeTab === 'jobs' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
             {initialFetching ? (
-              <div className="premium-card text-center" style={{ padding: '40px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid rgba(16, 185, 129, 0.15)', borderTop: '3px solid #10b981', borderRadius: '50%', animation: 'spin-anim 0.8s linear infinite' }}></div>
-                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading active job alerts...</p>
+              <div className="premium-card text-center" style={{ padding: '45px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <div style={{ position: 'relative', width: '42px', height: '42px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div style={{ position: 'absolute', width: '40px', height: '40px', border: '3.5px solid transparent', borderTopColor: '#10b981', borderBottomColor: '#10b981', borderRadius: '50%', animation: 'spin-clockwise 1.2s cubic-bezier(0.53, 0.21, 0.29, 0.83) infinite' }}></div>
+                  <div style={{ position: 'absolute', width: '28px', height: '28px', border: '2.5px solid transparent', borderLeftColor: '#6366f1', borderRightColor: '#6366f1', borderRadius: '50%', animation: 'spin-counter-clockwise 1s linear infinite' }}></div>
+                  <div style={{ width: '14px', height: '14px', backgroundColor: '#10b981', borderRadius: '50%', animation: 'core-pulse 2s ease-in-out infinite' }}></div>
+                </div>
+                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Loading active job alerts...</p>
               </div>
             ) : jobs.length === 0 ? (
               <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
@@ -955,9 +975,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 </select>
  
                 {initialFetching ? (
-                  <div className="premium-card text-center" style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                    <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid rgba(16, 185, 129, 0.15)', borderTop: '3px solid #10b981', borderRadius: '50%', animation: 'spin-anim 0.8s linear infinite' }}></div>
-                    <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading available application forms...</p>
+                  <div className="premium-card text-center" style={{ padding: '45px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ position: 'relative', width: '42px', height: '42px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ position: 'absolute', width: '40px', height: '40px', border: '3.5px solid transparent', borderTopColor: '#10b981', borderBottomColor: '#10b981', borderRadius: '50%', animation: 'spin-clockwise 1.2s cubic-bezier(0.53, 0.21, 0.29, 0.83) infinite' }}></div>
+                      <div style={{ position: 'absolute', width: '28px', height: '28px', border: '2.5px solid transparent', borderLeftColor: '#6366f1', borderRightColor: '#6366f1', borderRadius: '50%', animation: 'spin-counter-clockwise 1s linear infinite' }}></div>
+                      <div style={{ width: '14px', height: '14px', backgroundColor: '#10b981', borderRadius: '50%', animation: 'core-pulse 2s ease-in-out infinite' }}></div>
+                    </div>
+                    <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Loading available application forms...</p>
                   </div>
                 ) : filteredForms.length === 0 ? (
                   <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
@@ -1204,79 +1228,155 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       })()}
 
                       {/* Render custom input fields added by Admin */}
-                      {safeJsonParse(selectedForm.fields, []).map(f => (
-                        <div key={f.id} className="premium-input-group">
-                          <label className="premium-label">{f.label} {f.required && <span style={{ color: 'var(--error)' }}>*</span>}</label>
-                          {f.type === 'textarea' ? (
-                            <textarea
-                              value={formData[f.id] || ''}
-                              onChange={(e) => handleFieldChange(f.id, e.target.value)}
-                              rows={3}
-                              className="premium-input"
-                              placeholder="Enter details..."
-                              required={f.required}
-                            />
-                          ) : f.type === 'select' ? (
-                            <select
-                              value={formData[f.id] || ''}
-                              onChange={(e) => handleFieldChange(f.id, e.target.value)}
-                              className="premium-input"
-                              required={f.required}
-                            >
-                              <option value="">-- Choose option --</option>
-                              {f.options && f.options.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          ) : f.type === 'checkbox' ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                              {f.options && f.options.map(opt => {
-                                const currentVals = Array.isArray(formData[f.id]) ? formData[f.id] : (formData[f.id] ? formData[f.id].split(', ') : []);
-                                const isChecked = currentVals.includes(opt);
+                      {safeJsonParse(selectedForm.fields, []).map(f => {
+                        if (f.type === 'repeated') {
+                          const countValue = parseInt(formData[f.id]) || 0;
+                          
+                          return (
+                            <div key={f.id} style={{ padding: '16px', background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '12px', marginBottom: '16px' }}>
+                              <div className="premium-input-group" style={{ marginBottom: '12px' }}>
+                                <label className="premium-label" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
+                                  {f.label || 'Family Members Count'} (0-8) {f.required && <span style={{ color: 'var(--error)' }}>*</span>}
+                                </label>
+                                <select
+                                  value={formData[f.id] || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handleFieldChange(f.id, val);
+                                  }}
+                                  className="premium-input"
+                                  required={f.required}
+                                >
+                                  <option value="">-- Select Count (0-8) --</option>
+                                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                                    <option key={num} value={num}>{num}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {countValue > 0 && Array.from({ length: countValue }, (_, index) => {
+                                const i = index + 1;
                                 return (
-                                  <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', color: '#1e293b' }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={(e) => {
-                                        const nextVals = e.target.checked
-                                          ? [...currentVals, opt]
-                                          : currentVals.filter(v => v !== opt);
-                                        handleFieldChange(f.id, nextVals.join(', '));
-                                      }}
-                                    />
-                                    <span>{opt}</span>
-                                  </label>
+                                  <div key={i} style={{ marginTop: '14px', padding: '12px', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '8px' }}>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary)', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
+                                      #{i} {f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} Details
+                                    </div>
+                                    
+                                    {(f.subFields || []).map(sub => {
+                                      const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
+                                      return (
+                                        <div key={sub.id} className="premium-input-group" style={{ marginBottom: '10px' }}>
+                                          <label className="premium-label" style={{ fontSize: '0.75rem' }}>
+                                            {sub.label} <span style={{ color: 'var(--error)' }}>*</span>
+                                          </label>
+                                          {sub.type === 'select' ? (
+                                            <select
+                                              value={formData[subFieldKey] || ''}
+                                              onChange={(e) => handleFieldChange(subFieldKey, e.target.value)}
+                                              className="premium-input"
+                                              style={{ padding: '8px', fontSize: '0.85rem' }}
+                                              required={true}
+                                            >
+                                              <option value="">-- Choose option --</option>
+                                              {sub.options && sub.options.map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            <input
+                                              type={sub.type}
+                                              value={formData[subFieldKey] || ''}
+                                              onChange={(e) => handleFieldChange(subFieldKey, e.target.value)}
+                                              className="premium-input"
+                                              style={{ padding: '8px', fontSize: '0.85rem' }}
+                                              placeholder={`Enter ${sub.label.toLowerCase()}`}
+                                              required={true}
+                                            />
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 );
                               })}
                             </div>
-                          ) : f.type === 'radio' ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                              {f.options && f.options.map(opt => (
-                                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', color: '#1e293b' }}>
-                                  <input
-                                    type="radio"
-                                    name={`custom-radio-${f.id}`}
-                                    checked={formData[f.id] === opt}
-                                    onChange={() => handleFieldChange(f.id, opt)}
-                                    required={f.required}
-                                  />
-                                  <span>{opt}</span>
-                                </label>
-                              ))}
-                            </div>
-                          ) : (
-                            <input
-                              type={f.type}
-                              value={formData[f.id] || ''}
-                              onChange={(e) => handleFieldChange(f.id, e.target.value)}
-                              className="premium-input"
-                              placeholder="Type answer..."
-                              required={f.required}
-                            />
-                          )}
-                        </div>
-                      ))}
+                          );
+                        }
+
+                        return (
+                          <div key={f.id} className="premium-input-group">
+                            <label className="premium-label">{f.label} {f.required && <span style={{ color: 'var(--error)' }}>*</span>}</label>
+                            {f.type === 'textarea' ? (
+                              <textarea
+                                value={formData[f.id] || ''}
+                                onChange={(e) => handleFieldChange(f.id, e.target.value)}
+                                rows={3}
+                                className="premium-input"
+                                placeholder="Enter details..."
+                                required={f.required}
+                              />
+                            ) : f.type === 'select' ? (
+                              <select
+                                value={formData[f.id] || ''}
+                                onChange={(e) => handleFieldChange(f.id, e.target.value)}
+                                className="premium-input"
+                                required={f.required}
+                              >
+                                <option value="">-- Choose option --</option>
+                                {f.options && f.options.map(opt => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            ) : f.type === 'checkbox' ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                {f.options && f.options.map(opt => {
+                                  const currentVals = Array.isArray(formData[f.id]) ? formData[f.id] : (formData[f.id] ? formData[f.id].split(', ') : []);
+                                  const isChecked = currentVals.includes(opt);
+                                  return (
+                                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', color: '#1e293b' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          const nextVals = e.target.checked
+                                            ? [...currentVals, opt]
+                                            : currentVals.filter(v => v !== opt);
+                                          handleFieldChange(f.id, nextVals.join(', '));
+                                        }}
+                                      />
+                                      <span>{opt}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : f.type === 'radio' ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                {f.options && f.options.map(opt => (
+                                  <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', color: '#1e293b' }}>
+                                    <input
+                                      type="radio"
+                                      name={`custom-radio-${f.id}`}
+                                      checked={formData[f.id] === opt}
+                                      onChange={() => handleFieldChange(f.id, opt)}
+                                      required={f.required}
+                                    />
+                                    <span>{opt}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <input
+                                type={f.type}
+                                value={formData[f.id] || ''}
+                                onChange={(e) => handleFieldChange(f.id, e.target.value)}
+                                className="premium-input"
+                                placeholder="Type answer..."
+                                required={f.required}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <button 
@@ -1300,22 +1400,54 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     <div className="premium-card" style={{ margin: '0 0 16px 0' }}>
                       <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px', marginBottom: '10px' }}>Application Information</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {/* Map and show filled form data */}
-                        {Object.entries(formData).map(([key, value]) => {
-                          let label = key;
-                          if (STANDARD_FIELDS[key]) {
-                            label = STANDARD_FIELDS[key].label;
-                          } else if (selectedForm.fields) {
-                            const dyn = safeJsonParse(selectedForm.fields, []).find(f => f.id === key);
-                            if (dyn) label = dyn.label;
-                          }
-                          return (
-                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                              <span className="text-muted">{label}:</span>
-                              <span style={{ fontWeight: 700, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{value || '—'}</span>
+                        {(() => {
+                          const reqFieldsKeys = safeJsonParse(selectedForm.required_fields, []);
+                          const customFields = safeJsonParse(selectedForm.fields, []);
+                          const previewItems = [];
+                          
+                          reqFieldsKeys.forEach(fieldId => {
+                            previewItems.push({
+                              key: fieldId,
+                              label: STANDARD_FIELDS[fieldId]?.label || fieldId,
+                              value: formData[fieldId] || '—'
+                            });
+                          });
+                          
+                          customFields.forEach(f => {
+                            if (f.type === 'repeated') {
+                              const count = parseInt(formData[f.id]) || 0;
+                              previewItems.push({
+                                key: f.id,
+                                label: f.label || 'Count',
+                                value: count
+                              });
+                              for (let i = 1; i <= count; i++) {
+                                (f.subFields || []).forEach(sub => {
+                                  const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
+                                  const subLabel = `${f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} #${i} - ${sub.label}`;
+                                  previewItems.push({
+                                    key: subFieldKey,
+                                    label: subLabel,
+                                    value: formData[subFieldKey] || '—'
+                                  });
+                                });
+                              }
+                            } else {
+                              previewItems.push({
+                                key: f.id,
+                                label: f.label,
+                                value: formData[f.id] || '—'
+                              });
+                            }
+                          });
+                          
+                          return previewItems.map(item => (
+                            <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
+                              <span className="text-muted">{item.label}:</span>
+                              <span style={{ fontWeight: 700, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{item.value}</span>
                             </div>
-                          );
-                        })}
+                          ));
+                        })()}
                       </div>
                     </div>
 
@@ -1339,11 +1471,25 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             const reqFieldsKeys = safeJsonParse(selectedForm.required_fields, []);
                             const customFields = safeJsonParse(selectedForm.fields, []);
                             const responsesPack = {};
+                            
                             reqFieldsKeys.forEach(fieldId => {
                               responsesPack[STANDARD_FIELDS[fieldId]?.label || fieldId] = formData[fieldId] || '';
                             });
+                            
                             customFields.forEach(f => {
-                              responsesPack[f.label] = formData[f.id] || '';
+                              if (f.type === 'repeated') {
+                                const count = parseInt(formData[f.id]) || 0;
+                                responsesPack[f.label || 'Count'] = count;
+                                for (let i = 1; i <= count; i++) {
+                                  (f.subFields || []).forEach(sub => {
+                                    const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
+                                    const subLabel = `${f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} #${i} - ${sub.label}`;
+                                    responsesPack[subLabel] = formData[subFieldKey] || '';
+                                  });
+                                }
+                              } else {
+                                responsesPack[f.label] = formData[f.id] || '';
+                              }
                             });
                             await submitFormResponse(
                               selectedForm.id,
@@ -2441,45 +2587,95 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'transparent',
-          backdropFilter: 'none',
-          WebkitBackdropFilter: 'none',
+          backgroundColor: 'rgba(248, 250, 252, 0.8)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
           display: 'flex',
-          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 99999,
-          gap: '14px'
+          zIndex: 99999
         }}>
           <style>{`
-            @keyframes spin-anim {
+            @keyframes spin-clockwise {
               0% { transform: rotate(0deg); }
               100% { transform: rotate(360deg); }
             }
+            @keyframes spin-counter-clockwise {
+              0% { transform: rotate(360deg); }
+              100% { transform: rotate(0deg); }
+            }
+            @keyframes core-pulse {
+              0%, 100% { transform: scale(0.85); opacity: 0.5; box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
+              50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 28px rgba(16, 185, 129, 0.9); }
+            }
+            @keyframes float-card {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-6px); }
+            }
             @keyframes pulse-text {
-              0%, 100% { opacity: 0.6; }
-              50% { opacity: 1; }
+              0%, 100% { opacity: 0.6; transform: scale(0.98); }
+              50% { opacity: 1; transform: scale(1); }
             }
           `}</style>
           <div style={{
-            width: '48px',
-            height: '48px',
-            border: '4px solid rgba(16, 185, 129, 0.15)',
-            borderTop: '4px solid #10b981',
-            borderRadius: '50%',
-            animation: 'spin-anim 0.8s linear infinite',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)'
-          }}></div>
-          <span style={{
-            fontSize: '0.9rem',
-            fontWeight: '800',
-            color: '#10b981',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            animation: 'pulse-text 1.5s ease-in-out infinite'
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '24px',
+            padding: '40px 48px',
+            borderRadius: '24px',
+            background: 'rgba(255, 255, 255, 0.9)',
+            border: '1.5px solid rgba(255, 255, 255, 0.6)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8)',
+            animation: 'float-card 4s ease-in-out infinite',
+            width: '260px',
+            textAlign: 'center'
           }}>
-            {uploadProgress || 'Loading...'}
-          </span>
+            <div style={{ position: 'relative', width: '80px', height: '80px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{
+                position: 'absolute',
+                width: '74px',
+                height: '74px',
+                border: '4px solid transparent',
+                borderTopColor: '#10b981',
+                borderBottomColor: '#10b981',
+                borderRadius: '50%',
+                animation: 'spin-clockwise 1.2s cubic-bezier(0.53, 0.21, 0.29, 0.83) infinite'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                width: '54px',
+                height: '54px',
+                border: '3px solid transparent',
+                borderLeftColor: '#6366f1',
+                borderRightColor: '#6366f1',
+                borderRadius: '50%',
+                animation: 'spin-counter-clockwise 1s linear infinite'
+              }}></div>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                backgroundColor: '#10b981',
+                borderRadius: '50%',
+                animation: 'core-pulse 2s ease-in-out infinite'
+              }}></div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{
+                fontSize: '0.85rem',
+                fontWeight: '900',
+                color: '#10b981',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                animation: 'pulse-text 2s ease-in-out infinite'
+              }}>
+                {uploadProgress || 'Loading...'}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>
+                Please wait a moment
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
