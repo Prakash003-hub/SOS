@@ -1628,6 +1628,14 @@ export default function AdminPortal() {
                     </div>
                     {userSubmissions.map((sub) => {
                       const associatedFormName = forms.find(f => f.id === sub.form_id)?.title || 'Custom Application';
+                      const isDone = parseInt(sub.progress_percent) === 100;
+                      const isSelected = activeSubmission?.id === sub.id;
+                      
+                      const borderColor = isDone ? '#10b981' : '#ef4444';
+                      const background = isSelected 
+                        ? (isDone ? '#f0fdf4' : '#fef2f2') 
+                        : 'white';
+
                       return (
                         <div 
                           key={sub.id} 
@@ -1635,15 +1643,20 @@ export default function AdminPortal() {
                           className="premium-card" 
                           style={{ 
                             cursor: 'pointer', 
-                            borderLeft: activeSubmission?.id === sub.id ? '5px solid var(--primary)' : '1px solid rgba(0,0,0,0.06)',
-                            background: activeSubmission?.id === sub.id ? '#f1f5f9' : 'white',
-                            margin: '0 0 12px 0'
+                            borderLeft: isSelected ? `6px solid ${borderColor}` : `3px solid ${borderColor}`,
+                            borderColor: borderColor,
+                            background: background,
+                            margin: '0 0 12px 0',
+                            boxShadow: isSelected ? '0 4px 6px -1px rgba(0, 0, 0, 0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                            transition: 'all 0.2s ease-in-out'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)' }}>ID: {sub.id}</span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: isDone ? '#10b981' : '#ef4444' }}>ID: {sub.id}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {sub.uploaded_pdf_url ? (
+                              {sub.payment_status === 'rejected' ? (
+                                <span className="badge badge-danger" style={{ backgroundColor: '#ef4444' }}>Rejected</span>
+                              ) : sub.uploaded_pdf_url ? (
                                 <span className="badge badge-success" style={{ backgroundColor: '#10b981' }}>Received (Delivered)</span>
                               ) : sub.info_request_label && !sub.info_request_response ? (
                                 <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b' }}>Awaiting User Upload</span>
@@ -1957,6 +1970,7 @@ export default function AdminPortal() {
                           >
                             <option value="unpaid">Unpaid</option>
                             <option value="paid">Paid</option>
+                            <option value="rejected">Rejected</option>
                           </select>
                         </div>
 

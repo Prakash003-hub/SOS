@@ -129,6 +129,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   
   // Loading & error states
   const [loading, setLoading] = useState(false);
+  const [searchingStatus, setSearchingStatus] = useState(false);
   const [initialFetching, setInitialFetching] = useState(false);
   const [error, setError] = useState('');
   
@@ -698,7 +699,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       return;
     }
 
-    setLoading(true);
+    setSearchingStatus(true);
     try {
       const data = await getUserStatus(phoneVal, dobVal, aadharVal);
       setUserApplications(data);
@@ -707,7 +708,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       console.error(err);
       alert(err.message || 'No submissions found with these credentials.');
     } finally {
-      setLoading(false);
+      setSearchingStatus(false);
     }
   };
 
@@ -1829,16 +1830,30 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                 <button 
                   type="submit" 
-                  disabled={loading}
+                  disabled={searchingStatus}
                   className="premium-btn premium-btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
-                  {loading ? 'Searching...' : 'Enquire Status'}
+                  {searchingStatus ? (
+                    <>
+                      <div className="inner-spinner" style={{ width: '14px', height: '14px', border: '2px solid white', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                      Searching...
+                    </>
+                  ) : 'Enquire Status'}
                 </button>
               </form>
             )}
 
+            {/* Inline loader while searching status */}
+            {searchingStatus && (
+              <div className="premium-card text-center" style={{ padding: '40px 20px', marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid var(--primary)', borderTop: '3px solid transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                <p style={{ color: '#475569', fontSize: '0.85rem', fontWeight: '600', margin: 0 }}>Checking data from TN sevai database...</p>
+              </div>
+            )}
+
             {/* Results Board */}
-            {hasSearchedStatus && (
+            {!searchingStatus && hasSearchedStatus && (
               <div style={{ marginTop: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '12px' }}>
                   <h4 style={{ fontSize: '0.95rem', margin: 0, color: '#1e293b' }}>
@@ -1875,7 +1890,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           </span>
                         </div>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          {app.uploaded_pdf_url ? (
+                          {app.payment_status === 'rejected' ? (
+                            <span className="badge badge-danger" style={{ backgroundColor: '#ef4444' }}>Rejected</span>
+                          ) : app.uploaded_pdf_url ? (
                             <span className="badge badge-success" style={{ backgroundColor: '#10b981' }}>Received</span>
                           ) : app.info_request_label && !app.info_request_response ? (
                             <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b' }}>Awaiting Upload</span>
@@ -2126,75 +2143,30 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         </p>
                       </div>
 
-                      {/* Citizens Uploaded Documents List */}
-                      {app.uploaded_docs && (
-                        <div style={{ marginTop: '14px', borderTop: '1px dashed #cbd5e1', paddingTop: '14px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '8px' }}>
-                            Uploaded Application Documents:
-                          </span>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {(() => {
-                              try {
-                                const parsed = typeof app.uploaded_docs === 'string' ? JSON.parse(app.uploaded_docs) : app.uploaded_docs;
-                                if (!parsed || Object.keys(parsed).length === 0) return <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>No documents uploaded.</span>;
-                                return Object.entries(parsed).map(([docKey, urls]) => {
-                                  const urlList = Array.isArray(urls) ? urls : [urls];
-                                  return urlList.map((url, uIdx) => {
-                                    if (!url) return null;
-                                    const isPdf = checkIfPdf(url);
-                                    const docLabel = docKey.replace(/_/g, ' ').toUpperCase();
-                                    return (
-                                      <a 
-                                        key={`${docKey}-${uIdx}`}
-                                        href={getImageUrl(url)}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{ 
-                                          display: 'inline-flex', 
-                                          alignItems: 'center', 
-                                          gap: '6px', 
-                                          background: '#f1f5f9', 
-                                          border: '1px solid #e2e8f0', 
-                                          borderRadius: '6px', 
-                                          padding: '4px 8px', 
-                                          fontSize: '0.7rem', 
-                                          color: '#334155', 
-                                          textDecoration: 'none',
-                                          fontWeight: 'bold',
-                                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                        }}
-                                      >
-                                        {isPdf ? <FileText size={12} style={{ color: '#ef4444' }} /> : <Eye size={12} style={{ color: 'var(--primary)' }} />}
-                                        {docLabel} {urlList.length > 1 ? `#${uIdx + 1}` : ''}
-                                      </a>
-                                    );
-                                  });
-                                });
-                              } catch (e) {
-                                return <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>Error loading document attachments.</span>;
-                              }
-                            })()}
-                          </div>
-                        </div>
-                      )}
+
 
                       {/* Documents Received from Admin */}
-                      {(app.receipt_url || app.certificate_url || app.other_doc_url || app.uploaded_pdf_url) && (
-                        <div style={{ marginTop: '16px', padding: '14px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <h5 style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: 'bold', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <FileCheck size={16} style={{ color: '#16a34a' }} /> 📩 Received Documents from Administrator
-                          </h5>
-                          
-                          {/* List of files helper */}
-                          {(() => {
-                            const docs = [
-                              { key: 'receipt', title: 'Official Receipt', sub: 'Payment Receipt File', url: app.receipt_url },
-                              { key: 'certificate', title: 'Official Certificate', sub: 'Processed Outcome Certificate', url: app.certificate_url },
-                              { key: 'other', title: app.other_doc_name || 'Additional Document', sub: app.other_doc_name ? 'Official Custom Document' : 'Other uploaded attachment', url: app.other_doc_url },
-                              { key: 'legacy', title: 'Processed Final Document', sub: 'Legacy outcome document', url: app.uploaded_pdf_url }
-                            ].filter(d => !!d.url);
+                      {(() => {
+                        let docs = [
+                          { key: 'receipt', title: 'Official Receipt', sub: 'Payment Receipt File', url: app.receipt_url },
+                          { key: 'certificate', title: 'Official Certificate', sub: 'Processed Outcome Certificate', url: app.certificate_url },
+                          { key: 'other', title: app.other_doc_name || 'Additional Document', sub: app.other_doc_name ? 'Official Custom Document' : 'Other uploaded attachment', url: app.other_doc_url },
+                          { key: 'legacy', title: 'Processed Final Document', sub: 'Legacy outcome document', url: app.uploaded_pdf_url }
+                        ].filter(d => !!d.url);
 
-                            return docs.map(doc => {
+                        if (parseInt(app.progress_percent) === 100) {
+                          docs = docs.filter(d => d.key === 'certificate' || d.key === 'legacy');
+                        }
+
+                        if (docs.length === 0) return null;
+
+                        return (
+                          <div style={{ marginTop: '16px', padding: '14px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <h5 style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: 'bold', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <FileCheck size={16} style={{ color: '#16a34a' }} /> 📩 Received Documents from Administrator
+                            </h5>
+                            
+                            {docs.map(doc => {
                               const isPdf = checkIfPdf(doc.url);
                               return (
                                 <div key={doc.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'white', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
@@ -2242,10 +2214,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   </div>
                                 </div>
                               );
-                            });
-                          })()}
-                        </div>
-                      )}
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))
                 )}
