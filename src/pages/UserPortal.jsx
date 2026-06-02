@@ -129,6 +129,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   
   // Loading & error states
   const [loading, setLoading] = useState(false);
+  const [initialFetching, setInitialFetching] = useState(false);
   const [error, setError] = useState('');
   
   // Wizard States
@@ -213,7 +214,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   };
 
   async function fetchPostsAndForms() {
-    setLoading(true);
+    setInitialFetching(true);
     try {
       const postsData = await getPosts();
       const formsData = await getForms();
@@ -225,7 +226,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       console.error(err);
       setError('Failed to connect to Google Workspace Apps Script Web App. Please ensure your VITE_GOOGLE_SCRIPT_URL environment variable is configured correctly.');
     } finally {
-      setLoading(false);
+      setInitialFetching(false);
     }
   }
 
@@ -266,6 +267,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
             initialFields[fieldId] = currentUser[fieldId] || '';
           }
         });
+      }
+
+      // Prefill custom fields from user profile custom_fields
+      if (currentUser && currentUser.custom_fields) {
+        try {
+          const parsedCustom = typeof currentUser.custom_fields === 'string' 
+            ? JSON.parse(currentUser.custom_fields) 
+            : currentUser.custom_fields;
+          
+          if (parsedCustom && typeof parsedCustom === 'object') {
+            const customFields = safeJsonParse(selectedForm.fields, []);
+            customFields.forEach(f => {
+              if (parsedCustom[f.label] !== undefined) {
+                initialFields[f.id] = parsedCustom[f.label];
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing profile custom fields for autofill:", e);
+        }
       }
       
       setFormData(prev => ({ ...initialFields, ...prev }));
@@ -400,7 +421,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
         const registeredUser = await registerUser(regPayload);
         onUpdateProfile(registeredUser);
-        alert('Welcome! We have registered your details in WhatsBro so you can pre-fill forms easily in the future.');
+        alert('Welcome! We have registered your details in TN sevai so you can pre-fill forms easily in the future.');
       } else {
         // User is logged in: update profile with any inline corrections
         const updatePayload = {
@@ -604,7 +625,38 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         }
       }
 
-      // Fetch latest profile state to sync document URLs
+      // Save filled custom fields to user profile for future auto-filling
+      if (currentUser) {
+        let currentCustom = {};
+        if (currentUser.custom_fields) {
+          try {
+            currentCustom = typeof currentUser.custom_fields === 'string' 
+              ? JSON.parse(currentUser.custom_fields) 
+              : currentUser.custom_fields;
+          } catch(e) {
+            console.error("Error parsing user custom fields:", e);
+          }
+        }
+        
+        // Merge custom field responses from this submission
+        const customFields = safeJsonParse(selectedForm.fields, []);
+        customFields.forEach(f => {
+          if (formData[f.id] !== undefined) {
+            currentCustom[f.label] = formData[f.id];
+          }
+        });
+        
+        // Save back to user profile
+        try {
+          await updateUserProfile(currentUser.id, {
+            custom_fields: JSON.stringify(currentCustom)
+          });
+        } catch (err) {
+          console.error("Failed to sync custom fields to profile:", err);
+        }
+      }
+
+      // Fetch latest profile state to sync document and custom URLs
       if (currentUser) {
         const query = await getUserStatus(currentUser.phone, currentUser.dob);
         // Simply trigger a logout/login sequence or re-load the profile locally
@@ -698,11 +750,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   const handleUpiPay = (fee, submissionId) => {
     const pa = "9385497906@upi";
-    const pn = encodeURIComponent("WhatsBro TNService");
+    const pn = encodeURIComponent("TN sevai");
     const am = fee;
     const cu = "INR";
-    const tn = encodeURIComponent(`WhatsBro_Pay_${submissionId}`);
-    const tr = `WhatsBro_Pay_${submissionId}`;
+    const tn = encodeURIComponent(`TN_sevai_Pay_${submissionId}`);
+    const tr = `TN_sevai_Pay_${submissionId}`;
     
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
     
@@ -751,7 +803,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {/* --- TAB 1: HOME POSTS --- */}
         {activeTab === 'home' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
-            {posts.length === 0 ? (
+            {initialFetching ? (
+              <div className="premium-card text-center" style={{ padding: '40px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid rgba(16, 185, 129, 0.15)', borderTop: '3px solid #10b981', borderRadius: '50%', animation: 'spin-anim 0.8s linear infinite' }}></div>
+                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading latest updates...</p>
+              </div>
+            ) : posts.length === 0 ? (
               <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
                 <p className="text-muted">No services published yet.</p>
               </div>
@@ -803,7 +860,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {/* --- TAB 1B: JOB ALERTS --- */}
         {activeTab === 'jobs' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
-            {jobs.length === 0 ? (
+            {initialFetching ? (
+              <div className="premium-card text-center" style={{ padding: '40px 20px', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid rgba(16, 185, 129, 0.15)', borderTop: '3px solid #10b981', borderRadius: '50%', animation: 'spin-anim 0.8s linear infinite' }}></div>
+                <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading active job alerts...</p>
+              </div>
+            ) : jobs.length === 0 ? (
               <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
                 <p className="text-muted">No job alerts published yet.</p>
               </div>
@@ -869,7 +931,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   <option value="others">Others</option>
                 </select>
  
-                {filteredForms.length === 0 ? (
+                {initialFetching ? (
+                  <div className="premium-card text-center" style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid rgba(16, 185, 129, 0.15)', borderTop: '3px solid #10b981', borderRadius: '50%', animation: 'spin-anim 0.8s linear infinite' }}></div>
+                    <p className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading available application forms...</p>
+                  </div>
+                ) : filteredForms.length === 0 ? (
                   <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
                     <p className="text-muted">No form templates found in this category.</p>
                   </div>
@@ -1505,14 +1572,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     <div className="premium-card text-center" style={{ margin: '0 0 16px 0', borderBottom: '4px solid var(--success)' }}>
                       <CheckCircle size={44} style={{ color: 'var(--success)', margin: '0 auto 10px auto' }} />
                       <h3 style={{ fontSize: '1.2rem', marginBottom: '4px', color: '#1e293b' }}>Application Submitted!</h3>
-                      <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Your application has been stored securely in WhatsBro database.</p>
+                      <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Your application has been stored securely in TN sevai database.</p>
                     </div>
 
                     <div className="receipt-wrapper" id="receipt-downloadable-card" style={{ display: 'none' }}>
-                      <div className="receipt-watermark" style={{ opacity: 0.05, fontSize: '2.5rem', color: '#10b981' }}>WHATSBRO</div>
+                      <div className="receipt-watermark" style={{ opacity: 0.05, fontSize: '2.5rem', color: '#10b981' }}>TN SEVAI</div>
                       <div className="receipt-header" style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '12px', marginBottom: '16px' }}>
                         <h4 style={{ fontSize: '1.25rem', color: '#047857', margin: '0 0 6px 0', fontWeight: '900', textTransform: 'uppercase' }}>{selectedForm.title}</h4>
-                        <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: '700', display: 'block', marginBottom: '4px' }}>WHATSBRO TNSERVICE</span>
+                        <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: '700', display: 'block', marginBottom: '4px' }}>TN SEVAI E-SERVICE</span>
                         <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Official E-Governance Receipt</span>
                       </div>
                       
@@ -1553,7 +1620,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {/* Instant screenshot upload direct link in Receipt */}
                       {submissionResult.payment_status !== 'paid' && (() => {
                         const fee = selectedForm.fee || 0;
-                        const upiUrl = `upi://pay?pa=9385497906@upi&pn=WhatsBro%20TNService&am=${fee}&cu=INR&tn=WhatsBro_Pay_${submissionResult.id}`;
+                        const upiUrl = `upi://pay?pa=9385497906@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${submissionResult.id}`;
                         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
 
                         return (
@@ -1646,7 +1713,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       })()}
  
                       <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.7rem', color: '#94a3b8' }}>
-                        Thank you for using WhatsBro TNService! Save this receipt for status lookups.
+                        Thank you for using TN sevai! Save this receipt for status lookups.
                       </div>
                     </div>
 
@@ -1828,7 +1895,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {app.payment_status === 'unpaid' && (() => {
                         const formTemplate = forms.find(f => f.id === app.form_id);
                         const fee = formTemplate?.fee || 0;
-                        const upiUrl = `upi://pay?pa=9385497906@upi&pn=WhatsBro%20TNService&am=${fee}&cu=INR&tn=WhatsBro_Pay_${app.id}`;
+                        const upiUrl = `upi://pay?pa=9385497906@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${app.id}`;
                         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
 
                         return (
@@ -2059,6 +2126,58 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         </p>
                       </div>
 
+                      {/* Citizens Uploaded Documents List */}
+                      {app.uploaded_docs && (
+                        <div style={{ marginTop: '14px', borderTop: '1px dashed #cbd5e1', paddingTop: '14px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '8px' }}>
+                            Uploaded Application Documents:
+                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {(() => {
+                              try {
+                                const parsed = typeof app.uploaded_docs === 'string' ? JSON.parse(app.uploaded_docs) : app.uploaded_docs;
+                                if (!parsed || Object.keys(parsed).length === 0) return <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>No documents uploaded.</span>;
+                                return Object.entries(parsed).map(([docKey, urls]) => {
+                                  const urlList = Array.isArray(urls) ? urls : [urls];
+                                  return urlList.map((url, uIdx) => {
+                                    if (!url) return null;
+                                    const isPdf = checkIfPdf(url);
+                                    const docLabel = docKey.replace(/_/g, ' ').toUpperCase();
+                                    return (
+                                      <a 
+                                        key={`${docKey}-${uIdx}`}
+                                        href={getImageUrl(url)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ 
+                                          display: 'inline-flex', 
+                                          alignItems: 'center', 
+                                          gap: '6px', 
+                                          background: '#f1f5f9', 
+                                          border: '1px solid #e2e8f0', 
+                                          borderRadius: '6px', 
+                                          padding: '4px 8px', 
+                                          fontSize: '0.7rem', 
+                                          color: '#334155', 
+                                          textDecoration: 'none',
+                                          fontWeight: 'bold',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                        }}
+                                      >
+                                        {isPdf ? <FileText size={12} style={{ color: '#ef4444' }} /> : <Eye size={12} style={{ color: 'var(--primary)' }} />}
+                                        {docLabel} {urlList.length > 1 ? `#${uIdx + 1}` : ''}
+                                      </a>
+                                    );
+                                  });
+                                });
+                              } catch (e) {
+                                return <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>Error loading document attachments.</span>;
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Documents Received from Admin */}
                       {(app.receipt_url || app.certificate_url || app.other_doc_url || app.uploaded_pdf_url) && (
                         <div style={{ marginTop: '16px', padding: '14px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -2244,9 +2363,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.65)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          backgroundColor: 'transparent',
+          backdropFilter: 'none',
+          WebkitBackdropFilter: 'none',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -2281,7 +2400,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
             textTransform: 'uppercase',
             animation: 'pulse-text 1.5s ease-in-out infinite'
           }}>
-            Loading...
+            {uploadProgress || 'Loading...'}
           </span>
         </div>
       )}

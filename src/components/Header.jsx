@@ -11,8 +11,8 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
           style={{ width: '48px', height: '48px', objectFit: 'contain' }} 
         />
         <div>
-          <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>WhatsBro</div>
-          <div className="brand-subtitle" style={{ fontSize: '0.8rem' }}>TNService</div>
+          <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>TN sevai</div>
+          <div className="brand-subtitle" style={{ fontSize: '0.8rem' }}>E-Service Portal</div>
         </div>
       </div>
       

@@ -683,7 +683,7 @@ export default function AdminPortal() {
         }}>
           <div style={{ textAlign: 'center', marginBottom: '8px' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-light-main)', margin: 0 }}>
-              WhatsBro Admin Console
+              TN sevai Admin Console
             </h3>
             <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '6px', marginBottom: 0 }}>
               Access restricted to authorized portal administrators.
@@ -730,7 +730,7 @@ export default function AdminPortal() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#0f172a', color: 'white', borderRadius: '12px', margin: '16px 16px 0 16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>WhatsBro Admin Terminal</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>TN sevai Admin Terminal</span>
         </div>
         <button 
           onClick={handleAdminLogout}

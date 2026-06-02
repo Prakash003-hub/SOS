@@ -924,9 +924,10 @@ function initSpreadsheet() {
   ]);
   
   // 2. USERS PROFILE SHEET
-  ensureSheetExists("Users", [
-    "id", "name", "name_tamil", "dob", "phone", "aadhar", "gender", "marital_status", "father_name", "father_name_tamil", "mother_name", "mother_name_tamil", "community", "address", "religion", "state", "district", "taluk", "revenue_village", "street_name", "door_no", "pincode", "photo_url", "aadhar_url_1", "aadhar_url_2", "smart_card_url_1", "smart_card_url_2", "voter_id_url_1", "voter_id_url_2", "signature_url_1", "created_at"
+  var usersSheet = ensureSheetExists("Users", [
+    "id", "name", "name_tamil", "dob", "phone", "aadhar", "gender", "marital_status", "father_name", "father_name_tamil", "mother_name", "mother_name_tamil", "community", "address", "religion", "state", "district", "taluk", "revenue_village", "street_name", "door_no", "pincode", "photo_url", "aadhar_url_1", "aadhar_url_2", "smart_card_url_1", "smart_card_url_2", "voter_id_url_1", "voter_id_url_2", "signature_url_1", "custom_fields", "created_at"
   ]);
+  ensureColumnExists(usersSheet, "custom_fields");
   
   // 3. SUBMISSIONS SHEET
   var subSheet = ensureSheetExists("Submissions", [
