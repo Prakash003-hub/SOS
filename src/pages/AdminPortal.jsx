@@ -173,7 +173,7 @@ export default function AdminPortal() {
   
   // Job Editor states
   const [editingJobId, setEditingJobId] = useState(null);
-  const [jobForm, setJobForm] = useState({ title: '', description: '', img_url: '', apply_url: '' });
+  const [jobForm, setJobForm] = useState({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '' });
   const [uploadingJobImg, setUploadingJobImg] = useState(false);
   
   // Form Builder states
@@ -363,7 +363,7 @@ export default function AdminPortal() {
         await createJob(jobForm);
         alert('New job alert published successfully!');
       }
-      setJobForm({ title: '', description: '', img_url: '', apply_url: '' });
+      setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '' });
       setEditingJobId(null);
       const jobsData = await getJobs();
       setJobs(jobsData);
@@ -379,9 +379,10 @@ export default function AdminPortal() {
       title: job.title,
       description: job.description || '',
       img_url: job.img_url || '',
-      apply_url: job.apply_url || ''
+      apply_url: job.apply_url || '',
+      details_doc: job.details_doc || '',
+      button_name: job.button_name || ''
     });
-    // Scroll to editor form
     document.getElementById('job-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -1010,7 +1011,36 @@ export default function AdminPortal() {
                     className="premium-input" 
                   />
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
-                    Use local routes (e.g. `/user?tab=apply`) or full web links. <strong>Leave blank to hide the "Apply Now" button on this job.</strong>
+                    Use local routes (e.g. `/user?tab=apply`) or full web links. <strong>Leave blank to hide the button on this job.</strong>
+                  </span>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Custom Action Button Name (Optional)</label>
+                  <input 
+                    type="text" 
+                    value={jobForm.button_name} 
+                    onChange={(e) => setJobForm({ ...jobForm, button_name: e.target.value })} 
+                    placeholder="e.g. Apply Now, Register Online, View PDF"
+                    className="premium-input" 
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
+                    Defaults to "Apply Now" if left blank.
+                  </span>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Rich Document Details (Word-like Markdown Formatting)</label>
+                  <textarea 
+                    rows={8}
+                    value={jobForm.details_doc} 
+                    onChange={(e) => setJobForm({ ...jobForm, details_doc: e.target.value })} 
+                    placeholder="H1: Main Title&#10;H2: Sub-Heading&#10;H3: Paragraph Header&#10;--- (horizontal separator line)&#10;table:&#10;Header 1, Header 2, Header 3&#10;Row 1 Col 1, Row 1 Col 2, Row 1 Col 3"
+                    className="premium-input" 
+                    style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
+                    Enter headings using <strong>H1:</strong>, <strong>H2:</strong>, <strong>H3:</strong> prefixes. Use <strong>---</strong> for divider lines. Enter a table by typing <strong>table:</strong> followed by comma-separated lines.
                   </span>
                 </div>
 
@@ -1021,7 +1051,7 @@ export default function AdminPortal() {
                   {editingJobId && (
                     <button 
                       type="button" 
-                      onClick={() => { setEditingJobId(null); setJobForm({ title: '', description: '', img_url: '', apply_url: '' }) }} 
+                      onClick={() => { setEditingJobId(null); setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '' }) }} 
                       className="premium-btn premium-btn-secondary"
                       style={{ flex: 1 }}
                     >

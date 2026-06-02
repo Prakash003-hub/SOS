@@ -124,6 +124,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [posts, setPosts] = useState([]);
   const [forms, setForms] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [selectedJobDetails, setSelectedJobDetails] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'all');
   
   // Loading & error states
@@ -285,7 +286,22 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   };
 
-  const selectFormToFill = (form) => {
+  const selectFormToFill = async (form) => {
+    if (currentUser && currentUser.aadhar) {
+      setLoading(true);
+      try {
+        const userSubs = await getUserStatus(currentUser.phone, currentUser.dob, currentUser.aadhar);
+        if (Array.isArray(userSubs) && userSubs.some(s => s.form_id === form.id && s.payment_status !== 'draft')) {
+          alert(`You have already applied for the ${form.title}. You cannot apply more than once.`);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking pre-existing application:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
     setSelectedForm(form);
     setWizardStep(1);
     setFormData({});
@@ -496,9 +512,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
 
     setLoading(true);
-    setUploadProgress('Storing application data...');
+    setUploadProgress('Checking application status...');
 
     try {
+      // Check if already applied (Form ID + User Aadhar check)
+      const targetAadhar = formData.aadhar || currentUser?.aadhar || '';
+      const targetPhone = formData.phone || currentUser?.phone || '';
+      const targetDob = formData.dob || currentUser?.dob || '';
+      
+      if (targetAadhar) {
+        const userSubs = await getUserStatus(targetPhone, targetDob, targetAadhar);
+        if (Array.isArray(userSubs) && userSubs.some(s => s.form_id === selectedForm.id && s.payment_status !== 'draft')) {
+          alert(`You have already applied for this service (${selectedForm.title})! Multiple applications are not permitted.`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      setUploadProgress('Storing application data...');
       // 1. Package response answers (split standard fields and custom fields)
       const reqFieldsKeys = safeJsonParse(selectedForm.required_fields, []);
       const customFields = safeJsonParse(selectedForm.fields, []);
@@ -798,20 +829,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {job.description}
                     </p>
 
-                    {job.apply_url && job.apply_url.trim() !== '' && job.apply_url.trim().toLowerCase() !== 'none' && (
+                    {((job.apply_url && job.apply_url.trim() !== '' && job.apply_url.trim().toLowerCase() !== 'none') || (job.details_doc && job.details_doc.trim() !== '')) && (
                       <button 
-                        onClick={() => {
-                          if (job.apply_url.startsWith('/user')) {
-                            const urlParams = new URLSearchParams(job.apply_url.split('?')[1]);
-                            setSearchParams(urlParams);
-                          } else {
-                            window.open(job.apply_url, '_blank');
-                          }
-                        }}
+                        onClick={() => setSelectedJobDetails(job)}
                         className="premium-btn premium-btn-primary"
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', marginTop: '4px', width: '100%', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                       >
-                        Apply Now <ChevronRight size={18} />
+                        View Details & Apply <ChevronRight size={18} />
                       </button>
                     )}
                   </div>
@@ -2112,6 +2136,107 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         )}
       </div>
 
+      {/* Modal / Dialog for Job details */}
+      {selectedJobDetails && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div className="premium-card scroll-y" style={{ 
+            maxWidth: '650px', 
+            width: '100%', 
+            maxHeight: '90vh', 
+            padding: '24px', 
+            position: 'relative', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '16px', 
+            borderTop: '6px solid var(--primary)',
+            background: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            overflowY: 'auto'
+          }}>
+            
+            {/* Modal Close Button */}
+            <button 
+              onClick={() => setSelectedJobDetails(null)} 
+              className="premium-btn premium-btn-secondary" 
+              style={{ position: 'absolute', right: '16px', top: '16px', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, minWidth: 'auto' }}
+            >
+              ✕
+            </button>
+
+            {/* Modal Title */}
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0 24px 0 0', lineHeight: '1.3' }}>
+              {selectedJobDetails.title}
+            </h2>
+
+            {/* Modal Image */}
+            {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
+              <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', maxHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px 0' }}>
+                <img 
+                  src={getImageUrl(selectedJobDetails.img_url)} 
+                  style={{ width: '100%', maxHeight: '200px', objectFit: 'contain' }} 
+                  alt={selectedJobDetails.title} 
+                />
+              </div>
+            )}
+
+            {/* Modal Brief Description */}
+            <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: '1.6', margin: 0, paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              {selectedJobDetails.description}
+            </p>
+
+            {/* Modal Rich Document parsed layout */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {parseDetailsDoc(selectedJobDetails.details_doc)}
+            </div>
+
+            {/* Modal Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '16px' }}>
+              <button 
+                onClick={() => setSelectedJobDetails(null)} 
+                className="premium-btn premium-btn-secondary" 
+                style={{ flex: 1 }}
+              >
+                Close
+              </button>
+
+              {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' && (
+                <button 
+                  onClick={() => {
+                    const url = selectedJobDetails.apply_url;
+                    setSelectedJobDetails(null);
+                    if (url.startsWith('/user')) {
+                      const urlParams = new URLSearchParams(url.split('?')[1]);
+                      setSearchParams(urlParams);
+                    } else {
+                      window.open(url, '_blank');
+                    }
+                  }}
+                  className="premium-btn premium-btn-primary"
+                  style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  {selectedJobDetails.button_name || 'Apply Now'} <ChevronRight size={18} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading && (
         <div style={{
           position: 'fixed',
@@ -2164,3 +2289,114 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     </div>
   );
 }
+
+// --- HELPER: WORD-LIKE DOCUMENT CONTENT PARSER ---
+const parseDetailsDoc = (text) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const elements = [];
+  let inTable = false;
+  let tableHeaders = [];
+  let tableRows = [];
+  let tableKey = 0;
+
+  const renderTable = () => {
+    if (tableHeaders.length === 0 && tableRows.length === 0) return null;
+    const currentHeaders = [...tableHeaders];
+    const currentRows = [...tableRows];
+    const currentKey = `table-${tableKey++}`;
+    
+    // Reset table parser state
+    tableHeaders = [];
+    tableRows = [];
+    inTable = false;
+
+    return (
+      <div key={currentKey} className="table-responsive" style={{ margin: '14px 0', overflowX: 'auto', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+          {currentHeaders.length > 0 && (
+            <thead style={{ background: 'var(--primary)', color: 'white', fontWeight: 'bold' }}>
+              <tr>
+                {currentHeaders.map((h, i) => (
+                  <th key={i} style={{ padding: '8px 12px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>{h.trim()}</th>
+                ))}
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {currentRows.map((row, idx) => (
+              <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                {row.map((cell, cIdx) => (
+                  <td key={cIdx} style={{ padding: '8px 12px', color: '#475569' }}>{cell.trim()}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const rawLine = lines[idx];
+    const line = rawLine.trim();
+
+    // Check if we are inside a table and this line is a table row (contains commas or is part of table)
+    if (inTable) {
+      if (line === '' || line.startsWith('H1:') || line.startsWith('H2:') || line.startsWith('H3:') || line.startsWith('---') || line.startsWith('line')) {
+        // Close previous table
+        elements.push(renderTable());
+      } else {
+        const parts = rawLine.split(',');
+        if (tableHeaders.length === 0) {
+          tableHeaders = parts;
+        } else {
+          tableRows.push(parts);
+        }
+        continue;
+      }
+    }
+
+    if (line.startsWith('H1:')) {
+      elements.push(
+        <h4 key={idx} style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', margin: '16px 0 8px 0', borderBottom: '2.5px solid var(--primary)', paddingBottom: '4px' }}>
+          {line.substring(3).trim()}
+        </h4>
+      );
+    } else if (line.startsWith('H2:')) {
+      elements.push(
+        <h5 key={idx} style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', margin: '14px 0 6px 0' }}>
+          {line.substring(3).trim()}
+        </h5>
+      );
+    } else if (line.startsWith('H3:')) {
+      elements.push(
+        <h6 key={idx} style={{ fontSize: '0.95rem', fontWeight: '600', color: '#334155', margin: '12px 0 4px 0' }}>
+          {line.substring(3).trim()}
+        </h6>
+      );
+    } else if (line === '---' || line.startsWith('line')) {
+      elements.push(
+        <hr key={idx} style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.1)', margin: '14px 0' }} />
+      );
+    } else if (line === 'table:') {
+      inTable = true;
+      tableHeaders = [];
+      tableRows = [];
+    } else if (line !== '') {
+      // Normal paragraph text
+      elements.push(
+        <p key={idx} style={{ color: '#475569', fontSize: '0.85rem', lineHeight: '1.5', margin: '6px 0' }}>
+          {rawLine}
+        </p>
+      );
+    }
+  }
+
+  // If table is still open at the end of text
+  if (inTable) {
+    elements.push(renderTable());
+  }
+
+  return elements;
+};

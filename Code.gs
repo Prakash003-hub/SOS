@@ -279,6 +279,8 @@ function createJobAction(jobData) {
     description: jobData.description || "",
     img_url: jobData.img_url || "",
     apply_url: jobData.apply_url || "",
+    details_doc: jobData.details_doc || "",
+    button_name: jobData.button_name || "",
     created_at: new Date().toISOString()
   };
   
@@ -296,6 +298,8 @@ function updateJobAction(id, jobData) {
   existingRow.description = jobData.description !== undefined ? jobData.description : existingRow.description;
   existingRow.img_url = jobData.img_url !== undefined ? jobData.img_url : existingRow.img_url;
   existingRow.apply_url = jobData.apply_url !== undefined ? jobData.apply_url : existingRow.apply_url;
+  existingRow.details_doc = jobData.details_doc !== undefined ? jobData.details_doc : existingRow.details_doc;
+  existingRow.button_name = jobData.button_name !== undefined ? jobData.button_name : existingRow.button_name;
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -939,9 +943,11 @@ function initSpreadsheet() {
   ]);
 
   // 4B. JOBS FEED SHEET
-  ensureSheetExists("Jobs", [
-    "id", "title", "description", "img_url", "apply_url", "created_at"
+  var jobsSheet = ensureSheetExists("Jobs", [
+    "id", "title", "description", "img_url", "apply_url", "details_doc", "button_name", "created_at"
   ]);
+  ensureColumnExists(jobsSheet, "details_doc");
+  ensureColumnExists(jobsSheet, "button_name");
   
   // 5. SYSTEM ERROR/LOG SHEET
   ensureSheetExists("SystemLog", [
