@@ -4,7 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import UserPortal from './pages/UserPortal';
 import AdminPortal from './pages/AdminPortal';
-import { Home, FileText, CheckCircle, Plus, Users, X } from 'lucide-react';
+import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase } from 'lucide-react';
 import { registerUser, loginUser } from './services/db';
 
 function PortalLayout() {
@@ -43,8 +43,8 @@ function PortalLayout() {
   // Read active tab, default based on portal type with automatic bounds verification
   const rawTab = searchParams.get('tab');
   const activeTab = isAdmin
-    ? (['posts', 'forms', 'users'].includes(rawTab) ? rawTab : 'posts')
-    : (['home', 'apply', 'status'].includes(rawTab) ? rawTab : 'home');
+    ? (['posts', 'forms', 'users', 'jobs'].includes(rawTab) ? rawTab : 'posts')
+    : (['home', 'apply', 'status', 'jobs'].includes(rawTab) ? rawTab : 'home');
 
   const handleTabChange = (tabName) => {
     setSearchParams({ tab: tabName });
@@ -192,6 +192,13 @@ function PortalLayout() {
               <Users className="bottom-nav-icon" size={20} />
               <span>Submissions</span>
             </button>
+            <button 
+              onClick={() => handleTabChange('jobs')}
+              className={`bottom-nav-item ${activeTab === 'jobs' ? 'active' : ''}`}
+            >
+              <Briefcase className="bottom-nav-icon" size={20} />
+              <span>Jobs</span>
+            </button>
           </div>
         ) : (
           <div className="bottom-nav-bar">
@@ -215,6 +222,13 @@ function PortalLayout() {
             >
               <CheckCircle className="bottom-nav-icon" size={20} />
               <span>Status</span>
+            </button>
+            <button 
+              onClick={() => handleTabChange('jobs')}
+              className={`bottom-nav-item ${activeTab === 'jobs' ? 'active' : ''}`}
+            >
+              <Briefcase className="bottom-nav-icon" size={20} />
+              <span>Jobs</span>
             </button>
           </div>
         )}

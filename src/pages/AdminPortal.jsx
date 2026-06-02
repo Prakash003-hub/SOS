@@ -18,7 +18,12 @@ import {
   adminDeleteDoc,
   deleteSubmission,
   deleteUserAndSubmissions,
-  uploadPostImage
+  uploadPostImage,
+  getJobs,
+  createJob,
+  updateJob,
+  deleteJob,
+  uploadJobImage
 } from '../services/db';
 import { 
   Plus, 
@@ -40,7 +45,8 @@ import {
   Home,
   ArrowLeft,
   Download,
-  Copy
+  Copy,
+  Briefcase
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -164,6 +170,11 @@ export default function AdminPortal() {
   const [editingPostId, setEditingPostId] = useState(null);
   const [postForm, setPostForm] = useState({ title: '', description: '', img_url: '', apply_url: '' });
   
+  // Job Editor states
+  const [editingJobId, setEditingJobId] = useState(null);
+  const [jobForm, setJobForm] = useState({ title: '', description: '', img_url: '', apply_url: '' });
+  const [uploadingJobImg, setUploadingJobImg] = useState(false);
+  
   // Form Builder states
   const [editingFormId, setEditingFormId] = useState(null);
   const [formBuilder, setFormBuilder] = useState({
@@ -222,9 +233,11 @@ export default function AdminPortal() {
       const postsData = await getPosts();
       const formsData = await getForms();
       const usersData = await getUsersList();
+      const jobsData = await getJobs();
       setPosts(postsData);
       setForms(formsData);
       setUsers(usersData);
+      setJobs(jobsData);
     } catch (err) {
       console.error(err);
       alert('Failed to connect to Google Workspace Apps Script Web App. Please verify VITE_GOOGLE_SCRIPT_URL is configured in your .env file, or check your internet connection.');
@@ -241,6 +254,8 @@ export default function AdminPortal() {
     try {
       const usersData = await getUsersList();
       setUsers(usersData);
+      const jobsData = await getJobs();
+      setJobs(jobsData);
       if (selectedUser) {
         const latestUser = usersData.find(u => u.aadhar === selectedUser.aadhar);
         if (latestUser) {
@@ -316,6 +331,66 @@ export default function AdminPortal() {
     } catch (err) {
       console.error(err);
       alert('Failed to delete post.');
+    }
+  };
+
+  const handleJobImageUpload = async (file) => {
+    if (!file) return;
+    setUploadingJobImg(true);
+    try {
+      const res = await uploadJobImage(file);
+      setJobForm(prev => ({ ...prev, img_url: res.img_url }));
+      alert('Job banner image uploaded successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploadingJobImg(false);
+    }
+  };
+
+  // --- JOBS OPERATIONS ---
+  const handleJobSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingJobId) {
+        await updateJob(editingJobId, jobForm);
+        alert('Job alert updated successfully!');
+      } else {
+        await createJob(jobForm);
+        alert('New job alert published successfully!');
+      }
+      setJobForm({ title: '', description: '', img_url: '', apply_url: '' });
+      setEditingJobId(null);
+      const jobsData = await getJobs();
+      setJobs(jobsData);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save job alert.');
+    }
+  };
+
+  const startEditJob = (job) => {
+    setEditingJobId(job.id);
+    setJobForm({
+      title: job.title,
+      description: job.description || '',
+      img_url: job.img_url || '',
+      apply_url: job.apply_url || ''
+    });
+    // Scroll to editor form
+    document.getElementById('job-editor-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleDeleteJob = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this job alert?')) return;
+    try {
+      await deleteJob(id);
+      setJobs(jobs.filter(j => j.id !== id));
+      alert('Job alert deleted.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete job alert.');
     }
   };
 
@@ -705,6 +780,20 @@ export default function AdminPortal() {
           >
             Users
           </button>
+
+          <button
+            onClick={() => setActiveTab('jobs')}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: activeTab === 'jobs' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
+              background: activeTab === 'jobs' ? 'rgba(16,185,129,0.06)' : 'white',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'jobs' ? 800 : 600
+            }}
+          >
+            Job Alerts
+          </button>
         </div>
         {/* --- TAB 1: MANAGE POSTS --- */}
         {activeTab === 'posts' && (
@@ -827,6 +916,137 @@ export default function AdminPortal() {
                       <Edit size={16} />
                     </button>
                     <button onClick={() => handleDeletePost(post.id)} className="premium-btn premium-btn-danger" style={{ width: '36px', height: '36px', padding: 0 }} title="Delete Post">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        )}
+
+        {/* --- TAB 1B: MANAGE JOBS --- */}
+        {activeTab === 'jobs' && (
+          <div className="desktop-grid-2">
+            
+            {/* Job Add/Edit Form */}
+            <div className="premium-card" id="job-editor-form" style={{ borderTop: '6px solid var(--primary)', alignSelf: 'flex-start' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>
+                {editingJobId ? 'Edit Job Alert Details' : 'Add New Job Alert'}
+              </h3>
+              <form onSubmit={handleJobSubmit}>
+                <div className="premium-input-group">
+                  <label className="premium-label">Job Title</label>
+                  <input 
+                    type="text" 
+                    value={jobForm.title} 
+                    onChange={(e) => setJobForm({ ...jobForm, title: e.target.value })} 
+                    placeholder="e.g. TNPSC Group 4 VAO Notification"
+                    className="premium-input" 
+                    required 
+                  />
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Description (Requirements / Details)</label>
+                  <textarea 
+                    rows={4}
+                    value={jobForm.description} 
+                    onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })} 
+                    placeholder="Provide details about the qualification, age limits, pay scale, important dates..."
+                    className="premium-input" 
+                    required 
+                  />
+                </div>
+
+                 <div className="premium-input-group">
+                  <label className="premium-label">Job Banner Image (Optional)</label>
+                  
+                  {jobForm.img_url && (
+                    <div style={{ marginBottom: '10px', position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                      <img 
+                        src={getImageUrl(jobForm.img_url)} 
+                        alt="Uploaded preview" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f8fafc' }} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setJobForm(prev => ({ ...prev, img_url: '' }))} 
+                        className="premium-btn premium-btn-danger"
+                        style={{ position: 'absolute', right: '6px', bottom: '6px', width: 'auto', padding: '4px 8px', fontSize: '0.7rem' }}
+                      >
+                        Remove Image
+                      </button>
+                    </div>
+                  )}
+
+                  <label className="premium-btn premium-btn-secondary" style={{ padding: '12px', fontSize: '0.85rem', display: 'flex', gap: '8px', cursor: 'pointer', background: 'white', border: '1.5px dashed var(--primary)' }}>
+                    <Upload size={16} style={{ color: 'var(--primary)' }} /> 
+                    {uploadingJobImg ? 'Uploading image...' : jobForm.img_url ? 'Change Uploaded Image' : 'Upload Local Image File'}
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      disabled={uploadingJobImg}
+                      onChange={(e) => handleJobImageUpload(e.target.files[0])}
+                    />
+                  </label>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '6px' }}>
+                    Select a local PNG or JPG file. Standard web URL inputs are not allowed.
+                  </span>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Apply Now URL / Routing (Optional)</label>
+                  <input 
+                    type="text" 
+                    value={jobForm.apply_url} 
+                    onChange={(e) => setJobForm({ ...jobForm, apply_url: e.target.value })} 
+                    placeholder="e.g. /user?tab=apply"
+                    className="premium-input" 
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
+                    Use local routes (e.g. `/user?tab=apply`) or full web links. <strong>Leave blank to hide the "Apply Now" button on this job.</strong>
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" className="premium-btn premium-btn-primary" style={{ flex: 2 }}>
+                    {editingJobId ? 'Update Job Alert' : 'Publish Job Alert'}
+                  </button>
+                  {editingJobId && (
+                    <button 
+                      type="button" 
+                      onClick={() => { setEditingJobId(null); setJobForm({ title: '', description: '', img_url: '', apply_url: '' }) }} 
+                      className="premium-btn premium-btn-secondary"
+                      style={{ flex: 1 }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* List of existing jobs */}
+            <div>
+              <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
+                Active Job Alerts ({jobs.length} Listings)
+              </h4>
+              {jobs.map((job) => (
+                <div key={job.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ fontSize: '0.95rem', marginBottom: '4px' }}>{job.title}</h4>
+                    <p className="text-muted" style={{ fontSize: '0.8rem', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {job.description}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => startEditJob(job)} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Edit Job Alert">
+                      <Edit size={16} />
+                    </button>
+                    <button onClick={() => handleDeleteJob(job.id)} className="premium-btn premium-btn-danger" style={{ width: '36px', height: '36px', padding: 0 }} title="Delete Job Alert">
                       <Trash2 size={16} />
                     </button>
                   </div>

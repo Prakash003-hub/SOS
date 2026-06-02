@@ -141,6 +141,28 @@ export const uploadPostImage = async (file) => {
   return { img_url: url };
 };
 
+// --- JOBS SERVICE ---
+export const getJobs = async () => {
+  return await callApiGet("getJobs");
+};
+
+export const createJob = async (jobData) => {
+  return await callApi("createJob", { payload: jobData });
+};
+
+export const updateJob = async (id, jobData) => {
+  return await callApi("updateJob", { id, payload: jobData });
+};
+
+export const deleteJob = async (id) => {
+  return await callApi("deleteJob", { id });
+};
+
+export const uploadJobImage = async (file) => {
+  const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "Job_Banners"]);
+  return { img_url: url };
+};
+
 // --- FORMS SERVICE ---
 export const getForms = async () => {
   return await callApiGet("getForms");
@@ -449,6 +471,27 @@ const callMockFallback = (action, payload) => {
   if (!localStorage.getItem('mock_posts')) {
     localStorage.setItem('mock_posts', JSON.stringify(mockData.posts));
   }
+  if (!localStorage.getItem('mock_jobs')) {
+    const defaultJobs = [
+      {
+        id: 1,
+        title: "TNEB Wireman Recruitment",
+        description: "Tamil Nadu Electricity Board (TNEB) announces openings for Wireman positions. Required qualification: ITI in Electrical Trade. Age limit: 18-35 years. Apply before June 30, 2026.",
+        img_url: "",
+        apply_url: "/user?tab=apply",
+        created_at: new Date().toISOString()
+      },
+      {
+        id: 2,
+        title: "TNPSC Group 4 Openings",
+        description: "TNPSC has released the recruitment notification for Group 4 services including VAO, Junior Assistant, and Typist. Minimum qualification: 10th standard pass. Apply today through the official channel.",
+        img_url: "",
+        apply_url: "https://www.tnpsc.gov.in",
+        created_at: new Date().toISOString()
+      }
+    ];
+    localStorage.setItem('mock_jobs', JSON.stringify(defaultJobs));
+  }
   if (!localStorage.getItem('mock_forms')) {
     localStorage.setItem('mock_forms', JSON.stringify(mockData.forms));
   }
@@ -631,6 +674,35 @@ const callMockFallback = (action, payload) => {
       let users = getMockList('mock_users');
       users = users.filter(u => u.aadhar !== payload.aadhar);
       saveMockList('mock_users', users);
+      return { success: true };
+    }
+    
+    case "getJobs":
+      return getMockList('mock_jobs');
+      
+    case "createJob": {
+      const list = getMockList('mock_jobs');
+      const newJob = { id: Date.now(), ...payload.payload, created_at: new Date().toISOString() };
+      list.push(newJob);
+      saveMockList('mock_jobs', list);
+      return newJob;
+    }
+    
+    case "updateJob": {
+      const list = getMockList('mock_jobs');
+      const idx = list.findIndex(j => j.id === payload.id);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...payload.payload };
+        saveMockList('mock_jobs', list);
+        return list[idx];
+      }
+      throw new Error("Job alert not found");
+    }
+    
+    case "deleteJob": {
+      let list = getMockList('mock_jobs');
+      list = list.filter(j => j.id !== payload.id);
+      saveMockList('mock_jobs', list);
       return { success: true };
     }
     

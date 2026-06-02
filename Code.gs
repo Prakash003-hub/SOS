@@ -90,6 +90,9 @@ function doGet(e) {
       case "getPosts":
         responseData = getPostsAction();
         break;
+      case "getJobs":
+        responseData = getJobsAction();
+        break;
       case "getUsers":
         responseData = getUsersAction();
         break;
@@ -162,6 +165,17 @@ function doPost(e) {
         break;
       case "deletePost":
         responseData = deletePostAction(requestBody.id);
+        break;
+        
+      // Jobs Operations
+      case "createJob":
+        responseData = createJobAction(requestBody.payload);
+        break;
+      case "updateJob":
+        responseData = updateJobAction(requestBody.id, requestBody.payload);
+        break;
+      case "deleteJob":
+        responseData = deleteJobAction(requestBody.id);
         break;
         
       // Submission Operations
@@ -243,6 +257,54 @@ function deletePostAction(id) {
   var sheet = getSheet("Posts");
   var rowIndex = findRowIndexById(sheet, id);
   if (rowIndex === -1) throw new Error("Post template not found.");
+  sheet.deleteRow(rowIndex);
+  return { id: id, success: true };
+}
+
+// --- 1B. JOBS ACTIONS ---
+
+function getJobsAction() {
+  var rows = getRowsFromSheet("Jobs");
+  // Sort jobs descending by id
+  rows.sort(function(a, b) { return b.id - a.id; });
+  return rows;
+}
+
+function createJobAction(jobData) {
+  var sheet = getSheet("Jobs");
+  var id = Date.now();
+  var newJob = {
+    id: id,
+    title: jobData.title || "",
+    description: jobData.description || "",
+    img_url: jobData.img_url || "",
+    apply_url: jobData.apply_url || "",
+    created_at: new Date().toISOString()
+  };
+  
+  appendObjectToSheet(sheet, newJob);
+  return newJob;
+}
+
+function updateJobAction(id, jobData) {
+  var sheet = getSheet("Jobs");
+  var rowIndex = findRowIndexById(sheet, id);
+  if (rowIndex === -1) throw new Error("Job alert not found.");
+  
+  var existingRow = getRowObject(sheet, rowIndex);
+  existingRow.title = jobData.title !== undefined ? jobData.title : existingRow.title;
+  existingRow.description = jobData.description !== undefined ? jobData.description : existingRow.description;
+  existingRow.img_url = jobData.img_url !== undefined ? jobData.img_url : existingRow.img_url;
+  existingRow.apply_url = jobData.apply_url !== undefined ? jobData.apply_url : existingRow.apply_url;
+  
+  updateRowObject(sheet, rowIndex, existingRow);
+  return existingRow;
+}
+
+function deleteJobAction(id) {
+  var sheet = getSheet("Jobs");
+  var rowIndex = findRowIndexById(sheet, id);
+  if (rowIndex === -1) throw new Error("Job alert not found.");
   sheet.deleteRow(rowIndex);
   return { id: id, success: true };
 }
@@ -875,6 +937,11 @@ function initSpreadsheet() {
   ensureSheetExists("Posts", [
     "id", "title", "description", "img_url", "apply_url", "created_at"
   ]);
+
+  // 4B. JOBS FEED SHEET
+  ensureSheetExists("Jobs", [
+    "id", "title", "description", "img_url", "apply_url", "created_at"
+  ]);
   
   // 5. SYSTEM ERROR/LOG SHEET
   ensureSheetExists("SystemLog", [
@@ -906,6 +973,27 @@ function initSpreadsheet() {
       description: "New Voter Registration, address updates, or replacement voter ID card applications are active. Track status securely.",
       img_url: "",
       apply_url: "/user?tab=apply&category=voter%20id",
+      created_at: new Date().toISOString()
+    });
+  }
+
+  // Add initial mockup jobs if Jobs sheet is empty
+  var jobsSheet = getSheet("Jobs");
+  if (jobsSheet.getLastRow() === 1) {
+    appendObjectToSheet(jobsSheet, {
+      id: 1,
+      title: "TNEB Wireman Recruitment",
+      description: "Tamil Nadu Electricity Board (TNEB) announces openings for Wireman positions. Required qualification: ITI in Electrical Trade. Age limit: 18-35 years. Apply before June 30, 2026.",
+      img_url: "",
+      apply_url: "/user?tab=apply",
+      created_at: new Date().toISOString()
+    });
+    appendObjectToSheet(jobsSheet, {
+      id: 2,
+      title: "TNPSC Group 4 Openings",
+      description: "TNPSC has released the recruitment notification for Group 4 services including VAO, Junior Assistant, and Typist. Minimum qualification: 10th standard pass. Apply today through the official channel.",
+      img_url: "",
+      apply_url: "https://www.tnpsc.gov.in",
       created_at: new Date().toISOString()
     });
   }

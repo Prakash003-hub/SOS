@@ -12,7 +12,8 @@ import {
   uploadSubmissionDocument,
   submitInfoRequestResponse,
   deleteUserDocument,
-  loginUser
+  loginUser,
+  getJobs
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -122,6 +123,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   
   const [posts, setPosts] = useState([]);
   const [forms, setForms] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'all');
   
   // Loading & error states
@@ -214,8 +216,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     try {
       const postsData = await getPosts();
       const formsData = await getForms();
+      const jobsData = await getJobs();
       setPosts(postsData);
       setForms(formsData);
+      setJobs(jobsData);
     } catch (err) {
       console.error(err);
       setError('Failed to connect to Google Workspace Apps Script Web App. Please ensure your VITE_GOOGLE_SCRIPT_URL environment variable is configured correctly.');
@@ -750,6 +754,58 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             setSearchParams(urlParams);
                           } else {
                             window.open(post.apply_url, '_blank');
+                          }
+                        }}
+                        className="premium-btn premium-btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', marginTop: '4px', width: '100%', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        Apply Now <ChevronRight size={18} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* --- TAB 1B: JOB ALERTS --- */}
+        {activeTab === 'jobs' && (
+          <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
+            {jobs.length === 0 ? (
+              <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
+                <p className="text-muted">No job alerts published yet.</p>
+              </div>
+            ) : (
+              jobs.map((job) => {
+                return (
+                  <div key={job.id} className="instagram-post-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-light-main)', margin: 0, lineHeight: '1.3' }}>
+                      {job.title}
+                    </h3>
+
+                    {job.img_url && job.img_url.trim() !== '' && (
+                      <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', maxHeight: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img 
+                          src={getImageUrl(job.img_url)} 
+                          style={{ width: '100%', maxHeight: '280px', objectFit: 'contain' }} 
+                          alt={job.title} 
+                        />
+                      </div>
+                    )}
+
+                    <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: '1.6', margin: 0 }}>
+                      {job.description}
+                    </p>
+
+                    {job.apply_url && job.apply_url.trim() !== '' && job.apply_url.trim().toLowerCase() !== 'none' && (
+                      <button 
+                        onClick={() => {
+                          if (job.apply_url.startsWith('/user')) {
+                            const urlParams = new URLSearchParams(job.apply_url.split('?')[1]);
+                            setSearchParams(urlParams);
+                          } else {
+                            window.open(job.apply_url, '_blank');
                           }
                         }}
                         className="premium-btn premium-btn-primary"
