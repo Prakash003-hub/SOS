@@ -75,6 +75,27 @@ const checkIfPdf = (url) => {
   return lowerUrl.endsWith('.pdf') || lowerUrl.includes('.pdf') || lowerUrl.includes('/file/d/');
 };
 
+const getFileExtension = (url) => {
+  if (!url) return '';
+  if (checkIfPdf(url) || url.toLowerCase().includes('pdf') || url.toLowerCase().includes('application/pdf')) return 'PDF';
+  
+  const cleanUrl = url.split('?')[0];
+  const parts = cleanUrl.split('.');
+  if (parts.length > 1) {
+    const ext = parts.pop().toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+      return ext.toUpperCase();
+    }
+    if (ext === 'pdf') return 'PDF';
+  }
+  
+  if (url.includes('drive.google.com')) {
+    return 'IMAGE/PDF';
+  }
+  
+  return 'FILE';
+};
+
 const getImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -2052,9 +2073,19 @@ export default function AdminPortal() {
                           
                           {activeSubmission.receipt_url ? (
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#d1fae5', padding: '8px 10px', borderRadius: '8px', fontSize: '0.75rem', border: '1px solid #a7f3d0' }}>
-                              <span style={{ color: '#065f46', fontWeight: 600 }}>📩 Receipt Loaded ({activeSubmission.receipt_url.split('.').pop().toUpperCase()})</span>
-                              <div style={{ display: 'flex', gap: '8px' }}>
+                              <span style={{ color: '#065f46', fontWeight: 600 }}>📩 Receipt Loaded ({getFileExtension(activeSubmission.receipt_url)})</span>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <a href={getImageUrl(activeSubmission.receipt_url)} target="_blank" rel="noreferrer" style={{ color: '#047857', fontWeight: 800, textDecoration: 'underline' }}>View</a>
+                                <label style={{ color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', margin: 0 }}>
+                                  {uploadingDocType === 'receipt' ? 'Replacing...' : 'Replace'}
+                                  <input 
+                                    type="file" 
+                                    accept="application/pdf,image/*"
+                                    style={{ display: 'none' }}
+                                    disabled={uploadingDocType !== null}
+                                    onChange={(e) => handleUploadDocAdmin(activeSubmission.id, 'receipt', e.target.files[0])}
+                                  />
+                                </label>
                                 <button type="button" onClick={() => handleDeleteDocAdmin(activeSubmission.id, 'receipt')} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Delete</button>
                               </div>
                             </div>
@@ -2079,9 +2110,19 @@ export default function AdminPortal() {
                           
                           {activeSubmission.certificate_url ? (
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#d1fae5', padding: '8px 10px', borderRadius: '8px', fontSize: '0.75rem', border: '1px solid #a7f3d0' }}>
-                              <span style={{ color: '#065f46', fontWeight: 600 }}>📩 Certificate Loaded ({activeSubmission.certificate_url.split('.').pop().toUpperCase()})</span>
-                              <div style={{ display: 'flex', gap: '8px' }}>
+                              <span style={{ color: '#065f46', fontWeight: 600 }}>📩 Certificate Loaded ({getFileExtension(activeSubmission.certificate_url)})</span>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <a href={getImageUrl(activeSubmission.certificate_url)} target="_blank" rel="noreferrer" style={{ color: '#047857', fontWeight: 800, textDecoration: 'underline' }}>View</a>
+                                <label style={{ color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', margin: 0 }}>
+                                  {uploadingDocType === 'certificate' ? 'Replacing...' : 'Replace'}
+                                  <input 
+                                    type="file" 
+                                    accept="application/pdf,image/*"
+                                    style={{ display: 'none' }}
+                                    disabled={uploadingDocType !== null}
+                                    onChange={(e) => handleUploadDocAdmin(activeSubmission.id, 'certificate', e.target.files[0])}
+                                  />
+                                </label>
                                 <button type="button" onClick={() => handleDeleteDocAdmin(activeSubmission.id, 'certificate')} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Delete</button>
                               </div>
                             </div>
@@ -2140,9 +2181,19 @@ export default function AdminPortal() {
 
                           {activeSubmission.other_doc_url ? (
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#d1fae5', padding: '8px 10px', borderRadius: '8px', fontSize: '0.75rem', border: '1px solid #a7f3d0', marginTop: '4px' }}>
-                              <span style={{ color: '#065f46', fontWeight: 600 }}>📩 Document Loaded ({activeSubmission.other_doc_url.split('.').pop().toUpperCase()})</span>
-                              <div style={{ display: 'flex', gap: '8px' }}>
+                              <span style={{ color: '#065f46', fontWeight: 600 }}>📩 Document Loaded ({getFileExtension(activeSubmission.other_doc_url)})</span>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <a href={getImageUrl(activeSubmission.other_doc_url)} target="_blank" rel="noreferrer" style={{ color: '#047857', fontWeight: 800, textDecoration: 'underline' }}>View</a>
+                                <label style={{ color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', margin: 0 }}>
+                                  {uploadingDocType === 'other' ? 'Replacing...' : 'Replace'}
+                                  <input 
+                                    type="file" 
+                                    accept="application/pdf,image/*"
+                                    style={{ display: 'none' }}
+                                    disabled={uploadingDocType !== null}
+                                    onChange={(e) => handleUploadDocAdmin(activeSubmission.id, 'other', e.target.files[0])}
+                                  />
+                                </label>
                                 <button type="button" onClick={() => handleDeleteDocAdmin(activeSubmission.id, 'other')} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Delete</button>
                               </div>
                             </div>

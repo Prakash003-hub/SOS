@@ -35,7 +35,8 @@ import {
   Check,
   X,
   ShieldAlert,
-  Trash2
+  Trash2,
+  Clock
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -62,6 +63,27 @@ const checkIfPdf = (url) => {
   if (!url) return false;
   const lowerUrl = url.toLowerCase();
   return lowerUrl.endsWith('.pdf') || lowerUrl.includes('.pdf') || lowerUrl.includes('/file/d/');
+};
+
+const getFileExtension = (url) => {
+  if (!url) return '';
+  if (checkIfPdf(url) || url.toLowerCase().includes('pdf') || url.toLowerCase().includes('application/pdf')) return 'PDF';
+  
+  const cleanUrl = url.split('?')[0];
+  const parts = cleanUrl.split('.');
+  if (parts.length > 1) {
+    const ext = parts.pop().toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+      return ext.toUpperCase();
+    }
+    if (ext === 'pdf') return 'PDF';
+  }
+  
+  if (url.includes('drive.google.com')) {
+    return 'IMAGE/PDF';
+  }
+  
+  return 'FILE';
 };
 
 const getImageUrl = (url) => {
@@ -1915,6 +1937,74 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         const upiUrl = `upi://pay?pa=9385497906@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${app.id}`;
                         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
 
+                        if (app.payment_screenshot) {
+                          const isProofPdf = checkIfPdf(app.payment_screenshot);
+                          return (
+                            <div style={{ 
+                              background: '#fffbeb', 
+                              border: '1.5px solid #fef3c7', 
+                              borderRadius: '12px', 
+                              padding: '16px', 
+                              margin: '12px 0 16px 0',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+                            }}>
+                              <h4 style={{ fontSize: '0.9rem', color: '#b45309', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800' }}>
+                                <Clock size={16} style={{ color: '#d97706' }} /> Waiting for Payment Verification
+                              </h4>
+                              
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#ffffff', padding: '12px', borderRadius: '10px', border: '1px solid #fde68a' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: 'bold' }}>
+                                  You have uploaded a payment proof. Our administrative team will verify and approve your submission shortly.
+                                </span>
+
+                                {/* Uploaded proof preview */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isProofPdf ? (
+                                      <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                                        <FileText size={16} />
+                                      </div>
+                                    ) : (
+                                      <div style={{ width: '32px', height: '32px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <img src={getImageUrl(app.payment_screenshot)} alt="Payment Screenshot Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      </div>
+                                    )}
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#334155' }}>Uploaded Proof File</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                    <a 
+                                      href={getImageUrl(app.payment_screenshot)} 
+                                      target="_blank" 
+                                      rel="noreferrer"
+                                      style={{ color: '#0f766e', background: '#ccfbf1', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #99f6e4' }}
+                                    >
+                                      <Eye size={11} /> View
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Allow Re-upload option */}
+                              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #cbd5e1' }}>
+                                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
+                                  Need to update or replace your payment proof?
+                                </span>
+                                <label className="premium-btn premium-btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', gap: '6px', cursor: 'pointer', background: 'white', width: 'auto' }}>
+                                  <UploadCloud size={14} style={{ color: 'var(--primary)' }} /> 
+                                  {uploadingScreenshotId === app.id ? 'Uploading proof...' : 'Replace Payment Proof'}
+                                  <input 
+                                    type="file" 
+                                    accept="image/*,application/pdf"
+                                    style={{ display: 'none' }}
+                                    disabled={uploadingScreenshotId !== null}
+                                    onChange={(e) => handleScreenshotUpload(app.id, e.target.files[0])}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         return (
                           <div style={{ 
                             background: '#f8fafc', 
@@ -2168,16 +2258,27 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             
                             {docs.map(doc => {
                               const isPdf = checkIfPdf(doc.url);
+                              const ext = getFileExtension(doc.url);
                               return (
-                                <div key={doc.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'white', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    {/* Mini PDF or Image Preview */}
+                                <div key={doc.key} style={{ 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  gap: '12px', 
+                                  background: 'white', 
+                                  padding: '16px', 
+                                  borderRadius: '12px', 
+                                  border: '1.5px solid #cbd5e1',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.03)',
+                                  position: 'relative'
+                                }}>
+                                  <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                                    {/* Big Preview (PDF or Image) */}
                                     {isPdf ? (
-                                      <div style={{ width: '38px', height: '38px', borderRadius: '6px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
-                                        <FileText size={18} />
+                                      <div style={{ width: '60px', height: '60px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', flexShrink: 0 }}>
+                                        <FileText size={28} />
                                       </div>
                                     ) : (
-                                      <div style={{ width: '38px', height: '38px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                         <img 
                                           src={getImageUrl(doc.url)} 
                                           alt="Preview" 
@@ -2185,21 +2286,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                         />
                                       </div>
                                     )}
-                                    <div style={{ textAlign: 'left' }}>
-                                      <span style={{ fontSize: '0.75rem', color: '#1e293b', fontWeight: 'bold', display: 'block' }}>{doc.title}</span>
-                                      <span style={{ fontSize: '0.65rem', color: '#64748b' }}>{doc.sub} ({doc.url.split('.').pop().toUpperCase()})</span>
+                                    
+                                    <div style={{ textAlign: 'left', flex: 1 }}>
+                                      <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '800', display: 'block', marginBottom: '2px' }}>{doc.title}</span>
+                                      <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '6px' }}>{doc.sub}</span>
+                                      <span style={{ fontSize: '0.65rem', color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
+                                        Format: {ext}
+                                      </span>
                                     </div>
                                   </div>
                                   
-                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                  {/* Buttons below preview */}
+                                  <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #cbd5e1', paddingTop: '10px' }}>
                                     <a 
                                       href={getImageUrl(doc.url)} 
                                       target="_blank" 
                                       rel="noreferrer" 
                                       className="premium-btn premium-btn-secondary" 
-                                      style={{ width: 'auto', padding: '6px 10px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                                      style={{ flex: 1, padding: '8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', textDecoration: 'none', margin: 0 }}
                                     >
-                                      <Eye size={11} /> View
+                                      <Eye size={13} /> View Document
                                     </a>
                                     <a 
                                       href={getImageUrl(doc.url)} 
@@ -2207,9 +2313,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                       target="_blank" 
                                       rel="noreferrer" 
                                       className="premium-btn premium-btn-success" 
-                                      style={{ width: 'auto', padding: '6px 10px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                                      style={{ flex: 1, padding: '8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', textDecoration: 'none', margin: 0 }}
                                     >
-                                      <Download size={11} /> Download
+                                      <Download size={13} /> Download
                                     </a>
                                   </div>
                                 </div>
