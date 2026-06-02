@@ -247,8 +247,10 @@ export default function AdminPortal() {
   }
 
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    if (isAdminLoggedIn) {
+      fetchInitialData();
+    }
+  }, [isAdminLoggedIn]);
 
   const handleRefreshUsers = async () => {
     try {

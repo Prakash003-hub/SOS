@@ -58,8 +58,8 @@ const callApi = async (action, payload = {}) => {
 
     return json.data;
   } catch (err) {
-    console.error(`Google API Error on action [${action}]:`, err);
-    throw err;
+    console.warn(`Google API Network Error on action [${action}]. Falling back to offline mock database:`, err);
+    return callMockFallback(action, payload);
   }
 };
 
@@ -88,8 +88,8 @@ const callApiGet = async (action, queryParams = {}) => {
 
     return json.data;
   } catch (err) {
-    console.error(`Google GET API Error on action [${action}]:`, err);
-    throw err;
+    console.warn(`Google GET API Network Error on action [${action}]. Falling back to offline mock database:`, err);
+    return callMockFallback(action, queryParams);
   }
 };
 
