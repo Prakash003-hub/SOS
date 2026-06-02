@@ -54,9 +54,35 @@ const safeJsonParse = (str, fallback = []) => {
   }
 };
 
+const getGoogleDriveId = (url) => {
+  if (!url) return null;
+  const fileDMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) return fileDMatch[1];
+  const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) return idMatch[1];
+  return null;
+};
+
+const checkIfPdf = (url) => {
+  if (!url) return false;
+  const lowerUrl = url.toLowerCase();
+  return lowerUrl.endsWith('.pdf') || lowerUrl.includes('.pdf') || lowerUrl.includes('/file/d/');
+};
+
 const getImageUrl = (url) => {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (url.includes('drive.google.com')) {
+      if (checkIfPdf(url)) {
+        return url;
+      }
+      const driveId = getGoogleDriveId(url);
+      if (driveId) {
+        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+      }
+    }
+    return url;
+  }
   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
     return `http://${window.location.hostname}:8000${url.startsWith('/') ? '' : '/'}${url}`;
   }
@@ -720,7 +746,7 @@ export default function AdminPortal() {
                   {postForm.img_url && (
                     <div style={{ marginBottom: '10px', position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
                       <img 
-                        src={`http://localhost:8000${postForm.img_url}`} 
+                        src={getImageUrl(postForm.img_url)} 
                         alt="Uploaded preview" 
                         style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f8fafc' }} 
                       />
@@ -1546,7 +1572,7 @@ export default function AdminPortal() {
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   {doc.urls.map((url, urlIdx) => {
-                                    const isPdf = url.toLowerCase().endsWith('.pdf');
+                                    const isPdf = checkIfPdf(url);
                                     const fullUrl = getImageUrl(url);
                                     const fileLabel = doc.urls.length > 1 ? `Part ${urlIdx + 1}` : 'Document File';
                                     
@@ -1606,9 +1632,9 @@ export default function AdminPortal() {
                           {activeSubmission.info_request_response ? (
                             <div style={{ background: '#ffffff', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}>
                               <span style={{ color: '#475569', display: 'block', fontSize: '0.7rem', fontWeight: '600', marginBottom: '4px' }}>User Response:</span>
-                              {activeSubmission.info_request_response.startsWith('/uploads/') ? (() => {
+                              {(activeSubmission.info_request_response.startsWith('/uploads/') || activeSubmission.info_request_response.startsWith('http')) ? (() => {
                                 const fileUrl = getImageUrl(activeSubmission.info_request_response);
-                                const isPdf = activeSubmission.info_request_response.toLowerCase().endsWith('.pdf');
+                                const isPdf = checkIfPdf(activeSubmission.info_request_response);
                                 
                                 return (
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', marginTop: '6px' }}>

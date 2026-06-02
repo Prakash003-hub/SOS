@@ -11,7 +11,8 @@ import {
   uploadUserDocument,
   uploadSubmissionDocument,
   submitInfoRequestResponse,
-  deleteUserDocument
+  deleteUserDocument,
+  loginUser
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -47,9 +48,35 @@ const safeJsonParse = (str, fallback = []) => {
   }
 };
 
+const getGoogleDriveId = (url) => {
+  if (!url) return null;
+  const fileDMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) return fileDMatch[1];
+  const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) return idMatch[1];
+  return null;
+};
+
+const checkIfPdf = (url) => {
+  if (!url) return false;
+  const lowerUrl = url.toLowerCase();
+  return lowerUrl.endsWith('.pdf') || lowerUrl.includes('.pdf') || lowerUrl.includes('/file/d/');
+};
+
 const getImageUrl = (url) => {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (url.includes('drive.google.com')) {
+      if (checkIfPdf(url)) {
+        return url;
+      }
+      const driveId = getGoogleDriveId(url);
+      if (driveId) {
+        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+      }
+    }
+    return url;
+  }
   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
     return `http://${window.location.hostname}:8000${url.startsWith('/') ? '' : '/'}${url}`;
   }
@@ -546,11 +573,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       if (currentUser) {
         const query = await getUserStatus(currentUser.phone, currentUser.dob);
         // Simply trigger a logout/login sequence or re-load the profile locally
-        const latestProfile = await fetch(`http://${window.location.hostname}:8000/api/users/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dob: currentUser.dob, phone: currentUser.phone })
-        }).then(r => r.json()).catch(() => null);
+        const latestProfile = await loginUser({ dob: currentUser.dob, phone: currentUser.phone }).catch(() => null);
         
         if (latestProfile && latestProfile.id) {
           onUpdateProfile(latestProfile);
@@ -1216,7 +1239,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             <div key={docKey} className="document-upload-zone" style={{ padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #10b981', background: '#f0fdf4', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.05)' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 {/* Small Display Thumbnail */}
-                                {savedUrl.toLowerCase().endsWith('.pdf') ? (
+                                {checkIfPdf(savedUrl) ? (
                                   <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
                                     <FileText size={22} />
                                   </div>
@@ -1901,7 +1924,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               {(app.info_request_response.startsWith('/uploads/') || app.info_request_response.startsWith('http')) ? (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'rgba(255, 255, 255, 0.1)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {app.info_request_response.toLowerCase().endsWith('.pdf') || app.info_request_response.includes('mimeType=application/pdf') ? (
+                                    {checkIfPdf(app.info_request_response) || app.info_request_response.includes('mimeType=application/pdf') ? (
                                       <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
                                         <FileText size={16} />
                                       </div>
@@ -1973,7 +1996,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             ].filter(d => !!d.url);
 
                             return docs.map(doc => {
-                              const isPdf = doc.url.toLowerCase().endsWith('.pdf');
+                              const isPdf = checkIfPdf(doc.url);
                               return (
                                 <div key={doc.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'white', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

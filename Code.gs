@@ -737,7 +737,11 @@ function getSubmissionsAction() {
       submitted_at: s.submitted_at,
       info_request_label: s.info_request_label,
       info_request_type: s.info_request_type,
-      info_request_response: s.info_request_response
+      info_request_response: s.info_request_response,
+      receipt_url: s.receipt_url || "",
+      certificate_url: s.certificate_url || "",
+      other_doc_url: s.other_doc_url || "",
+      other_doc_name: s.other_doc_name || ""
     };
   });
 }
@@ -859,9 +863,13 @@ function initSpreadsheet() {
   ]);
   
   // 3. SUBMISSIONS SHEET
-  ensureSheetExists("Submissions", [
-    "id", "form_id", "user_id", "phone", "dob", "aadhar", "responses", "uploaded_docs", "payment_status", "payment_screenshot", "progress_percent", "progress_desc", "uploaded_pdf_url", "submitted_at", "info_request_label", "info_request_type", "info_request_response"
+  var subSheet = ensureSheetExists("Submissions", [
+    "id", "form_id", "user_id", "phone", "dob", "aadhar", "responses", "uploaded_docs", "payment_status", "payment_screenshot", "progress_percent", "progress_desc", "uploaded_pdf_url", "submitted_at", "info_request_label", "info_request_type", "info_request_response", "receipt_url", "certificate_url", "other_doc_url", "other_doc_name"
   ]);
+  ensureColumnExists(subSheet, "receipt_url");
+  ensureColumnExists(subSheet, "certificate_url");
+  ensureColumnExists(subSheet, "other_doc_url");
+  ensureColumnExists(subSheet, "other_doc_name");
   
   // 4. POSTS FEED SHEET
   ensureSheetExists("Posts", [
