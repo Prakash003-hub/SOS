@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, LogOut, MessageSquare, X, ChevronDown, Send } from 'lucide-react';
+import { submitFeedback } from '../services/db';
 
 export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -25,6 +26,8 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
   }, [isProfileOpen]);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   const getAvatarUrl = () => {
     if (currentUser && currentUser.photo_url) {
@@ -39,30 +42,37 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
     return '/avatar.png';
   };
 
-  const handleFeedbackSubmit = (e) => {
+  const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
     if (!feedbackText.trim()) {
       alert('Please enter your feedback message.');
       return;
     }
+    if (feedbackRating === 0) {
+      alert('Please select a star rating.');
+      return;
+    }
 
+    setFeedbackSubmitting(true);
     try {
-      const feedList = JSON.parse(localStorage.getItem('whatsbro_feedback') || '[]');
-      feedList.push({
-        name: currentUser ? currentUser.name : 'Guest User',
-        phone: currentUser ? currentUser.phone : 'N/A',
-        message: feedbackText,
-        submitted_at: new Date().toISOString()
-      });
-      localStorage.setItem('whatsbro_feedback', JSON.stringify(feedList));
+      await submitFeedback(
+        currentUser ? currentUser.name : 'Guest User',
+        currentUser ? currentUser.phone : '',
+        currentUser ? currentUser.aadhar : '',
+        feedbackText,
+        feedbackRating
+      );
       
       alert('Thank you for your valuable feedback! Your feedback has been recorded successfully.');
       setFeedbackText('');
+      setFeedbackRating(0);
       setIsFeedbackOpen(false);
       setIsProfileOpen(false);
     } catch (err) {
       console.error(err);
-      alert('Failed to submit feedback.');
+      alert('Failed to submit feedback. Please try again.');
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -106,8 +116,8 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                   height: '38px',
                   borderRadius: '50%',
                   overflow: 'hidden',
-                  border: '2px solid #10b981',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
+                  border: '2px solid var(--primary)',
+                  boxShadow: '0 2px 8px rgba(30, 168, 103, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -148,7 +158,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                     height: '64px',
                     borderRadius: '50%',
                     overflow: 'hidden',
-                    border: '3px solid #10b981',
+                    border: '3px solid var(--primary)',
                     background: '#f8fafc',
                     boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
                   }}>
@@ -162,7 +172,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                   <div style={{ textAlign: 'center', width: '100%' }}>
                     <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: '800', color: '#1e293b' }}>{currentUser.name}</h4>
                     <p style={{ margin: 0, fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Phone: {currentUser.phone}</p>
-                    <p style={{ margin: 0, fontSize: '0.65rem', color: '#94a3b8', fontWeight: '500' }}>Aadhaar: {currentUser.aadhar ? currentUser.aadhar.replace(/(\d{4})/g, '$1 ').trim() : 'N/A'}</p>
+
                   </div>
 
                   <div style={{ width: '100%', borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -297,6 +307,32 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
             </div>
 
             <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Star Rating */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Rating *</label>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setFeedbackRating(star)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '1.5rem',
+                        color: star <= feedbackRating ? '#f59e0b' : '#cbd5e1',
+                        transition: 'color 0.15s, transform 0.15s',
+                        transform: star <= feedbackRating ? 'scale(1.1)' : 'scale(1)',
+                        padding: '2px'
+                      }}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Your Message *</label>
                 <textarea
@@ -319,6 +355,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
 
               <button
                 type="submit"
+                disabled={feedbackSubmitting}
                 className="premium-btn premium-btn-success"
                 style={{
                   padding: '10px',
@@ -327,10 +364,11 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                   justifyContent: 'center',
                   gap: '6px',
                   fontSize: '0.8rem',
-                  fontWeight: '700'
+                  fontWeight: '700',
+                  opacity: feedbackSubmitting ? 0.7 : 1
                 }}
               >
-                <Send size={14} /> Send Feedback
+                <Send size={14} /> {feedbackSubmitting ? 'Sending...' : 'Send Feedback'}
               </button>
             </form>
           </div>

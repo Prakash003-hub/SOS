@@ -23,7 +23,9 @@ import {
   createJob,
   updateJob,
   deleteJob,
-  uploadJobImage
+  uploadJobImage,
+  getFeedback,
+  deleteFeedback
 } from '../services/db';
 import { 
   Plus, 
@@ -46,7 +48,9 @@ import {
   ArrowLeft,
   Download,
   Copy,
-  Briefcase
+  Briefcase,
+  MessageSquare,
+  Star
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -173,6 +177,9 @@ export default function AdminPortal() {
   const [forms, setForms] = useState([]);
   const [users, setUsers] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
+  const [feedbackSearchTerm, setFeedbackSearchTerm] = useState('');
   
   // Selected user details (Aadhaar click)
   const [selectedUser, setSelectedUser] = useState(null);
@@ -274,10 +281,12 @@ export default function AdminPortal() {
       const formsData = await getForms();
       const usersData = await getUsersList();
       const jobsData = await getJobs();
+      const feedbackData = await getFeedback();
       setPosts(postsData);
       setForms(formsData);
       setUsers(usersData);
       setJobs(jobsData);
+      setFeedbackList(feedbackData);
     } catch (err) {
       console.error(err);
       alert('Failed to connect to Google Workspace Apps Script Web App. Please verify VITE_GOOGLE_SCRIPT_URL is configured in your .env file, or check your internet connection.');
@@ -285,6 +294,33 @@ export default function AdminPortal() {
       setLoading(false);
     }
   }
+
+  const handleDeleteFeedback = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this feedback?')) return;
+    try {
+      await deleteFeedback(id);
+      setFeedbackList(feedbackList.filter(f => f.id !== id));
+      alert('Feedback deleted.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete feedback.');
+    }
+  };
+
+  const handleRefreshFeedback = async () => {
+    try {
+      const feedbackData = await getFeedback();
+      setFeedbackList(feedbackData);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const filteredFeedback = feedbackList.filter(f =>
+    (f.user_name && f.user_name.toLowerCase().includes(feedbackSearchTerm.toLowerCase())) ||
+    (f.user_phone && f.user_phone.includes(feedbackSearchTerm)) ||
+    (f.message && f.message.toLowerCase().includes(feedbackSearchTerm.toLowerCase()))
+  );
 
   useEffect(() => {
     if (isAdminLoggedIn) {
@@ -778,12 +814,20 @@ export default function AdminPortal() {
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
           <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>TN sevai Admin Terminal</span>
         </div>
-        <button 
-          onClick={handleAdminLogout}
-          style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: 'bold', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-        >
-          Logout Admin
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button 
+            onClick={() => { setShowFeedbackPanel(true); handleRefreshFeedback(); }}
+            style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: 'bold', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <MessageSquare size={12} /> Feedback ({feedbackList.length})
+          </button>
+          <button 
+            onClick={handleAdminLogout}
+            style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: 'bold', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            Logout Admin
+          </button>
+        </div>
       </div>
 
       {/* Server Status Maintenance Panel */}
@@ -2415,6 +2459,157 @@ export default function AdminPortal() {
         )}
 
       </div>
+
+      {/* Feedback Panel Modal */}
+      {showFeedbackPanel && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15,23,42,0.4)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 99998,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            width: '100%',
+            maxWidth: '520px',
+            maxHeight: '85vh',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+              color: 'white'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '800' }}>
+                  <MessageSquare size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                  User Feedback ({feedbackList.length})
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', opacity: 0.85 }}>View and manage feedback from citizens</p>
+              </div>
+              <button
+                onClick={() => setShowFeedbackPanel(false)}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '8px', padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'bold' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Search by name, phone, or message..."
+                  value={feedbackSearchTerm}
+                  onChange={(e) => setFeedbackSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 32px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.8rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Feedback List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+              {filteredFeedback.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                  <MessageSquare size={40} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
+                  <p style={{ fontSize: '0.85rem', fontWeight: '600', margin: 0 }}>No feedback yet</p>
+                  <p style={{ fontSize: '0.7rem', margin: '4px 0 0 0' }}>Feedback from citizens will appear here</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {filteredFeedback.map(fb => (
+                    <div key={fb.id} style={{
+                      background: '#fafbfc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      transition: 'box-shadow 0.2s',
+                      position: 'relative'
+                    }}>
+                      {/* User Info Row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>{fb.user_name || 'Guest User'}</p>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '0.65rem', color: '#64748b' }}>
+                            {fb.user_phone ? `📱 ${fb.user_phone}` : ''}
+                            {fb.user_phone && fb.user_aadhar ? ' • ' : ''}
+                            {fb.user_aadhar ? `Aadhaar: ****${fb.user_aadhar.slice(-4)}` : ''}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteFeedback(fb.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                          title="Delete feedback"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+
+                      {/* Star Rating */}
+                      {fb.rating && parseInt(fb.rating) > 0 && (
+                        <div style={{ marginBottom: '6px', display: 'flex', gap: '2px' }}>
+                          {[1, 2, 3, 4, 5].map(s => (
+                            <span key={s} style={{
+                              fontSize: '0.85rem',
+                              color: s <= parseInt(fb.rating) ? '#f59e0b' : '#e2e8f0'
+                            }}>★</span>
+                          ))}
+                          <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginLeft: '4px' }}>({fb.rating}/5)</span>
+                        </div>
+                      )}
+
+                      {/* Message */}
+                      <p style={{
+                        margin: 0,
+                        fontSize: '0.78rem',
+                        color: '#334155',
+                        lineHeight: '1.5',
+                        background: '#ffffff',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #f1f5f9'
+                      }}>{fb.message}</p>
+
+                      {/* Date */}
+                      <p style={{ margin: '8px 0 0 0', fontSize: '0.6rem', color: '#94a3b8', textAlign: 'right' }}>
+                        {fb.created_at ? new Date(fb.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div style={{

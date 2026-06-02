@@ -502,6 +502,32 @@ export const submitInfoRequestResponse = async (subId, valueOrFile, isFile = fal
   });
 };
 
+// --- FEEDBACK SERVICE ---
+export const submitFeedback = async (userName, userPhone, userAadhar, message, rating) => {
+  const payload = {
+    user_name: userName,
+    user_phone: userPhone,
+    user_aadhar: userAadhar,
+    message,
+    rating
+  };
+  return await callApi("submitFeedback", { payload });
+};
+
+export const getFeedback = async () => {
+  try {
+    const data = await callApiGet("getFeedback");
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getFeedback:", err);
+    return [];
+  }
+};
+
+export const deleteFeedback = async (id) => {
+  return await callApi("deleteFeedback", { id });
+};
+
 // --- MOCK DATABASE FALLBACK SYSTEM (LOCALSTORAGE) ---
 const callMockFallback = (action, payload) => {
   console.log(`[Offline Mode] Simulating Action: ${action}`, payload);
@@ -746,6 +772,28 @@ const callMockFallback = (action, payload) => {
       let list = getMockList('mock_jobs');
       list = list.filter(j => j.id !== payload.id);
       saveMockList('mock_jobs', list);
+      return { success: true };
+    }
+    
+    case "submitFeedback": {
+      const feedList = JSON.parse(localStorage.getItem('mock_feedback') || '[]');
+      const newFb = {
+        id: `fb-${Math.random().toString(36).substring(2, 8)}`,
+        ...payload.payload,
+        created_at: new Date().toISOString()
+      };
+      feedList.push(newFb);
+      localStorage.setItem('mock_feedback', JSON.stringify(feedList));
+      return newFb;
+    }
+    
+    case "getFeedback":
+      return JSON.parse(localStorage.getItem('mock_feedback') || '[]');
+      
+    case "deleteFeedback": {
+      let feedList = JSON.parse(localStorage.getItem('mock_feedback') || '[]');
+      feedList = feedList.filter(f => f.id !== payload.id);
+      localStorage.setItem('mock_feedback', JSON.stringify(feedList));
       return { success: true };
     }
     

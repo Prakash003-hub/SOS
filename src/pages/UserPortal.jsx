@@ -183,6 +183,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [infoRequestTexts, setInfoRequestTexts] = useState({});
   const [infoRequestFiles, setInfoRequestFiles] = useState({});
   const [deletedSavedDocs, setDeletedSavedDocs] = useState({});
+  const [duplicateSubmissionError, setDuplicateSubmissionError] = useState('');
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
   // Premium custom Toast Alerts system (Intercepts and upgrades native alert dialogs)
   const [toast, setToast] = useState(null);
@@ -398,6 +400,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       setSubmissionResult(null);
       setAgreeCheckbox(false);
       setDeletedSavedDocs({});
+      setDuplicateSubmissionError('');
     }
   };
 
@@ -423,10 +426,37 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     setUploadedFiles({});
     setAgreeCheckbox(false);
     setDeletedSavedDocs({});
+    setDuplicateSubmissionError('');
   };
 
   const handleFieldChange = (fieldId, val) => {
     setFormData(prev => ({ ...prev, [fieldId]: val }));
+    
+    // Early duplicate check when Aadhaar is entered (12 digits)
+    if (fieldId === 'aadhar' && val && val.match(/^\d{12}$/) && selectedForm) {
+      checkDuplicateSubmission(val);
+    } else if (fieldId === 'aadhar' && (!val || !val.match(/^\d{12}$/))) {
+      setDuplicateSubmissionError('');
+    }
+  };
+
+  const checkDuplicateSubmission = async (aadharValue) => {
+    setCheckingDuplicate(true);
+    try {
+      const targetPhone = formData.phone || currentUser?.phone || '';
+      const targetDob = formData.dob || currentUser?.dob || '';
+      const userSubs = await getUserStatus(targetPhone, targetDob, aadharValue);
+      if (Array.isArray(userSubs) && userSubs.some(s => s.form_id === selectedForm.id && s.payment_status !== 'draft')) {
+        setDuplicateSubmissionError(`You have already applied for "${selectedForm.title}". You cannot apply more than once. You are already applicable for this certificate.`);
+      } else {
+        setDuplicateSubmissionError('');
+      }
+    } catch (err) {
+      console.error('Error checking duplicate submission:', err);
+      setDuplicateSubmissionError('');
+    } finally {
+      setCheckingDuplicate(false);
+    }
   };
 
   // --- WIZARD STEPS PROGRESSION ---
@@ -439,6 +469,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // Proceed from Step 2 (Form details) to Step 3 (Preview)
   const handleValidateForm = async (e) => {
     e.preventDefault();
+    
+    // Block if duplicate submission detected
+    if (duplicateSubmissionError) {
+      alert(duplicateSubmissionError);
+      return;
+    }
     
     // Check validation of standard required fields
     let reqFields = safeJsonParse(selectedForm.required_fields, []);
@@ -1394,6 +1430,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         </div>
                       )
                     )}
+
+                {duplicateSubmissionError && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #fef2f2, #fff1f2)',
+                    border: '2px solid #fca5a5',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    animation: 'fadeIn 0.3s ease'
+                  }}>
+                    <ShieldAlert size={24} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '700', color: '#991b1b' }}>Duplicate Application Detected</p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#b91c1c', lineHeight: '1.5' }}>{duplicateSubmissionError}</p>
+                    </div>
+                  </div>
+                )}
 
                     <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '0 0 20px 0' }}>
                       <h4 style={{ fontSize: '0.95rem', marginBottom: '16px', color: '#1e293b' }}>Application Data Form</h4>

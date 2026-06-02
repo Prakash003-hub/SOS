@@ -105,6 +105,9 @@ function doGet(e) {
       case "getUserSubmissions":
         responseData = getUserSubmissionsAction(e.parameter.aadhar);
         break;
+      case "getFeedback":
+        responseData = getFeedbackAction();
+        break;
       default:
         return jsonResponse({ success: false, error: "Invalid GET Action: " + action }, 400);
     }
@@ -193,6 +196,14 @@ function doPost(e) {
         break;
       case "deleteUserAndSubmissions":
         responseData = deleteUserAndSubmissionsAction(requestBody.aadhar);
+        break;
+
+      // Feedback Operations
+      case "submitFeedback":
+        responseData = submitFeedbackAction(requestBody.payload);
+        break;
+      case "deleteFeedback":
+        responseData = deleteFeedbackAction(requestBody.id);
         break;
         
       // File Uploads directly to Google Drive
@@ -878,6 +889,53 @@ function getUserSubmissionsAction(aadhar) {
   });
 }
 
+// --- 4B. FEEDBACK ACTIONS ---
+
+function submitFeedbackAction(payload) {
+  var sheet = getSheet("Feedback");
+  var feedbackId = "fb-" + Math.random().toString(36).substring(2, 10);
+  
+  var newFeedback = {
+    id: feedbackId,
+    user_name: payload.user_name || "Guest User",
+    user_phone: payload.user_phone ? "'" + formatNumberString(payload.user_phone) : "",
+    user_aadhar: payload.user_aadhar ? "'" + formatNumberString(payload.user_aadhar) : "",
+    message: payload.message || "",
+    rating: parseInt(payload.rating) || 0,
+    created_at: new Date().toISOString()
+  };
+  
+  appendObjectToSheet(sheet, newFeedback);
+  
+  newFeedback.user_phone = payload.user_phone ? formatNumberString(payload.user_phone) : "";
+  newFeedback.user_aadhar = payload.user_aadhar ? formatNumberString(payload.user_aadhar) : "";
+  return newFeedback;
+}
+
+function getFeedbackAction() {
+  var rows = getRowsFromSheet("Feedback");
+  rows.sort(function(a, b) {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+  return rows.map(function(f) {
+    var item = {};
+    Object.keys(f).forEach(function(key) {
+      item[key] = f[key];
+    });
+    item.user_phone = formatNumberString(f.user_phone);
+    item.user_aadhar = formatNumberString(f.user_aadhar);
+    return item;
+  });
+}
+
+function deleteFeedbackAction(id) {
+  var sheet = getSheet("Feedback");
+  var rowIndex = findRowIndexById(sheet, id);
+  if (rowIndex === -1) throw new Error("Feedback entry not found.");
+  sheet.deleteRow(rowIndex);
+  return { id: id, success: true };
+}
+
 // --- 5. GOOGLE DRIVE FILE UPLOADS ---
 
 function uploadFileAction(requestData) {
@@ -950,6 +1008,11 @@ function initSpreadsheet() {
   ensureColumnExists(jobsSheet, "details_doc");
   ensureColumnExists(jobsSheet, "button_name");
   
+  // 5B. FEEDBACK SHEET
+  ensureSheetExists("Feedback", [
+    "id", "user_name", "user_phone", "user_aadhar", "message", "rating", "created_at"
+  ]);
+
   // 5. SYSTEM ERROR/LOG SHEET
   ensureSheetExists("SystemLog", [
     "timestamp", "context", "message"
