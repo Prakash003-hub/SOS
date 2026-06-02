@@ -1,8 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, LogOut, MessageSquare, X, ChevronDown, Send } from 'lucide-react';
 
 export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+    
+    const handleOutsideClick = (e) => {
+      const popover = document.getElementById('profile-popover-container');
+      const avatarBtn = document.getElementById('profile-avatar-button');
+      if (popover && !popover.contains(e.target) && avatarBtn && !avatarBtn.contains(e.target)) {
+        setIsProfileOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isProfileOpen]);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
 
@@ -16,7 +36,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
       return currentUser.photo_url;
     }
     // Sleek premium default avatar placeholder (Demo person)
-    return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
+    return '/avatar.png';
   };
 
   const handleFeedbackSubmit = (e) => {
@@ -67,6 +87,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
               
               {/* Circular profile avatar button */}
               <button
+                id="profile-avatar-button"
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 style={{
                   display: 'flex',
@@ -103,8 +124,10 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
 
               {/* Profile Popover Overlay Dropdown */}
               {isProfileOpen && (
-                <div style={{
-                  position: 'absolute',
+                <div 
+                  id="profile-popover-container"
+                  style={{
+                    position: 'absolute',
                   top: '46px',
                   right: 0,
                   width: '240px',
@@ -180,7 +203,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                         border: 'none'
                       }}
                     >
-                      <LogOut size={14} /> Logout (/logout)
+                      <LogOut size={14} /> Logout 
                     </button>
                   </div>
                 </div>

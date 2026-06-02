@@ -184,6 +184,32 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [infoRequestFiles, setInfoRequestFiles] = useState({});
   const [deletedSavedDocs, setDeletedSavedDocs] = useState({});
 
+  // Premium custom Toast Alerts system (Intercepts and upgrades native alert dialogs)
+  const [toast, setToast] = useState(null);
+  const [toastTimeoutId, setToastTimeoutId] = useState(null);
+
+  const alert = (message, type = 'success') => {
+    if (toastTimeoutId) {
+      clearTimeout(toastTimeoutId);
+    }
+    
+    let alertType = type;
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('fail') || lowerMessage.includes('error') || lowerMessage.includes('exceed') || lowerMessage.includes('not permitted') || lowerMessage.includes('exceeds')) {
+      alertType = 'error';
+    } else if (lowerMessage.includes('please') || lowerMessage.includes('check') || lowerMessage.includes('enter') || lowerMessage.includes('already applied') || lowerMessage.includes('required')) {
+      alertType = 'warning';
+    }
+    
+    setToast({ message, type: alertType });
+    
+    const id = setTimeout(() => {
+      setToast(null);
+      setToastTimeoutId(null);
+    }, 4500);
+    setToastTimeoutId(id);
+  };
+
   const handleInfoRequestSubmit = async (appId, type) => {
     setLoading(true);
     try {
@@ -1015,6 +1041,46 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* Premium custom Toast Alerts */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 999999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '14px 20px',
+          borderRadius: '16px',
+          background: toast.type === 'error' ? '#fef2f2' : toast.type === 'warning' ? '#fffbeb' : '#f0fdf4',
+          border: `1.5px solid ${toast.type === 'error' ? '#fca5a5' : toast.type === 'warning' ? '#fde68a' : '#a7f3d0'}`,
+          color: toast.type === 'error' ? '#991b1b' : toast.type === 'warning' ? '#92400e' : '#065f46',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+          maxWidth: '380px',
+          width: '90%',
+          animation: 'float-card 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards'
+        }}>
+          {toast.type === 'error' ? (
+            <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
+          ) : toast.type === 'warning' ? (
+            <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
+          ) : (
+            <CheckCircle size={20} style={{ color: '#10b981', flexShrink: 0 }} />
+          )}
+          <span style={{ fontSize: '0.85rem', fontWeight: '700', lineHeight: '1.4', flex: 1, textAlign: 'left' }}>
+            {toast.message}
+          </span>
+          <button 
+            onClick={() => setToast(null)} 
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', color: 'inherit', opacity: 0.6 }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
       
       <div style={{ flex: 1 }}>
         {error && (
