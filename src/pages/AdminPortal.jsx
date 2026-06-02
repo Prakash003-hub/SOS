@@ -151,6 +151,7 @@ export default function AdminPortal() {
   const [posts, setPosts] = useState([]);
   const [forms, setForms] = useState([]);
   const [users, setUsers] = useState([]);
+  const [jobs, setJobs] = useState([]);
   
   // Selected user details (Aadhaar click)
   const [selectedUser, setSelectedUser] = useState(null);

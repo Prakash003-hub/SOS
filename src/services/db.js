@@ -120,7 +120,13 @@ const uploadFileToDrive = async (file, folderPathArray) => {
 
 // --- POSTS SERVICE ---
 export const getPosts = async () => {
-  return await callApiGet("getPosts");
+  try {
+    const data = await callApiGet("getPosts");
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getPosts:", err);
+    return [];
+  }
 };
 
 export const createPost = async (postData) => {
@@ -143,7 +149,13 @@ export const uploadPostImage = async (file) => {
 
 // --- JOBS SERVICE ---
 export const getJobs = async () => {
-  return await callApiGet("getJobs");
+  try {
+    const data = await callApiGet("getJobs");
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getJobs:", err);
+    return [];
+  }
 };
 
 export const createJob = async (jobData) => {
@@ -165,7 +177,13 @@ export const uploadJobImage = async (file) => {
 
 // --- FORMS SERVICE ---
 export const getForms = async () => {
-  return await callApiGet("getForms");
+  try {
+    const data = await callApiGet("getForms");
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getForms:", err);
+    return [];
+  }
 };
 
 export const getFormById = async (id) => {
@@ -210,7 +228,13 @@ export const submitFormResponse = async (formId, phone, dob, aadhar, responses, 
 };
 
 export const getUserStatus = async (phone, dob, aadhar) => {
-  return await callApiGet("getUserStatus", { phone, dob, aadhar });
+  try {
+    const data = await callApiGet("getUserStatus", { phone, dob, aadhar });
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getUserStatus:", err);
+    return [];
+  }
 };
 
 // --- CITIZEN PROFILE SERVICES ---
@@ -281,8 +305,9 @@ export const uploadSubmissionDocument = async (subId, docKey, file1, file2 = nul
   const url2 = file2 ? await uploadFileToDrive(file2, path) : null;
   
   // Get active submission to read and merge current docs list
-  const subs = await callApiGet("getSubmissions");
-  const sub = subs.find(s => s.id === subId);
+  const rawSubs = await callApiGet("getSubmissions");
+  const subs = Array.isArray(rawSubs) ? rawSubs : [];
+  const sub = subs.find(s => s && s.id === subId);
   if (!sub) throw new Error("Submission not found in spreadsheet database");
   
   let currentDocs = {};
@@ -362,79 +387,93 @@ export const adminDeleteDoc = async (subId, docType) => {
   });
 };
 
-// --- ADMIN USERS LIST SERVICES ---
+/// --- ADMIN USERS LIST SERVICES ---
 export const getUsersList = async () => {
-  const subs = await callApiGet("getSubmissions") || [];
-  const users = await callApiGet("getUsers") || [];
-  
-  const seenAadhar = new Set();
-  const uniqueUsers = [];
-  
-  // 1. Process all registered users first (so everyone shows up!)
-  for (const u of users) {
-    if (u.aadhar) {
-      const cleanAadhar = u.aadhar.toString().trim();
-      if (!seenAadhar.has(cleanAadhar)) {
-        seenAadhar.add(cleanAadhar);
-        
-        // Find their latest submission to determine last_active date
-        const userSubs = subs.filter(s => s.aadhar && s.aadhar.toString().trim() === cleanAadhar);
-        let lastActive = u.created_at || new Date().toISOString();
-        if (userSubs.length > 0) {
-          // Sort submissions descending by date
-          userSubs.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
-          lastActive = userSubs[0].submitted_at;
+  try {
+    const rawSubs = await callApiGet("getSubmissions");
+    const rawUsers = await callApiGet("getUsers");
+    
+    const subs = Array.isArray(rawSubs) ? rawSubs : [];
+    const users = Array.isArray(rawUsers) ? rawUsers : [];
+    
+    const seenAadhar = new Set();
+    const uniqueUsers = [];
+    
+    // 1. Process all registered users first (so everyone shows up!)
+    for (const u of users) {
+      if (u && u.aadhar) {
+        const cleanAadhar = u.aadhar.toString().trim();
+        if (!seenAadhar.has(cleanAadhar)) {
+          seenAadhar.add(cleanAadhar);
+          
+          // Find their latest submission to determine last_active date
+          const userSubs = subs.filter(s => s && s.aadhar && s.aadhar.toString().trim() === cleanAadhar);
+          let lastActive = u.created_at || new Date().toISOString();
+          if (userSubs.length > 0) {
+            // Sort submissions descending by date
+            userSubs.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            lastActive = userSubs[0].submitted_at;
+          }
+          
+          uniqueUsers.push({
+            aadhar: cleanAadhar,
+            phone: u.phone,
+            dob: u.dob,
+            last_active: lastActive,
+            name: u.name || 'Citizen User',
+            photo_url: u.photo_url || null,
+            aadhar_url_1: u.aadhar_url_1 || null,
+            aadhar_url_2: u.aadhar_url_2 || null,
+            smart_card_url_1: u.smart_card_url_1 || null,
+            smart_card_url_2: u.smart_card_url_2 || null,
+            voter_id_url_1: u.voter_id_url_1 || null,
+            voter_id_url_2: u.voter_id_url_2 || null,
+            signature_url_1: u.signature_url_1 || null
+          });
         }
-        
-        uniqueUsers.push({
-          aadhar: cleanAadhar,
-          phone: u.phone,
-          dob: u.dob,
-          last_active: lastActive,
-          name: u.name || 'Citizen User',
-          photo_url: u.photo_url || null,
-          aadhar_url_1: u.aadhar_url_1 || null,
-          aadhar_url_2: u.aadhar_url_2 || null,
-          smart_card_url_1: u.smart_card_url_1 || null,
-          smart_card_url_2: u.smart_card_url_2 || null,
-          voter_id_url_1: u.voter_id_url_1 || null,
-          voter_id_url_2: u.voter_id_url_2 || null,
-          signature_url_1: u.signature_url_1 || null
-        });
       }
     }
-  }
-  
-  // 2. Append any submission users who are not registered in the Users sheet (fallback)
-  for (const sub of subs) {
-    if (sub.aadhar) {
-      const cleanAadhar = sub.aadhar.toString().trim();
-      if (!seenAadhar.has(cleanAadhar)) {
-        seenAadhar.add(cleanAadhar);
-        uniqueUsers.push({
-          aadhar: cleanAadhar,
-          phone: sub.phone,
-          dob: sub.dob,
-          last_active: sub.submitted_at,
-          name: 'Citizen User',
-          photo_url: null,
-          aadhar_url_1: null,
-          aadhar_url_2: null,
-          smart_card_url_1: null,
-          smart_card_url_2: null,
-          voter_id_url_1: null,
-          voter_id_url_2: null,
-          signature_url_1: null
-        });
+    
+    // 2. Append any submission users who are not registered in the Users sheet (fallback)
+    for (const sub of subs) {
+      if (sub && sub.aadhar) {
+        const cleanAadhar = sub.aadhar.toString().trim();
+        if (!seenAadhar.has(cleanAadhar)) {
+          seenAadhar.add(cleanAadhar);
+          uniqueUsers.push({
+            aadhar: cleanAadhar,
+            phone: sub.phone,
+            dob: sub.dob,
+            last_active: sub.submitted_at,
+            name: 'Citizen User',
+            photo_url: null,
+            aadhar_url_1: null,
+            aadhar_url_2: null,
+            smart_card_url_1: null,
+            smart_card_url_2: null,
+            voter_id_url_1: null,
+            voter_id_url_2: null,
+            signature_url_1: null
+          });
+        }
       }
     }
+    
+    return uniqueUsers;
+  } catch (err) {
+    console.error("Error in getUsersList:", err);
+    return [];
   }
-  
-  return uniqueUsers;
 };
-
+ 
 export const getSubmissionsByUser = async (aadhar) => {
-  return await callApiGet("getUserSubmissions", { aadhar });
+  try {
+    const data = await callApiGet("getUserSubmissions", { aadhar });
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getSubmissionsByUser:", err);
+    return [];
+  }
 };
 
 export const adminUpdateSubmission = async (subId, updateData) => {
