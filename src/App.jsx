@@ -7,6 +7,106 @@ import AdminPortal from './pages/AdminPortal';
 import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase } from 'lucide-react';
 import { registerUser, loginUser } from './services/db';
 
+function TrollPage() {
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 20px',
+      minHeight: '70vh',
+      width: '100%',
+      background: 'radial-gradient(circle at 50% 50%, #f8fafc 0%, #f1f5f9 100%)'
+    }}>
+      <div className="premium-card text-center" style={{
+        maxWidth: '480px',
+        width: '100%',
+        padding: '32px 24px',
+        borderRadius: '24px',
+        background: '#ffffff',
+        border: '1.5px solid #e2e8f0',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '20px',
+        animation: 'float-card 4s ease-in-out infinite'
+      }}>
+        <div style={{
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: '#fee2e2',
+          border: '1.5px solid #fca5a5',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#ef4444',
+          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+        }}>
+          <span style={{ fontSize: '1.8rem' }}>💡</span>
+        </div>
+        
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{
+            fontSize: '1.4rem',
+            fontWeight: '900',
+            color: '#1e293b',
+            margin: '0 0 6px 0',
+            fontFamily: 'system-ui, sans-serif'
+          }}>
+            வீரம் பல்பு வாங்கிய தருணம்
+          </h2>
+          <p style={{
+            margin: 0,
+            fontSize: '0.85rem',
+            color: '#64748b',
+            fontWeight: '600'
+          }}>
+            Restricted Admin access area!
+          </p>
+        </div>
+
+        <div style={{
+          borderRadius: '16px',
+          overflow: 'hidden',
+          border: '2px solid #e2e8f0',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)',
+          background: '#f8fafc',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <img 
+            src="/vadivelu_meme.png" 
+            alt="வீரம் பல்பு வாங்கிய தருணம்" 
+            style={{ width: '100%', objectFit: 'contain', display: 'block' }} 
+          />
+        </div>
+
+        <button 
+          onClick={() => window.location.replace('/user')}
+          className="premium-btn premium-btn-primary"
+          style={{
+            padding: '11px 24px',
+            borderRadius: '12px',
+            border: 'none',
+            fontWeight: '800',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            width: '100%',
+            marginTop: '8px'
+          }}
+        >
+          Return to Safety
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PortalLayout() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,7 +138,7 @@ function PortalLayout() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Determine if active route is admin or user
-  const isAdmin = location.pathname.toLowerCase().startsWith('/admin');
+  const isAdmin = location.pathname.toLowerCase().startsWith('/tnkpadmin');
   
   // Read active tab, default based on portal type with automatic bounds verification
   const rawTab = searchParams.get('tab');
@@ -159,7 +259,8 @@ function PortalLayout() {
           <main style={{ flex: 1, paddingBottom: '20px' }}>
             <Routes>
               <Route path="/user" element={<UserPortal currentUser={currentUser} onUpdateProfile={handleUpdateProfile} onLoginTrigger={() => { setAuthError(''); setAuthSuccess(''); setIsRegisterMode(false); setIsAuthModalOpen(true); }} />} />
-              <Route path="/admin" element={<AdminPortal />} />
+              <Route path="/tnkpadmin" element={<AdminPortal />} />
+              <Route path="/admin" element={<TrollPage />} />
               <Route path="*" element={<Navigate to="/user" replace />} />
             </Routes>
           </main>
