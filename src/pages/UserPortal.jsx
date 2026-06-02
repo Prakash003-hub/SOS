@@ -989,23 +989,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         </div>
         
         <div style={{ textAlign: 'center', marginTop: '4px' }}>
-          <p style={{
+          <div className="shimmer-text" style={{
             margin: 0,
-            fontSize: '1rem',
+            fontSize: '1.05rem',
             fontWeight: '900',
-            color: '#10b981',
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             fontFamily: 'system-ui, sans-serif'
-          }}>{label}</p>
-          <p style={{
+          }}>
+            {label}
+          </div>
+          <div className="shimmer-text" style={{
             margin: '4px 0 0 0',
-            fontSize: '0.8rem',
-            fontWeight: '600',
-            color: '#10b981',
-            opacity: 0.8,
-            letterSpacing: '0.02em'
-          }}>pls wait.</p>
+            fontSize: '0.85rem',
+            fontWeight: '700',
+            letterSpacing: '0.05em'
+          }}>
+            pls wait.
+          </div>
         </div>
       </div>
     );
