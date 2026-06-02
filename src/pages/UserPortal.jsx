@@ -2056,6 +2056,55 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         )}
       </div>
 
+      {loading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 99999,
+          gap: '14px'
+        }}>
+          <style>{`
+            @keyframes spin-anim {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            @keyframes pulse-text {
+              0%, 100% { opacity: 0.6; }
+              50% { opacity: 1; }
+            }
+          `}</style>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid rgba(16, 185, 129, 0.15)',
+            borderTop: '4px solid #10b981',
+            borderRadius: '50%',
+            animation: 'spin-anim 0.8s linear infinite',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)'
+          }}></div>
+          <span style={{
+            fontSize: '0.9rem',
+            fontWeight: '800',
+            color: '#10b981',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            animation: 'pulse-text 1.5s ease-in-out infinite'
+          }}>
+            Loading...
+          </span>
+        </div>
+      )}
+
     </div>
   );
 }
