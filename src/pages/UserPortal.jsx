@@ -1081,8 +1081,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           <div class="watermark">TN SEVAI</div>
           <div class="header">
             <h2>${certName}</h2>
-            <div class="sub">TN SEVAI E-SERVICE</div>
-            <div class="sub2">Official E-Governance Receipt</div>
+            <div class="sub">TN SEVAI </div>
+            <div class="sub2"> Receipt</div>
           </div>
           <div class="row"><span class="label">Receipt ID:</span><span class="value green">${receiptId}</span></div>
           <div class="row"><span class="label">Applicant Name:</span><span class="value">${applicantName}</span></div>
@@ -1419,19 +1419,19 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <div key={form.id} className="premium-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                           <span className="badge badge-info">{form.category}</span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Online Wizard</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Apply</span>
                         </div>
                         <h3 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>{form.title}</h3>
                         
                         {form.img_url && (
-                          <div style={{ width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
                             <img src={getImageUrl(form.img_url)} alt={form.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           </div>
                         )}
                         
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                           <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px' }}>
-                            Fee: ₹{form.fee || 0}
+                            Rs ₹{form.fee || 0}
                           </span>
                         </div>
                         
@@ -1441,7 +1441,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           className="premium-btn premium-btn-primary"
                           style={{ padding: '10px' }}
                         >
-                          Start Application
+                          Click toApply 
                         </button>
                       </div>
                     ))}
@@ -3359,7 +3359,7 @@ const parseDetailsDoc = (text) => {
         // Close previous table
         elements.push(renderTable());
       } else {
-        const parts = rawLine.split(',');
+        const parts = rawLine.split('$');
         if (tableHeaders.length === 0) {
           tableHeaders = parts;
         } else {
