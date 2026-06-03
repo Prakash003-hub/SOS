@@ -1642,14 +1642,39 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   required={isRequired}
                                 />
                               ) : (
-                                <input
-                                  type={fieldConfig.type}
-                                  value={formData[fieldId] || ''}
-                                  onChange={(e) => handleFieldChange(fieldId, e.target.value)}
-                                  className="premium-input"
-                                  placeholder={`Enter ${fieldConfig.label.toLowerCase()}`}
-                                  required={isRequired}
-                                />
+                                <div style={{ position: 'relative' }}>
+                                  <input
+                                    type={fieldConfig.type}
+                                    value={formData[fieldId] || ''}
+                                    onChange={(e) => handleFieldChange(fieldId, e.target.value)}
+                                    className="premium-input"
+                                    placeholder={`Enter ${fieldConfig.label.toLowerCase()}`}
+                                    required={isRequired}
+                                    readOnly={fieldId === 'aadhar' && currentUser && !!currentUser.aadhar}
+                                    style={fieldId === 'aadhar' && currentUser && currentUser.aadhar ? {
+                                      backgroundColor: '#f1f5f9',
+                                      color: '#64748b',
+                                      cursor: 'not-allowed',
+                                      borderColor: '#e2e8f0'
+                                    } : {}}
+                                  />
+                                  {fieldId === 'aadhar' && currentUser && currentUser.aadhar && (
+                                    <span style={{
+                                      position: 'absolute',
+                                      right: '10px',
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
+                                      fontSize: '0.65rem',
+                                      color: '#94a3b8',
+                                      fontWeight: '700',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}>
+                                      🔒 Permanent
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           );

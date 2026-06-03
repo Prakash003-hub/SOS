@@ -472,32 +472,21 @@ function registerUserAction(userData) {
     throw new Error("Email ID is required for registration.");
   }
   
-  // Enforce Unique constraint: phone
+  // Check if Aadhaar or Email is already registered (these are permanent unique identifiers)
   var existingRows = getRowsFromSheet("Users");
-  var isPhoneTaken = existingRows.some(function(u) {
-    var uPhone = u.phone ? formatNumberString(u.phone) : "";
-    return uPhone === phoneClean;
-  });
-  if (isPhoneTaken) {
-    throw new Error("A user profile with this Phone number is already registered.");
-  }
   
-  // Aadhaar unique check
   var isAadharTaken = existingRows.some(function(u) {
     var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
     return uAadhar === aadharClean;
   });
-  if (isAadharTaken) {
-    throw new Error("A user profile with this Aadhaar number is already registered.");
-  }
   
-  // Email unique check
   var isEmailTaken = existingRows.some(function(u) {
     var uEmail = u.email ? u.email.trim().toLowerCase() : "";
     return uEmail === emailClean;
   });
-  if (isEmailTaken) {
-    throw new Error("A user profile with this Email ID is already registered.");
+  
+  if (isAadharTaken || isEmailTaken) {
+    throw new Error("This Aadhaar number and email is already registered. Please login with your Phone number and Aadhaar first 4 digits.");
   }
   
   var userId = "usr-" + Math.random().toString(36).substring(2, 10);
@@ -733,17 +722,37 @@ function submitFormResponseAction(payload) {
   var dobClean = payload.dob ? formatDateString(payload.dob) : "";
   var aadharClean = payload.aadhar ? formatNumberString(payload.aadhar) : "";
   
-  // Find linked user_id if they have a registered profile
+  // Find linked user_id and email if they have a registered profile
   var userId = "";
+  var userEmail = "";
   try {
-    var loggedUser = loginUserAction({ phone: phoneClean, dob: dobClean, aadhar: aadharClean });
-    userId = loggedUser.id;
+    // Look up user by phone + aadhar prefix (new login format)
+    var users = getRowsFromSheet("Users");
+    for (var i = 0; i < users.length; i++) {
+      var u = users[i];
+      var uPhone = u.phone ? formatNumberString(u.phone) : "";
+      var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
+      if (uPhone === phoneClean || (aadharClean && uAadhar === aadharClean)) {
+        userId = u.id;
+        userEmail = u.email ? u.email.trim().toLowerCase() : "";
+        break;
+      }
+    }
   } catch (e) {
     // User not registered, leave user_id blank
   }
   
   var responsesPack = payload.responses || {};
   var responsesString = typeof responsesPack === "string" ? responsesPack : JSON.stringify(responsesPack);
+  
+  // Get form title for email
+  var formTitle = payload.form_title || "Application";
+  try {
+    if (payload.form_id) {
+      var formObj = getFormByIdAction(payload.form_id);
+      if (formObj && formObj.title) formTitle = formObj.title;
+    }
+  } catch(e) {}
   
   var newSubmission = {
     id: subId,
@@ -766,15 +775,13 @@ function submitFormResponseAction(payload) {
   };
   
   // --- DYNAMIC COLUMN MAPPING SYSTEM ---
-  // We parse the responses pack and dynamically write them into columns of the Submissions sheet!
   var responsesObj = typeof responsesPack === "string" ? JSON.parse(responsesPack) : responsesPack;
   var responseKeys = Object.keys(responsesObj);
   
-  // 1. Ensure sheet has columns for each custom question response
   responseKeys.forEach(function(qKey) {
     var colName = "Custom_" + qKey;
     ensureColumnExists(sheet, colName);
-    newSubmission[colName] = responsesObj[qKey]; // Attach dynamic key-value
+    newSubmission[colName] = responsesObj[qKey];
   });
   
   // Write or Append the submission
@@ -782,13 +789,48 @@ function submitFormResponseAction(payload) {
   if (rowIndex === -1) {
     appendObjectToSheet(sheet, newSubmission);
   } else {
-    // Merge existing details and save updates
     var existingSub = getRowObject(sheet, rowIndex);
     var updateKeys = Object.keys(newSubmission);
     updateKeys.forEach(function(k) {
       if (newSubmission[k] !== undefined) existingSub[k] = newSubmission[k];
     });
     updateRowObject(sheet, rowIndex, existingSub);
+  }
+  
+  // Send receipt email to user if email available and not a draft
+  if (userEmail && payload.payment_status !== "draft") {
+    try {
+      var fee = 0;
+      try { fee = getFormByIdAction(payload.form_id).fee || 0; } catch(e) {}
+      var submittedDate = new Date();
+      var dateStr = Utilities.formatDate(submittedDate, "Asia/Kolkata", "dd/MM/yyyy");
+      var timeStr = Utilities.formatDate(submittedDate, "Asia/Kolkata", "hh:mm a");
+      
+      MailApp.sendEmail({
+        to: userEmail,
+        subject: "TN Sevai - Application Receipt (" + formTitle + ")",
+        htmlBody: '<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">'
+          + '<div style="text-align:center;border-bottom:2px dashed #10b981;padding-bottom:14px;margin-bottom:16px;">'
+          + '<h2 style="color:#047857;margin:0 0 4px 0;font-size:1.3rem;">' + formTitle + '</h2>'
+          + '<span style="color:#10b981;font-size:0.8rem;font-weight:700;">TN SEVAI E-SERVICE</span><br/>'
+          + '<span style="color:#64748b;font-size:0.7rem;">Official E-Governance Receipt</span>'
+          + '</div>'
+          + '<table style="width:100%;font-size:0.85rem;border-collapse:collapse;">'
+          + '<tr><td style="color:#64748b;padding:6px 0;">Receipt ID:</td><td style="font-weight:700;color:#10b981;text-align:right;">' + subId + '</td></tr>'
+          + '<tr><td style="color:#64748b;padding:6px 0;">Phone:</td><td style="font-weight:700;text-align:right;">' + phoneClean + '</td></tr>'
+          + '<tr><td style="color:#64748b;padding:6px 0;">Date:</td><td style="font-weight:700;text-align:right;">' + dateStr + '</td></tr>'
+          + '<tr><td style="color:#64748b;padding:6px 0;">Time:</td><td style="font-weight:700;text-align:right;">' + timeStr + '</td></tr>'
+          + '<tr><td colspan="2" style="border-top:1px dashed #cbd5e1;padding-top:10px;"></td></tr>'
+          + '<tr><td style="color:#64748b;padding:6px 0;">Service Fee:</td><td style="font-weight:800;font-size:1rem;text-align:right;">Rs. ' + fee + '</td></tr>'
+          + '<tr><td style="color:#64748b;padding:6px 0;">Payment Status:</td><td style="text-align:right;"><span style="background:#fef2f2;color:#ef4444;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">UNPAID</span></td></tr>'
+          + '</table>'
+          + '<p style="text-align:center;color:#94a3b8;font-size:0.75rem;margin-top:16px;">Thank you for using TN Sevai E-Service Portal.</p>'
+          + '</div>'
+      });
+    } catch (emailErr) {
+      // Don't fail the submission if email fails
+      logError("submitFormResponse_email", emailErr);
+    }
   }
   
   // Clean returned object
@@ -804,6 +846,8 @@ function adminUpdateSubmissionAction(id, updateData) {
   if (rowIndex === -1) throw new Error("Submission record not found.");
   
   var existingSub = getRowObject(sheet, rowIndex);
+  var oldStatus = existingSub.payment_status || "";
+  var oldProgress = existingSub.progress_percent || 0;
   
   // Map standard and dynamic updates
   var keys = Object.keys(updateData);
@@ -823,6 +867,72 @@ function adminUpdateSubmissionAction(id, updateData) {
   });
   
   updateRowObject(sheet, rowIndex, existingSub);
+  
+  // Send email notification if status or progress changed
+  var newStatus = existingSub.payment_status || "";
+  var newProgress = parseInt(existingSub.progress_percent) || 0;
+  var statusChanged = (oldStatus !== newStatus) || (parseInt(oldProgress) !== newProgress);
+  
+  if (statusChanged) {
+    // Find user email from Users sheet
+    var subAadhar = existingSub.aadhar ? formatNumberString(existingSub.aadhar) : "";
+    var subPhone = existingSub.phone ? formatNumberString(existingSub.phone) : "";
+    var userEmail = "";
+    
+    try {
+      var users = getRowsFromSheet("Users");
+      for (var i = 0; i < users.length; i++) {
+        var u = users[i];
+        var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
+        var uPhone = u.phone ? formatNumberString(u.phone) : "";
+        if ((subAadhar && uAadhar === subAadhar) || (subPhone && uPhone === subPhone)) {
+          userEmail = u.email ? u.email.trim().toLowerCase() : "";
+          break;
+        }
+      }
+    } catch(e) {}
+    
+    if (userEmail) {
+      try {
+        // Get form title
+        var formTitle = "Application";
+        try {
+          var formObj = getFormByIdAction(existingSub.form_id);
+          if (formObj && formObj.title) formTitle = formObj.title;
+        } catch(e) {}
+        
+        var progressDesc = existingSub.progress_desc || "Status updated.";
+        var statusBadge = newStatus === 'paid' 
+          ? '<span style="background:#f0fdf4;color:#10b981;padding:3px 10px;border-radius:6px;font-weight:700;">' + newStatus.toUpperCase() + '</span>'
+          : '<span style="background:#fef2f2;color:#ef4444;padding:3px 10px;border-radius:6px;font-weight:700;">' + (newStatus || 'UNPAID').toUpperCase() + '</span>';
+        
+        MailApp.sendEmail({
+          to: userEmail,
+          subject: "TN Sevai - Application Status Update (" + formTitle + ")",
+          htmlBody: '<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">'
+            + '<div style="text-align:center;margin-bottom:16px;">'
+            + '<h2 style="color:#047857;margin:0;">TN Sevai E-Service</h2>'
+            + '<p style="color:#64748b;font-size:0.8rem;">Application Status Update</p>'
+            + '</div>'
+            + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:16px;">'
+            + '<table style="width:100%;font-size:0.85rem;border-collapse:collapse;">'
+            + '<tr><td style="color:#64748b;padding:6px 0;">Application ID:</td><td style="font-weight:700;text-align:right;">' + id + '</td></tr>'
+            + '<tr><td style="color:#64748b;padding:6px 0;">Service:</td><td style="font-weight:700;text-align:right;">' + formTitle + '</td></tr>'
+            + '<tr><td style="color:#64748b;padding:6px 0;">Progress:</td><td style="font-weight:700;text-align:right;color:#10b981;">' + newProgress + '%</td></tr>'
+            + '<tr><td style="color:#64748b;padding:6px 0;">Payment Status:</td><td style="text-align:right;">' + statusBadge + '</td></tr>'
+            + '</table>'
+            + '</div>'
+            + '<div style="background:#f0fdf4;border-left:4px solid #10b981;padding:12px;border-radius:0 8px 8px 0;">'
+            + '<p style="margin:0;font-size:0.85rem;color:#1e293b;"><strong>Update:</strong> ' + progressDesc + '</p>'
+            + '</div>'
+            + '<p style="text-align:center;color:#94a3b8;font-size:0.75rem;margin-top:16px;">Login to TN Sevai to view full details.</p>'
+            + '</div>'
+        });
+      } catch (emailErr) {
+        logError("adminUpdateSubmission_email", emailErr);
+      }
+    }
+  }
   
   // Clean returned object
   var cleanedSub = {};
