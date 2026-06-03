@@ -13,7 +13,8 @@ import {
   submitInfoRequestResponse,
   deleteUserDocument,
   loginUser,
-  getJobs
+  getJobs,
+  uploadFileToDrive
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -168,6 +169,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // Document upload state
   // Stores file selections: { [docKey]: { type: 'pdf' | 'images', file1, file2 } }
   const [uploadedFiles, setUploadedFiles] = useState({});
+  const [uploadStatuses, setUploadStatuses] = useState({});
+  const [uploadedUrls, setUploadedUrls] = useState({});
   const [uploadProgress, setUploadProgress] = useState('');
   const [submissionResult, setSubmissionResult] = useState(null);
   
@@ -606,35 +609,61 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     setWizardStep(4);
   };
 
-  // Handle local file selections inside Step 4
-  const handleFileChange = (docKey, uploadType, fileInputIdx, file) => {
+  // Animated upload text
+  useEffect(() => {
+    let interval;
+    const hasUploading = Object.values(uploadStatuses).some(s => s === 'uploading');
+    if (hasUploading) {
+      interval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev === 'Uploading.') return 'Uploading..';
+          if (prev === 'Uploading..') return 'Uploading...';
+          return 'Uploading.';
+        });
+      }, 500);
+    } else {
+      setUploadProgress('');
+    }
+    return () => clearInterval(interval);
+  }, [uploadStatuses]);
+
+  // Handle immediate upload for independent documents
+  const handleImmediateUpload = async (docKey, uploadType, fileInputIdx, file) => {
     if (!file) return;
 
-    // Check size limit: Photo < 7MB, other < 5MB
+    // Check size limit
     const limit = docKey === 'photo' ? 7 * 1024 * 1024 : 5 * 1024 * 1024;
     if (file.size > limit) {
       alert(`File size exceeds limit. ${docKey === 'photo' ? 'Photo' : 'Documents'} must be less than ${limit / (1024 * 1024)}MB.`);
       return;
     }
 
-    setUploadedFiles(prev => {
-      const current = prev[docKey] || { type: uploadType };
-      if (uploadType === 'pdf') {
-        return {
-          ...prev,
-          [docKey]: { type: 'pdf', file1: file }
-        };
-      } else {
-        return {
-          ...prev,
-          [docKey]: {
-            ...current,
-            type: 'images',
-            [`file${fileInputIdx}`]: file
-          }
-        };
+    setUploadStatuses(prev => ({ ...prev, [docKey]: 'uploading' }));
+    if (!uploadProgress) setUploadProgress('Uploading.');
+
+    try {
+      let folderPath = ['TN_Sevai_App', 'Submissions', 'Temp'];
+      if (currentUser) {
+        folderPath = ['TN_Sevai_App', 'Users', currentUser.phone || 'Unknown', 'Documents'];
       }
-    });
+      
+      const fileUrl = await uploadFileToDrive(file, folderPath);
+      
+      setUploadedUrls(prev => {
+        const current = prev[docKey] || { type: uploadType };
+        if (uploadType === 'pdf') {
+          return { ...prev, [docKey]: { type: 'pdf', url1: fileUrl, name1: file.name } };
+        } else {
+          return { ...prev, [docKey]: { ...current, type: 'images', [`url${fileInputIdx}`]: fileUrl, [`name${fileInputIdx}`]: file.name } };
+        }
+      });
+      
+      setUploadStatuses(prev => ({ ...prev, [docKey]: 'uploaded' }));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to upload " + docKey);
+      setUploadStatuses(prev => ({ ...prev, [docKey]: 'failed' }));
+    }
   };
 
   // Proceed from Step 4 (Upload Docs) to Step 5 (Receipt) - Perform uploads and save submission
@@ -651,7 +680,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         currentUser[`${docKey}_url_1`] ||
         currentUser[`${docKey}_url`]
       );
-      const isSelectedLocal = uploadedFiles[docKey] && (uploadedFiles[docKey].file1 || uploadedFiles[docKey].file2);
+      const isSelectedLocal = uploadedUrls[docKey] && (uploadedUrls[docKey].url1 || uploadedUrls[docKey].url2);
       
       if (!isAlreadyUploaded && !isSelectedLocal) {
         missing.push(STANDARD_FIELDS[docKey]?.label || docKey);
@@ -659,14 +688,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     });
 
     customDocsList.forEach(docLabel => {
-      const isSelectedLocal = uploadedFiles[docLabel] && uploadedFiles[docLabel].file1;
+      const isSelectedLocal = uploadedUrls[docLabel] && uploadedUrls[docLabel].url1;
       if (!isSelectedLocal) {
         missing.push(docLabel);
       }
     });
 
     if (missing.length > 0) {
-      alert(`Please select files to upload for: ${missing.join(', ')}`);
+      alert(`Please upload files for: ${missing.join(', ')}`);
       return;
     }
 
@@ -713,8 +742,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           responsesPack[f.label] = formData[f.id] || '';
         }
       });
-
-      // 2. Prepare pre-existing documents payload to avoid duplicate uploads
+      
+      // 2. Prepare documents payload using uploadedUrls and currentUser saved docs
       const docReferencesPack = {};
       requiredDocsList.forEach(docKey => {
         if (deletedSavedDocs[docKey]) return; // Skip if deleted/replaced!
@@ -724,55 +753,43 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         const isPhotoSavedUrl = docKey === 'photo' && currentUser && currentUser.photo_url;
         const isSignatureSavedUrl = docKey === 'signature' && currentUser && currentUser.signature_url_1;
         
-        if (isPhotoSavedUrl && !uploadedFiles['photo']) {
-          docReferencesPack['photo'] = [currentUser.photo_url];
-        } else if (isSignatureSavedUrl && !uploadedFiles['signature']) {
-          docReferencesPack['signature'] = [currentUser.signature_url_1];
-        } else if (hasSavedUrl1 && !uploadedFiles[docKey]) {
-          docReferencesPack[docKey] = [hasSavedUrl1];
-          if (hasSavedUrl2) docReferencesPack[docKey].push(hasSavedUrl2);
+        const freshlyUploaded = uploadedUrls[docKey];
+        
+        if (freshlyUploaded) {
+           docReferencesPack[docKey] = freshlyUploaded.type === 'pdf' 
+             ? [freshlyUploaded.url1] 
+             : [freshlyUploaded.url1, freshlyUploaded.url2].filter(Boolean);
+        } else if (isPhotoSavedUrl) {
+           docReferencesPack['photo'] = [currentUser.photo_url];
+        } else if (isSignatureSavedUrl) {
+           docReferencesPack['signature'] = [currentUser.signature_url_1];
+        } else if (hasSavedUrl1) {
+           docReferencesPack[docKey] = [hasSavedUrl1];
+           if (hasSavedUrl2) docReferencesPack[docKey].push(hasSavedUrl2);
         }
       });
 
-      // 3. Create Submission record in Backend
+      customDocsList.forEach(docLabel => {
+        const freshlyUploaded = uploadedUrls[docLabel];
+        if (freshlyUploaded) {
+           docReferencesPack[docLabel] = freshlyUploaded.type === 'pdf' 
+             ? [freshlyUploaded.url1] 
+             : [freshlyUploaded.url1, freshlyUploaded.url2].filter(Boolean);
+        }
+      });
+
+      // 3. Create Submission record in Backend, including uploadedDocs
       const submission = await submitFormResponse(
         selectedForm.id,
         formData.phone || currentUser?.phone || '',
         formData.dob || currentUser?.dob || '',
         formData.aadhar || currentUser?.aadhar || '',
-        responsesPack
+        responsesPack,
+        "submitted",
+        docReferencesPack
       );
 
-      // Save initial document mappings
-      if (Object.keys(docReferencesPack).length > 0) {
-        submission.uploaded_docs = JSON.stringify(docReferencesPack);
-      }
-
       setSubmissionResult(submission);
-
-      // 4. Perform upload calls for all newly selected files
-      const uploadsMap = Object.entries(uploadedFiles);
-      for (let i = 0; i < uploadsMap.length; i++) {
-        const [docKey, fileObj] = uploadsMap[i];
-        setUploadProgress(`Uploading ${docKey.replace(/_/g, ' ')} file (${i + 1}/${uploadsMap.length})...`);
-
-        const isStandardDoc = ['photo', 'aadhar', 'smart_card', 'voter_id', 'signature'].includes(docKey);
-
-        if (fileObj.type === 'pdf') {
-          // Single PDF Upload
-          await uploadSubmissionDocument(submission.id, docKey, fileObj.file1);
-          // Also sync to global user profile for future pre-filling
-          if (currentUser && isStandardDoc) {
-            await uploadUserDocument(currentUser.id, docKey, fileObj.file1);
-          }
-        } else {
-          // Front and Back images upload
-          await uploadSubmissionDocument(submission.id, docKey, fileObj.file1, fileObj.file2);
-          if (currentUser && isStandardDoc) {
-            await uploadUserDocument(currentUser.id, docKey, fileObj.file1, fileObj.file2);
-          }
-        }
-      }
 
       // Save filled custom fields to user profile for future auto-filling
       if (currentUser) {
@@ -1405,6 +1422,19 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Online Wizard</span>
                         </div>
                         <h3 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>{form.title}</h3>
+                        
+                        {form.img_url && (
+                          <div style={{ width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                            <img src={getImageUrl(form.img_url)} alt={form.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        )}
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px' }}>
+                            Fee: ₹{form.fee || 0}
+                          </span>
+                        </div>
+                        
                         <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '16px' }}>{form.description}</p>
                         <button 
                           onClick={() => selectFormToFill(form)}
@@ -2076,103 +2106,129 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           );
                         }
 
+                        const isUploading = uploadStatuses[docKey] === 'uploading';
+                        const isUploaded = uploadStatuses[docKey] === 'uploaded';
+                        const freshlyUploaded = uploadedUrls[docKey];
+
                         return (
                           <div key={docKey} className="document-upload-zone" style={{ padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f8fafc', marginBottom: '16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                               <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize' }}>
                                 {STANDARD_FIELDS[docKey]?.label || docKey} <span style={{ color: 'var(--error)' }}>*</span>
                               </span>
+                              {isUploaded && (
+                                <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <CheckCircle size={14} /> Uploaded
+                                </span>
+                              )}
                             </div>
 
-                            {/* Options Toggle for Aadhaar, Voter, Smart Card (images vs PDF) */}
-                            {docKey !== 'photo' && docKey !== 'signature' && (
-                              <div style={{ display: 'flex', backgroundColor: '#e2e8f0', borderRadius: '6px', padding: '2px', border: '1px solid #cbd5e1', marginBottom: '10px', maxWidth: '240px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'pdf' } }))}
-                                  style={{
-                                    flex: 1,
-                                    padding: '4px 8px',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '600',
-                                    backgroundColor: selectedType === 'pdf' ? '#10b981' : 'transparent',
-                                    color: selectedType === 'pdf' ? '#ffffff' : '#64748b',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  One PDF File
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'images' } }))}
-                                  style={{
-                                    flex: 1,
-                                    padding: '4px 8px',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '600',
-                                    backgroundColor: selectedType === 'images' ? '#10b981' : 'transparent',
-                                    color: selectedType === 'images' ? '#ffffff' : '#64748b',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  2 Images (Front/Back)
-                                </button>
+                            {isUploading ? (
+                              <div style={{ padding: '12px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid #0369a1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                {uploadProgress || 'Uploading...'}
                               </div>
-                            )}
-
-                            {/* Render Upload inputs */}
-                            {docKey === 'photo' || docKey === 'signature' || selectedType === 'pdf' ? (
-                              // Single Input (PDF/Image)
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                                  <Upload size={16} style={{ color: 'var(--primary)' }} />
-                                  <span>{localFile.file1 ? localFile.file1.name : 'Choose PDF / Image File'}</span>
-                                  <input 
-                                    type="file" 
-                                    accept={['photo', 'signature'].includes(docKey) ? 'image/*' : 'application/pdf,image/*'}
-                                    onChange={(e) => handleFileChange(docKey, 'pdf', 1, e.target.files[0])}
-                                    style={{ display: 'none' }}
-                                  />
-                                </label>
+                            ) : isUploaded && freshlyUploaded ? (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#f0fdf4', border: '1px solid #10b981', borderRadius: '6px' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600' }}>
+                                  {freshlyUploaded.type === 'pdf' ? freshlyUploaded.name1 : `${freshlyUploaded.name1} & ${freshlyUploaded.name2}`}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <a 
+                                    href={getImageUrl(freshlyUploaded.url1)} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="premium-btn premium-btn-secondary"
+                                    style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
+                                  >
+                                    View
+                                  </a>
+                                  <label className="premium-btn premium-btn-primary" style={{ padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', margin: 0 }}>
+                                    Replace
+                                    <input 
+                                      type="file" 
+                                      accept={['photo', 'signature'].includes(docKey) ? 'image/*' : 'application/pdf,image/*'}
+                                      onChange={(e) => handleImmediateUpload(docKey, 'pdf', 1, e.target.files[0])}
+                                      style={{ display: 'none' }}
+                                    />
+                                  </label>
+                                </div>
                               </div>
                             ) : (
-                              // Dual Side Image Inputs (Front & Back)
-                              <div style={{ display: 'flex', gap: '10px' }}>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Front Side Image:</span>
-                                  <label className="premium-btn premium-btn-secondary" style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', gap: '4px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                                    <Upload size={14} style={{ color: 'var(--primary)' }} />
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>
-                                      {localFile.file1 ? localFile.file1.name : 'Select Front'}
-                                    </span>
-                                    <input 
-                                      type="file" 
-                                      accept="image/*"
-                                      onChange={(e) => handleFileChange(docKey, 'images', 1, e.target.files[0])}
-                                      style={{ display: 'none' }}
-                                    />
-                                  </label>
-                                </div>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Back Side Image:</span>
-                                  <label className="premium-btn premium-btn-secondary" style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', gap: '4px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                                    <Upload size={14} style={{ color: 'var(--primary)' }} />
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>
-                                      {localFile.file2 ? localFile.file2.name : 'Select Back'}
-                                    </span>
-                                    <input 
-                                      type="file" 
-                                      accept="image/*"
-                                      onChange={(e) => handleFileChange(docKey, 'images', 2, e.target.files[0])}
-                                      style={{ display: 'none' }}
-                                    />
-                                  </label>
-                                </div>
-                              </div>
+                              <>
+                                {/* Options Toggle for Aadhaar, Voter, Smart Card (images vs PDF) */}
+                                {docKey !== 'photo' && docKey !== 'signature' && (
+                                  <div style={{ display: 'flex', backgroundColor: '#e2e8f0', borderRadius: '6px', padding: '2px', border: '1px solid #cbd5e1', marginBottom: '10px', maxWidth: '240px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'pdf' } }))}
+                                      style={{
+                                        flex: 1, padding: '4px 8px', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '600',
+                                        backgroundColor: selectedType === 'pdf' ? '#10b981' : 'transparent',
+                                        color: selectedType === 'pdf' ? '#ffffff' : '#64748b', cursor: 'pointer'
+                                      }}
+                                    >
+                                      One PDF File
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'images' } }))}
+                                      style={{
+                                        flex: 1, padding: '4px 8px', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '600',
+                                        backgroundColor: selectedType === 'images' ? '#10b981' : 'transparent',
+                                        color: selectedType === 'images' ? '#ffffff' : '#64748b', cursor: 'pointer'
+                                      }}
+                                    >
+                                      2 Images
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Render Upload inputs */}
+                                {docKey === 'photo' || docKey === 'signature' || selectedType === 'pdf' ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
+                                      <Upload size={16} style={{ color: 'var(--primary)' }} />
+                                      <span>Choose PDF / Image File to Upload</span>
+                                      <input 
+                                        type="file" 
+                                        accept={['photo', 'signature'].includes(docKey) ? 'image/*' : 'application/pdf,image/*'}
+                                        onChange={(e) => handleImmediateUpload(docKey, 'pdf', 1, e.target.files[0])}
+                                        style={{ display: 'none' }}
+                                      />
+                                    </label>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: '10px' }}>
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Front Side:</span>
+                                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', gap: '4px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
+                                        <Upload size={14} style={{ color: 'var(--primary)' }} />
+                                        <span>Upload Front</span>
+                                        <input 
+                                          type="file" 
+                                          accept="image/*"
+                                          onChange={(e) => handleImmediateUpload(docKey, 'images', 1, e.target.files[0])}
+                                          style={{ display: 'none' }}
+                                        />
+                                      </label>
+                                    </div>
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Back Side:</span>
+                                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', gap: '4px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
+                                        <Upload size={14} style={{ color: 'var(--primary)' }} />
+                                        <span>Upload Back</span>
+                                        <input 
+                                          type="file" 
+                                          accept="image/*"
+                                          onChange={(e) => handleImmediateUpload(docKey, 'images', 2, e.target.files[0])}
+                                          style={{ display: 'none' }}
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         );
@@ -2180,22 +2236,66 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                       {/* Custom Documents list */}
                       {safeJsonParse(selectedForm.custom_docs, []).map(docLabel => {
-                        const localFile = uploadedFiles[docLabel] || {};
+                        const isUploading = uploadStatuses[docLabel] === 'uploading';
+                        const isUploaded = uploadStatuses[docLabel] === 'uploaded';
+                        const freshlyUploaded = uploadedUrls[docLabel];
+
                         return (
                           <div key={docLabel} className="document-upload-zone" style={{ padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f8fafc', marginBottom: '16px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', display: 'block', marginBottom: '8px' }}>
-                              {docLabel} <span style={{ color: 'var(--error)' }}>*</span>
-                            </span>
-                            <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                              <Upload size={16} style={{ color: 'var(--primary)' }} />
-                              <span>{localFile.file1 ? localFile.file1.name : 'Choose File (PDF / Image)'}</span>
-                              <input 
-                                type="file" 
-                                accept="application/pdf,image/*"
-                                onChange={(e) => handleFileChange(docLabel, 'pdf', 1, e.target.files[0])}
-                                style={{ display: 'none' }}
-                              />
-                            </label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', display: 'block' }}>
+                                {docLabel} <span style={{ color: 'var(--error)' }}>*</span>
+                              </span>
+                              {isUploaded && (
+                                <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <CheckCircle size={14} /> Uploaded
+                                </span>
+                              )}
+                            </div>
+
+                            {isUploading ? (
+                              <div style={{ padding: '12px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid #0369a1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                {uploadProgress || 'Uploading...'}
+                              </div>
+                            ) : isUploaded && freshlyUploaded ? (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#f0fdf4', border: '1px solid #10b981', borderRadius: '6px' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600' }}>
+                                  {freshlyUploaded.name1}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <a 
+                                    href={getImageUrl(freshlyUploaded.url1)} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="premium-btn premium-btn-secondary"
+                                    style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
+                                  >
+                                    View
+                                  </a>
+                                  <label className="premium-btn premium-btn-primary" style={{ padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', margin: 0 }}>
+                                    Replace
+                                    <input 
+                                      type="file" 
+                                      accept="application/pdf,image/*"
+                                      onChange={(e) => handleImmediateUpload(docLabel, 'pdf', 1, e.target.files[0])}
+                                      style={{ display: 'none' }}
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                            ) : (
+                              <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
+                                <Upload size={16} style={{ color: 'var(--primary)' }} />
+                                <span>Choose File to Upload</span>
+                                <input 
+                                  type="file" 
+                                  accept="application/pdf,image/*"
+                                  onChange={(e) => handleImmediateUpload(docLabel, 'pdf', 1, e.target.files[0])}
+                                  style={{ display: 'none' }}
+                                />
+                              </label>
+                            )}
                           </div>
                         );
                       })}
@@ -2209,7 +2309,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         className="premium-btn premium-btn-primary" 
                         style={{ flex: 2 }}
                       >
-                        {loading ? 'Uploading Docs...' : 'Submit Application'}
+                        {loading ? 'Submitting Application...' : 'Submit Application'}
                       </button>
                     </div>
                   </div>

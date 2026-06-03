@@ -25,7 +25,10 @@ import {
   deleteJob,
   uploadJobImage,
   getFeedback,
-  deleteFeedback
+  deleteFeedback,
+  getSettings,
+  updateSettings,
+  uploadFormImage
 } from '../services/db';
 import { 
   Plus, 
@@ -181,6 +184,9 @@ export default function AdminPortal() {
   const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
   const [feedbackSearchTerm, setFeedbackSearchTerm] = useState('');
   
+  // Settings
+  const [settings, setSettings] = useState({ admin_email: '' });
+  
   // Selected user details (Aadhaar click)
   const [selectedUser, setSelectedUser] = useState(null);
   const [userSubmissions, setUserSubmissions] = useState([]);
@@ -233,8 +239,10 @@ export default function AdminPortal() {
     required_fields: [], // List of standard field IDs
     required_docs: [],   // List of default doc IDs ('photo', 'aadhar', etc)
     custom_docs: [],     // List of custom doc upload labels
-    fields: []           // Any extra custom inputs
+    fields: [],           // Any extra custom inputs
+    img_url: ''          // Form image
   });
+  const [uploadingFormImg, setUploadingFormImg] = useState(false);
   
   // Submission Editor states
   const [editingResponses, setEditingResponses] = useState({});
@@ -282,11 +290,13 @@ export default function AdminPortal() {
       const usersData = await getUsersList();
       const jobsData = await getJobs();
       const feedbackData = await getFeedback();
+      const settingsData = await getSettings();
       setPosts(postsData);
       setForms(formsData);
       setUsers(usersData);
       setJobs(jobsData);
       setFeedbackList(feedbackData);
+      if (settingsData) setSettings(settingsData);
     } catch (err) {
       console.error(err);
       alert('Failed to connect to Google Workspace Apps Script Web App. Please verify VITE_GOOGLE_SCRIPT_URL is configured in your .env file, or check your internet connection.');
@@ -364,6 +374,43 @@ export default function AdminPortal() {
       alert('Failed to upload image. Please try again.');
     } finally {
       setUploadingPostImg(false);
+    }
+  };
+
+  const moveItem = async (type, list, index, direction) => {
+    const sorted = [...list].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].order_index === undefined) {
+        sorted[i].order_index = i;
+      }
+    }
+    
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+    
+    const temp = sorted[index].order_index;
+    sorted[index].order_index = sorted[targetIndex].order_index;
+    sorted[targetIndex].order_index = temp;
+    
+    try {
+      if (type === 'post') {
+        await updatePost(sorted[index].id, { order_index: sorted[index].order_index });
+        await updatePost(sorted[targetIndex].id, { order_index: sorted[targetIndex].order_index });
+        const res = await getPosts();
+        setPosts(res);
+      } else if (type === 'job') {
+        await updateJob(sorted[index].id, { order_index: sorted[index].order_index });
+        await updateJob(sorted[targetIndex].id, { order_index: sorted[targetIndex].order_index });
+        const res = await getJobs();
+        setJobs(res);
+      } else if (type === 'form') {
+        await updateForm(sorted[index].id, { order_index: sorted[index].order_index });
+        await updateForm(sorted[targetIndex].id, { order_index: sorted[targetIndex].order_index });
+        const res = await getForms();
+        setForms(res);
+      }
+    } catch (e) {
+      console.error("Failed to reorder", e);
     }
   };
 
@@ -473,6 +520,21 @@ export default function AdminPortal() {
     }
   };
 
+  const handleFormImageUpload = async (file) => {
+    if (!file) return;
+    setUploadingFormImg(true);
+    try {
+      const res = await uploadFormImage(file);
+      setFormBuilder(prev => ({ ...prev, img_url: res.img_url }));
+      alert('Form image uploaded successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploadingFormImg(false);
+    }
+  };
+
   // --- FORM BUILDER OPERATIONS ---
   const addFieldToBuilder = () => {
     const newField = {
@@ -525,7 +587,8 @@ export default function AdminPortal() {
       required_fields: JSON.stringify(formBuilder.required_fields),
       required_docs: JSON.stringify(formBuilder.required_docs),
       custom_docs: JSON.stringify(formBuilder.custom_docs),
-      fields: JSON.stringify(formBuilder.fields)
+      fields: JSON.stringify(formBuilder.fields),
+      img_url: formBuilder.img_url
     };
 
     try {
@@ -556,7 +619,8 @@ export default function AdminPortal() {
       required_fields: safeJsonParse(form.required_fields),
       required_docs: safeJsonParse(form.required_docs),
       custom_docs: safeJsonParse(form.custom_docs),
-      fields: safeJsonParse(form.fields)
+      fields: safeJsonParse(form.fields),
+      img_url: form.img_url || ''
     });
     document.getElementById('form-builder-panel')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -597,7 +661,8 @@ export default function AdminPortal() {
       required_fields: [],
       required_docs: [],
       custom_docs: [],
-      fields: []
+      fields: [],
+      img_url: ''
     });
   };
 
@@ -955,6 +1020,20 @@ export default function AdminPortal() {
           >
             Job Alerts
           </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: activeTab === 'settings' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
+              background: activeTab === 'settings' ? 'rgba(16,185,129,0.06)' : 'white',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'settings' ? 800 : 600
+            }}
+          >
+            Settings
+          </button>
         </div>
         {/* --- TAB 1: MANAGE POSTS --- */}
         {activeTab === 'posts' && (
@@ -1064,7 +1143,7 @@ export default function AdminPortal() {
               <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
                 Active Posts Feed ({posts.length} Posts)
               </h4>
-              {posts.map((post) => (
+              {[...posts].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).map((post, idx) => (
                 <div key={post.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <h4 style={{ fontSize: '0.95rem', marginBottom: '4px' }}>{post.title}</h4>
@@ -1073,6 +1152,8 @@ export default function AdminPortal() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => moveItem('post', posts, idx, 'up')} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Move Up">↑</button>
+                    <button onClick={() => moveItem('post', posts, idx, 'down')} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Move Down">↓</button>
                     <button onClick={() => startEditPost(post)} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Edit Post">
                       <Edit size={16} />
                     </button>
@@ -1224,7 +1305,7 @@ export default function AdminPortal() {
               <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
                 Active Job Alerts ({jobs.length} Listings)
               </h4>
-              {jobs.map((job) => (
+              {[...jobs].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).map((job, idx) => (
                 <div key={job.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <h4 style={{ fontSize: '0.95rem', marginBottom: '4px' }}>{job.title}</h4>
@@ -1233,6 +1314,8 @@ export default function AdminPortal() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => moveItem('job', jobs, idx, 'up')} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Move Up">↑</button>
+                    <button onClick={() => moveItem('job', jobs, idx, 'down')} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Move Down">↓</button>
                     <button onClick={() => startEditJob(job)} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Edit Job Alert">
                       <Edit size={16} />
                     </button>
@@ -1294,6 +1377,38 @@ export default function AdminPortal() {
                     <option value="voter id">Voter ID</option>
                     <option value="others">Others</option>
                   </select>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Form Image (Optional)</label>
+                  {formBuilder.img_url && (
+                    <div style={{ marginBottom: '10px', position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                      <img 
+                        src={getImageUrl(formBuilder.img_url)} 
+                        alt="Uploaded preview" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f8fafc' }} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setFormBuilder(prev => ({ ...prev, img_url: '' }))} 
+                        className="premium-btn premium-btn-danger"
+                        style={{ position: 'absolute', right: '6px', bottom: '6px', width: 'auto', padding: '4px 8px', fontSize: '0.7rem' }}
+                      >
+                        Remove Image
+                      </button>
+                    </div>
+                  )}
+                  <label className="premium-btn premium-btn-secondary" style={{ padding: '12px', fontSize: '0.85rem', display: 'flex', gap: '8px', cursor: 'pointer', background: 'white', border: '1.5px dashed var(--primary)' }}>
+                    <Upload size={16} style={{ color: 'var(--primary)' }} /> 
+                    {uploadingFormImg ? 'Uploading image...' : formBuilder.img_url ? 'Change Uploaded Image' : 'Upload Local Image File'}
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      disabled={uploadingFormImg}
+                      onChange={(e) => handleFormImageUpload(e.target.files[0])}
+                    />
+                  </label>
                 </div>
 
                 <div className="premium-input-group">
@@ -1716,8 +1831,13 @@ export default function AdminPortal() {
               <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
                 Configured Templates ({forms.length} Templates)
               </h4>
-              {forms.map((form) => (
+              {[...forms].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).map((form, idx) => (
                 <div key={form.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
+                  {form.img_url && (
+                    <div style={{ width: '50px', height: '50px', marginRight: '12px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)', flexShrink: 0 }}>
+                      <img src={getImageUrl(form.img_url)} alt="Form Image" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  )}
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
                       <span className="badge badge-info">{form.category}</span>
@@ -1727,6 +1847,8 @@ export default function AdminPortal() {
                     <p className="text-muted" style={{ fontSize: '0.8rem' }}>{form.description}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => moveItem('form', forms, idx, 'up')} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Move Up">↑</button>
+                    <button onClick={() => moveItem('form', forms, idx, 'down')} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Move Down">↓</button>
                     <button onClick={() => handleDuplicateForm(form.id)} className="premium-btn premium-btn-success" style={{ width: '36px', height: '36px', padding: 0 }} title="Duplicate Template">
                       <Copy size={16} />
                     </button>
@@ -1741,6 +1863,45 @@ export default function AdminPortal() {
               ))}
             </div>
 
+          </div>
+        )}
+
+        {/* --- TAB: SETTINGS --- */}
+        {activeTab === 'settings' && (
+          <div className="desktop-grid-2">
+            <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', alignSelf: 'flex-start' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>
+                Platform Settings
+              </h3>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  await updateSettings(settings);
+                  alert('Settings saved successfully!');
+                } catch (err) {
+                  console.error(err);
+                  alert('Failed to save settings.');
+                }
+              }}>
+                <div className="premium-input-group">
+                  <label className="premium-label">Admin Email Address</label>
+                  <input 
+                    type="email" 
+                    value={settings.admin_email} 
+                    onChange={(e) => setSettings({ ...settings, admin_email: e.target.value })} 
+                    placeholder="admin@example.com"
+                    className="premium-input" 
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
+                    System notifications will be sent to this email.
+                  </span>
+                </div>
+                
+                <button type="submit" className="premium-btn premium-btn-primary" style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <Save size={16} /> Save Settings
+                </button>
+              </form>
+            </div>
           </div>
         )}
 

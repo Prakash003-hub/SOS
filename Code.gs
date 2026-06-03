@@ -108,6 +108,9 @@ function doGet(e) {
       case "getFeedback":
         responseData = getFeedbackAction();
         break;
+      case "getSettings":
+        responseData = getSettingsAction();
+        break;
       default:
         return jsonResponse({ success: false, error: "Invalid GET Action: " + action }, 400);
     }
@@ -217,6 +220,11 @@ function doPost(e) {
         responseData = uploadFileAction(requestBody);
         break;
         
+      // Settings Operations
+      case "updateSettings":
+        responseData = updateSettingsAction(requestBody.payload);
+        break;
+        
       default:
         return jsonResponse({ success: false, error: "Invalid POST Action: " + action }, 400);
     }
@@ -234,8 +242,13 @@ function doPost(e) {
 
 function getPostsAction() {
   var rows = getRowsFromSheet("Posts");
-  // Sort posts descending by id
-  rows.sort(function(a, b) { return b.id - a.id; });
+  // Sort posts descending by order_index, then by id
+  rows.sort(function(a, b) {
+    var orderA = parseInt(a.order_index) || 0;
+    var orderB = parseInt(b.order_index) || 0;
+    if (orderB !== orderA) return orderB - orderA;
+    return b.id - a.id; 
+  });
   return rows;
 }
 
@@ -248,6 +261,7 @@ function createPostAction(postData) {
     description: postData.description || "",
     img_url: postData.img_url || "",
     apply_url: postData.apply_url || "",
+    order_index: parseInt(postData.order_index) || 0,
     created_at: new Date().toISOString()
   };
   
@@ -265,6 +279,7 @@ function updatePostAction(id, postData) {
   existingRow.description = postData.description !== undefined ? postData.description : existingRow.description;
   existingRow.img_url = postData.img_url !== undefined ? postData.img_url : existingRow.img_url;
   existingRow.apply_url = postData.apply_url !== undefined ? postData.apply_url : existingRow.apply_url;
+  if (postData.order_index !== undefined) existingRow.order_index = parseInt(postData.order_index) || 0;
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -282,8 +297,13 @@ function deletePostAction(id) {
 
 function getJobsAction() {
   var rows = getRowsFromSheet("Jobs");
-  // Sort jobs descending by id
-  rows.sort(function(a, b) { return b.id - a.id; });
+  // Sort jobs descending by order_index, then by id
+  rows.sort(function(a, b) { 
+    var orderA = parseInt(a.order_index) || 0;
+    var orderB = parseInt(b.order_index) || 0;
+    if (orderB !== orderA) return orderB - orderA;
+    return b.id - a.id; 
+  });
   return rows;
 }
 
@@ -298,6 +318,7 @@ function createJobAction(jobData) {
     apply_url: jobData.apply_url || "",
     details_doc: jobData.details_doc || "",
     button_name: jobData.button_name || "",
+    order_index: parseInt(jobData.order_index) || 0,
     created_at: new Date().toISOString()
   };
   
@@ -317,6 +338,7 @@ function updateJobAction(id, jobData) {
   existingRow.apply_url = jobData.apply_url !== undefined ? jobData.apply_url : existingRow.apply_url;
   existingRow.details_doc = jobData.details_doc !== undefined ? jobData.details_doc : existingRow.details_doc;
   existingRow.button_name = jobData.button_name !== undefined ? jobData.button_name : existingRow.button_name;
+  if (jobData.order_index !== undefined) existingRow.order_index = parseInt(jobData.order_index) || 0;
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -346,6 +368,8 @@ function getFormsAction() {
       required_docs: parseJsonField(row.required_docs),
       custom_docs: parseJsonField(row.custom_docs),
       fields: parseJsonField(row.fields),
+      img_url: row.img_url || "",
+      order_index: parseInt(row.order_index) || 0,
       created_at: row.created_at
     };
   });
@@ -368,6 +392,8 @@ function getFormByIdAction(id) {
     required_docs: parseJsonField(row.required_docs),
     custom_docs: parseJsonField(row.custom_docs),
     fields: parseJsonField(row.fields),
+    img_url: row.img_url || "",
+    order_index: parseInt(row.order_index) || 0,
     created_at: row.created_at
   };
 }
@@ -387,6 +413,8 @@ function createFormAction(formData) {
     required_docs: typeof formData.required_docs === "string" ? formData.required_docs : JSON.stringify(formData.required_docs || []),
     custom_docs: typeof formData.custom_docs === "string" ? formData.custom_docs : JSON.stringify(formData.custom_docs || []),
     fields: typeof formData.fields === "string" ? formData.fields : JSON.stringify(formData.fields || []),
+    img_url: formData.img_url || "",
+    order_index: parseInt(formData.order_index) || 0,
     created_at: new Date().toISOString()
   };
   
@@ -409,6 +437,8 @@ function updateFormAction(id, formData) {
   if (formData.required_docs !== undefined) existingRow.required_docs = typeof formData.required_docs === "string" ? formData.required_docs : JSON.stringify(formData.required_docs);
   if (formData.custom_docs !== undefined) existingRow.custom_docs = typeof formData.custom_docs === "string" ? formData.custom_docs : JSON.stringify(formData.custom_docs);
   if (formData.fields !== undefined) existingRow.fields = typeof formData.fields === "string" ? formData.fields : JSON.stringify(formData.fields);
+  if (formData.img_url !== undefined) existingRow.img_url = formData.img_url;
+  if (formData.order_index !== undefined) existingRow.order_index = parseInt(formData.order_index) || 0;
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -449,7 +479,9 @@ function duplicateFormAction(id) {
     required_fields: form.required_fields,
     required_docs: form.required_docs,
     custom_docs: form.custom_docs,
-    fields: form.fields
+    fields: form.fields,
+    img_url: form.img_url,
+    order_index: form.order_index
   };
   return createFormAction(duplicatedForm);
 }
@@ -832,6 +864,45 @@ function submitFormResponseAction(payload) {
       logError("submitFormResponse_email", emailErr);
     }
   }
+
+  // Send email to the admin if admin_email is configured
+  try {
+    var settings = getSettingsAction();
+    var adminEmail = settings.admin_email;
+    if (adminEmail && payload.payment_status !== "draft") {
+      var applicantName = "";
+      if (userId) {
+        var usersArr = getRowsFromSheet("Users");
+        for (var u = 0; u < usersArr.length; u++) {
+          if (usersArr[u].id === userId) {
+            applicantName = usersArr[u].name || "";
+            break;
+          }
+        }
+      }
+      
+      var submittedDate = new Date();
+      var dStr = Utilities.formatDate(submittedDate, "Asia/Kolkata", "dd/MM/yyyy");
+      var tStr = Utilities.formatDate(submittedDate, "Asia/Kolkata", "hh:mm a");
+
+      var adminSubject = "New Application Received: " + formTitle;
+      var adminBody = "A new application has been submitted.\n\n" +
+                      "Applicant Name: " + applicantName + "\n" +
+                      "Certificate Name: " + formTitle + "\n" +
+                      "Date: " + dStr + "\n" +
+                      "Time: " + tStr + "\n" +
+                      "Aadhaar No: " + aadharClean + "\n" +
+                      "Phone No: " + phoneClean + "\n";
+      
+      MailApp.sendEmail({
+        to: adminEmail,
+        subject: adminSubject,
+        body: adminBody
+      });
+    }
+  } catch (adminEmailErr) {
+    logError("submitFormResponse_adminEmail", adminEmailErr);
+  }
   
   // Clean returned object
   newSubmission.phone = phoneClean;
@@ -1165,6 +1236,43 @@ function deleteFeedbackAction(id) {
   return { id: id, success: true };
 }
 
+// --- 4C. SETTINGS ACTIONS ---
+
+function getSettingsAction() {
+  var rows = getRowsFromSheet("Settings");
+  var settings = {};
+  rows.forEach(function(r) {
+    settings[r.key] = r.value;
+  });
+  return settings;
+}
+
+function updateSettingsAction(payload) {
+  var sheet = getSheet("Settings");
+  var keys = Object.keys(payload);
+  
+  var values = sheet.getDataRange().getDisplayValues();
+  var headers = values[0];
+  var keyColIndex = headers.indexOf("key");
+  var valColIndex = headers.indexOf("value");
+  
+  keys.forEach(function(k) {
+    var foundRow = -1;
+    for (var r = 1; r < values.length; r++) {
+      if (values[r][keyColIndex] === k) {
+        foundRow = r + 1;
+        break;
+      }
+    }
+    if (foundRow !== -1) {
+      sheet.getRange(foundRow, valColIndex + 1).setValue(payload[k]);
+    } else {
+      appendObjectToSheet(sheet, { key: k, value: payload[k] });
+    }
+  });
+  return getSettingsAction();
+}
+
 // --- 5. GOOGLE DRIVE FILE UPLOADS ---
 
 function uploadFileAction(requestData) {
@@ -1206,9 +1314,11 @@ function uploadFileAction(requestData) {
  */
 function initSpreadsheet() {
   // 1. FORMS SHEET
-  ensureSheetExists("Forms", [
-    "id", "title", "description", "category", "fee", "instructions", "required_fields", "required_docs", "custom_docs", "fields", "created_at"
+  var formsSheet = ensureSheetExists("Forms", [
+    "id", "title", "description", "category", "fee", "instructions", "required_fields", "required_docs", "custom_docs", "fields", "img_url", "order_index", "created_at"
   ]);
+  ensureColumnExists(formsSheet, "img_url");
+  ensureColumnExists(formsSheet, "order_index");
   
   // 2. USERS PROFILE SHEET
   var usersSheet = ensureSheetExists("Users", [
@@ -1227,16 +1337,18 @@ function initSpreadsheet() {
   ensureColumnExists(subSheet, "other_doc_name");
   
   // 4. POSTS FEED SHEET
-  ensureSheetExists("Posts", [
-    "id", "title", "description", "img_url", "apply_url", "created_at"
+  var postsSheet = ensureSheetExists("Posts", [
+    "id", "title", "description", "img_url", "apply_url", "order_index", "created_at"
   ]);
+  ensureColumnExists(postsSheet, "order_index");
 
   // 4B. JOBS FEED SHEET
   var jobsSheet = ensureSheetExists("Jobs", [
-    "id", "title", "description", "img_url", "apply_url", "details_doc", "button_name", "created_at"
+    "id", "title", "description", "img_url", "apply_url", "details_doc", "button_name", "order_index", "created_at"
   ]);
   ensureColumnExists(jobsSheet, "details_doc");
   ensureColumnExists(jobsSheet, "button_name");
+  ensureColumnExists(jobsSheet, "order_index");
   
   // 5B. FEEDBACK SHEET
   ensureSheetExists("Feedback", [
@@ -1248,7 +1360,13 @@ function initSpreadsheet() {
     "email", "otp", "expires_at"
   ]);
 
-  // 5. SYSTEM ERROR/LOG SHEET
+  // 6. SETTINGS SHEET
+  var settingsSheet = ensureSheetExists("Settings", ["key", "value"]);
+  if (settingsSheet.getLastRow() <= 1) {
+    appendObjectToSheet(settingsSheet, { key: "admin_email", value: "" });
+  }
+
+  // 7. SYSTEM ERROR/LOG SHEET
   ensureSheetExists("SystemLog", [
     "timestamp", "context", "message"
   ]);

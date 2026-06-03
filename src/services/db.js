@@ -96,7 +96,7 @@ const callApiGet = async (action, queryParams = {}) => {
 };
 
 // --- HELPER: FILE UPLOADER TO GOOGLE DRIVE ---
-const uploadFileToDrive = async (file, folderPathArray) => {
+export const uploadFileToDrive = async (file, folderPathArray) => {
   if (!file) return null;
   
   try {
@@ -208,8 +208,13 @@ export const duplicateForm = async (id) => {
   return await callApi("duplicateForm", { id });
 };
 
+export const uploadFormImage = async (file) => {
+  const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "Form_Images"]);
+  return { img_url: url };
+};
+
 // --- SUBMISSIONS SERVICE ---
-export const submitFormResponse = async (formId, phone, dob, aadhar, responses, status = "submitted") => {
+export const submitFormResponse = async (formId, phone, dob, aadhar, responses, status = "submitted", uploadedDocs = null) => {
   const payload = {
     form_id: formId,
     phone,
@@ -223,7 +228,8 @@ export const submitFormResponse = async (formId, phone, dob, aadhar, responses, 
       : "Application submitted successfully. Awaiting payment verification.",
     info_request_label: "",
     info_request_type: "text",
-    info_request_response: ""
+    info_request_response: "",
+    uploaded_docs: uploadedDocs ? JSON.stringify(uploadedDocs) : undefined
   };
   
   return await callApi("submitFormResponse", { payload });
@@ -538,6 +544,20 @@ export const deleteFeedback = async (id) => {
   return await callApi("deleteFeedback", { id });
 };
 
+// --- SETTINGS SERVICE ---
+export const getSettings = async () => {
+  try {
+    return await callApiGet("getSettings");
+  } catch (err) {
+    console.error("Error in getSettings:", err);
+    return {};
+  }
+};
+
+export const updateSettings = async (settingsData) => {
+  return await callApi("updateSettings", { payload: settingsData });
+};
+
 // --- MOCK DATABASE FALLBACK SYSTEM (LOCALSTORAGE) ---
 const callMockFallback = (action, payload) => {
   console.log(`[Offline Mode] Simulating Action: ${action}`, payload);
@@ -805,6 +825,14 @@ const callMockFallback = (action, payload) => {
       feedList = feedList.filter(f => f.id !== payload.id);
       localStorage.setItem('mock_feedback', JSON.stringify(feedList));
       return { success: true };
+    }
+    
+    case "getSettings":
+      return JSON.parse(localStorage.getItem('mock_settings') || '{"admin_email":""}');
+      
+    case "updateSettings": {
+      localStorage.setItem('mock_settings', JSON.stringify(payload.payload));
+      return payload.payload;
     }
     
     case "uploadFile":
