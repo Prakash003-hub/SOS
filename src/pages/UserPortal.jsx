@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   getPosts, 
@@ -189,6 +189,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // Refresh key: incrementing this forces the status useEffect to re-fetch data
   // even when activeTab and currentUser references haven't changed.
   const [statusRefreshKey, setStatusRefreshKey] = useState(0);
+
+  // Tracks when userApplications was last populated after a submission.
+  // Prevents the status useEffect from overwriting fresh data with stale Google Sheets data.
+  const lastStatusFetchRef = useRef(0);
 
   // Premium custom Toast Alerts system (Intercepts and upgrades native alert dialogs)
   const [toast, setToast] = useState(null);
@@ -829,19 +833,48 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       });
 
       // Wait briefly for Google Sheets to propagate the new row before re-fetching
-      console.log('[Fetch] Waiting 1.5s for Google Sheets propagation before refreshing status...');
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      console.log('[Fetch] Waiting 2s for Google Sheets propagation before refreshing status...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       if (phoneVal && dobVal) {
         try {
           console.log('[Fetch] Re-fetching user applications after submission...');
           const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);
           console.log('[Fetch] Refreshed applications data:', freshApps?.length, 'records found');
-          setUserApplications(freshApps);
+          
+          // Optimistic merge: ensure the new submission appears even if Google Sheets
+          // hasn't propagated yet. Check if the submission is already in the list.
+          let mergedApps = freshApps || [];
+          const submissionExists = mergedApps.some(app => app.id === submission.id);
+          if (!submissionExists && submission) {
+            console.log('[State] New submission not found in fetched data — adding optimistically');
+            mergedApps = [submission, ...mergedApps];
+          }
+          
+          setUserApplications(mergedApps);
           setHasSearchedStatus(true);
+          lastStatusFetchRef.current = Date.now();
+          console.log('[State] userApplications set with', mergedApps.length, 'records (timestamp:', lastStatusFetchRef.current, ')');
         } catch (e) {
           console.error("Error refreshing applications list on submit:", e);
+          // Even on error, optimistically add the submission
+          setUserApplications(prev => {
+            const exists = prev.some(app => app.id === submission.id);
+            if (!exists) return [submission, ...prev];
+            return prev;
+          });
+          setHasSearchedStatus(true);
+          lastStatusFetchRef.current = Date.now();
         }
+      } else {
+        // No credentials to fetch — just optimistically add the submission
+        setUserApplications(prev => {
+          const exists = prev.some(app => app.id === submission.id);
+          if (!exists) return [submission, ...prev];
+          return prev;
+        });
+        setHasSearchedStatus(true);
+        lastStatusFetchRef.current = Date.now();
       }
 
       if (currentUser) {
@@ -912,6 +945,15 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // even if activeTab and currentUser haven't changed references.
   useEffect(() => {
     if (activeTab === 'status' && currentUser) {
+      // Skip re-fetch if data was freshly populated after a submission (within 10 seconds).
+      // This prevents the useEffect from overwriting optimistically-merged data with
+      // stale Google Sheets data that hasn't propagated the new row yet.
+      const timeSinceLastFetch = Date.now() - lastStatusFetchRef.current;
+      if (timeSinceLastFetch < 10000) {
+        console.log('[Fetch] Status useEffect SKIPPED — data is fresh (age:', timeSinceLastFetch, 'ms). Using existing userApplications.');
+        return;
+      }
+
       const loadUserSubmissions = async () => {
         try {
           console.log('[Fetch] Status useEffect triggered. Fetching user submissions...', {
@@ -924,6 +966,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           console.log('[Fetch] Status useEffect received', data?.length, 'applications');
           setUserApplications(data);
           setHasSearchedStatus(true);
+          lastStatusFetchRef.current = Date.now();
           console.log('[State] userApplications updated with', data?.length, 'records');
         } catch (e) {
           console.error('[Fetch] Status useEffect error:', e);
@@ -1844,6 +1887,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 console.log('[Fetch] Refreshed applications data after draft:', freshApps?.length, 'records');
                                 setUserApplications(freshApps);
                                 setHasSearchedStatus(true);
+                                lastStatusFetchRef.current = Date.now();
                               } catch (e) {
                                 console.error("Error refreshing applications list on draft save:", e);
                               }

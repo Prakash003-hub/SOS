@@ -39,7 +39,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
       return currentUser.photo_url;
     }
     // Sleek premium default avatar placeholder (Demo person)
-    return '/avatar.png';
+    return '/default_avatar.png';
   };
 
   const handleFeedbackSubmit = async (e) => {
@@ -127,6 +127,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                     src={getAvatarUrl()} 
                     alt={currentUser.name} 
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { e.target.onerror = null; e.target.src = '/default_avatar.png'; }}
                   />
                 </div>
                 <ChevronDown size={14} style={{ color: '#64748b' }} />
@@ -166,6 +167,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                       src={getAvatarUrl()} 
                       alt={currentUser.name} 
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.onerror = null; e.target.src = '/default_avatar.png'; }}
                     />
                   </div>
                   
