@@ -56,6 +56,7 @@ const callApi = async (action, payload = {}) => {
       throw new Error(json.error || "Unknown Apps Script Execution Failure");
     }
 
+    console.log(`[API POST] Action: ${action} | Response:`, json.data);
     return json.data;
   } catch (err) {
     console.warn(`Google API Network Error on action [${action}]. Falling back to offline mock database:`, err);
@@ -86,6 +87,7 @@ const callApiGet = async (action, queryParams = {}) => {
       throw new Error(json.error || "Unknown Apps Script Execution Failure");
     }
 
+    console.log(`[API GET] Action: ${action} | Records:`, Array.isArray(json.data) ? json.data.length : 'N/A');
     return json.data;
   } catch (err) {
     console.warn(`Google GET API Network Error on action [${action}]. Falling back to offline mock database:`, err);

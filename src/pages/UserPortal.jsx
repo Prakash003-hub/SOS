@@ -186,6 +186,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [duplicateSubmissionError, setDuplicateSubmissionError] = useState('');
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
+  // Refresh key: incrementing this forces the status useEffect to re-fetch data
+  // even when activeTab and currentUser references haven't changed.
+  const [statusRefreshKey, setStatusRefreshKey] = useState(0);
+
   // Premium custom Toast Alerts system (Intercepts and upgrades native alert dialogs)
   const [toast, setToast] = useState(null);
   const [toastTimeoutId, setToastTimeoutId] = useState(null);
@@ -815,10 +819,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       const phoneVal = currentUser?.phone || formData.phone || '';
       const dobVal = currentUser?.dob || formData.dob || '';
       const aadharVal = currentUser?.aadhar || formData.aadhar || '';
+
+      console.log('[Upload Success] Form submission completed successfully.', {
+        submissionId: submission.id,
+        formId: selectedForm.id,
+        phone: phoneVal,
+        dob: dobVal,
+        aadhar: aadharVal
+      });
+
+      // Wait briefly for Google Sheets to propagate the new row before re-fetching
+      console.log('[Fetch] Waiting 1.5s for Google Sheets propagation before refreshing status...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       if (phoneVal && dobVal) {
         try {
+          console.log('[Fetch] Re-fetching user applications after submission...');
           const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);
+          console.log('[Fetch] Refreshed applications data:', freshApps?.length, 'records found');
           setUserApplications(freshApps);
           setHasSearchedStatus(true);
         } catch (e) {
@@ -833,6 +851,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           onUpdateProfile(latestProfile);
         }
       }
+
+      // Increment refresh key to force the status useEffect to re-fetch
+      // when the user navigates to the Status tab
+      setStatusRefreshKey(prev => {
+        const newKey = prev + 1;
+        console.log('[State] statusRefreshKey incremented to:', newKey);
+        return newKey;
+      });
 
       setUploadProgress('');
       setWizardStep(5); // Final Step: Get Receipt
@@ -867,11 +893,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
     setSearchingStatus(true);
     try {
+      console.log('[Fetch] Manual status lookup initiated:', { phone: phoneVal, dob: dobVal, aadhar: aadharVal });
       const data = await getUserStatus(phoneVal, dobVal, aadharVal);
+      console.log('[Fetch] Manual status lookup received', data?.length, 'applications');
       setUserApplications(data);
       setHasSearchedStatus(true);
+      console.log('[State] userApplications updated with', data?.length, 'records from manual lookup');
     } catch (err) {
-      console.error(err);
+      console.error('[Fetch] Manual status lookup error:', err);
       alert(err.message || 'No submissions found with these credentials.');
     } finally {
       setSearchingStatus(false);
@@ -879,20 +908,30 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   };
 
   // Load submissions automatically if logged-in user clicks Status tab
+  // statusRefreshKey is included to force a re-fetch after form submission
+  // even if activeTab and currentUser haven't changed references.
   useEffect(() => {
     if (activeTab === 'status' && currentUser) {
       const loadUserSubmissions = async () => {
         try {
+          console.log('[Fetch] Status useEffect triggered. Fetching user submissions...', {
+            activeTab,
+            statusRefreshKey,
+            phone: currentUser.phone,
+            dob: currentUser.dob
+          });
           const data = await getUserStatus(currentUser.phone, currentUser.dob, currentUser.aadhar);
+          console.log('[Fetch] Status useEffect received', data?.length, 'applications');
           setUserApplications(data);
           setHasSearchedStatus(true);
+          console.log('[State] userApplications updated with', data?.length, 'records');
         } catch (e) {
-          console.error(e);
+          console.error('[Fetch] Status useEffect error:', e);
         }
       };
       loadUserSubmissions();
     }
-  }, [activeTab, currentUser]);
+  }, [activeTab, currentUser, statusRefreshKey]);
 
   const handleScreenshotUpload = async (subId, file) => {
     if (!file) return;
@@ -1789,19 +1828,29 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               "draft"
                             );
                             
+                            console.log('[Upload Success] Draft saved successfully.');
+
+                            // Wait briefly for Google Sheets propagation
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+
                             // Synchronize status list immediately in-memory
                             const phoneVal = formData.phone || currentUser?.phone || '';
                             const dobVal = formData.dob || currentUser?.dob || '';
                             const aadharVal = formData.aadhar || currentUser?.aadhar || '';
                             if (phoneVal && dobVal) {
                               try {
+                                console.log('[Fetch] Re-fetching user applications after draft save...');
                                 const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);
+                                console.log('[Fetch] Refreshed applications data after draft:', freshApps?.length, 'records');
                                 setUserApplications(freshApps);
                                 setHasSearchedStatus(true);
                               } catch (e) {
                                 console.error("Error refreshing applications list on draft save:", e);
                               }
                             }
+
+                            // Increment refresh key to force status useEffect re-fetch
+                            setStatusRefreshKey(prev => prev + 1);
                             
                             alert('Draft saved successfully! You can search/resume your draft using your phone/aadhar in the status tab.');
                           } catch (err) {
