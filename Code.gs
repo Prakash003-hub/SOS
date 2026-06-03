@@ -141,6 +141,12 @@ function doPost(e) {
       case "loginUser":
         responseData = loginUserAction(requestBody.payload);
         break;
+      case "sendOtp":
+        responseData = sendOtpAction(requestBody.payload);
+        break;
+      case "verifyOtp":
+        responseData = verifyOtpAction(requestBody.payload);
+        break;
       case "updateUserProfile":
         responseData = updateUserProfileAction(requestBody.userId, requestBody.payload);
         break;
@@ -453,34 +459,45 @@ function duplicateFormAction(id) {
 function registerUserAction(userData) {
   var sheet = getSheet("Users");
   var phoneClean = userData.phone ? formatNumberString(userData.phone) : "";
-  var dobClean = userData.dob ? formatDateString(userData.dob) : "";
   var aadharClean = userData.aadhar ? formatNumberString(userData.aadhar) : "";
+  var emailClean = userData.email ? userData.email.trim().toLowerCase() : "";
   
-  if (!phoneClean || !dobClean) {
-    throw new Error("Phone number and Date of Birth are required for registration.");
+  if (!phoneClean) {
+    throw new Error("Phone number is required for registration.");
+  }
+  if (!aadharClean || aadharClean.length !== 12) {
+    throw new Error("A valid 12-digit Aadhaar number is required for registration.");
+  }
+  if (!emailClean) {
+    throw new Error("Email ID is required for registration.");
   }
   
-  // Enforce Unique constraint: phone + dob
+  // Enforce Unique constraint: phone
   var existingRows = getRowsFromSheet("Users");
-  var isRegistered = existingRows.some(function(u) {
+  var isPhoneTaken = existingRows.some(function(u) {
     var uPhone = u.phone ? formatNumberString(u.phone) : "";
-    var uDob = u.dob ? formatDateString(u.dob) : "";
-    return uPhone === phoneClean && uDob === dobClean;
+    return uPhone === phoneClean;
   });
-  if (isRegistered) {
-    throw new Error("A user profile with this Phone number and DOB is already registered.");
+  if (isPhoneTaken) {
+    throw new Error("A user profile with this Phone number is already registered.");
   }
   
-  // Aadhaar unique check if provided
-  if (aadharClean) {
-    var aadharDuplicate = existingRows.some(function(u) {
-      var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
-      var uDob = u.dob ? formatDateString(u.dob) : "";
-      return uAadhar === aadharClean && uDob === dobClean;
-    });
-    if (aadharDuplicate) {
-      throw new Error("A user profile with this Aadhaar number and DOB is already registered.");
-    }
+  // Aadhaar unique check
+  var isAadharTaken = existingRows.some(function(u) {
+    var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
+    return uAadhar === aadharClean;
+  });
+  if (isAadharTaken) {
+    throw new Error("A user profile with this Aadhaar number is already registered.");
+  }
+  
+  // Email unique check
+  var isEmailTaken = existingRows.some(function(u) {
+    var uEmail = u.email ? u.email.trim().toLowerCase() : "";
+    return uEmail === emailClean;
+  });
+  if (isEmailTaken) {
+    throw new Error("A user profile with this Email ID is already registered.");
   }
   
   var userId = "usr-" + Math.random().toString(36).substring(2, 10);
@@ -488,9 +505,10 @@ function registerUserAction(userData) {
     id: userId,
     name: userData.name || "",
     name_tamil: userData.name_tamil || "",
-    dob: "'" + dobClean,
+    dob: "",
     phone: "'" + phoneClean,
-    aadhar: aadharClean ? "'" + aadharClean : "",
+    aadhar: "'" + aadharClean,
+    email: emailClean,
     gender: userData.gender || "",
     marital_status: userData.marital_status || "",
     father_name: userData.father_name || "",
@@ -521,7 +539,6 @@ function registerUserAction(userData) {
   appendObjectToSheet(sheet, newUser);
   
   // Strip quotes for returned object
-  newUser.dob = dobClean;
   newUser.phone = phoneClean;
   newUser.aadhar = aadharClean;
   return newUser;
@@ -529,31 +546,31 @@ function registerUserAction(userData) {
 
 function loginUserAction(loginData) {
   var phoneClean = loginData.phone ? formatNumberString(loginData.phone) : "";
-  var dobClean = loginData.dob ? formatDateString(loginData.dob) : "";
-  var aadharClean = loginData.aadhar ? formatNumberString(loginData.aadhar) : "";
+  var aadharPrefix = loginData.aadhar_prefix ? loginData.aadhar_prefix.toString().trim() : "";
+  
+  if (!phoneClean) {
+    throw new Error("Phone number is required for login.");
+  }
+  if (!aadharPrefix || aadharPrefix.length !== 4) {
+    throw new Error("First 4 digits of Aadhaar number are required for login.");
+  }
   
   var users = getRowsFromSheet("Users");
   var matchedUser = null;
   
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
-    var uDob = u.dob ? formatDateString(u.dob) : "";
     var uPhone = u.phone ? formatNumberString(u.phone) : "";
     var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
     
-    if (uDob === dobClean) {
-      if (phoneClean && uPhone === phoneClean) {
-        matchedUser = u;
-        break;
-      } else if (aadharClean && uAadhar === aadharClean) {
-        matchedUser = u;
-        break;
-      }
+    if (uPhone === phoneClean && uAadhar.substring(0, 4) === aadharPrefix) {
+      matchedUser = u;
+      break;
     }
   }
   
   if (!matchedUser) {
-    throw new Error("No user profile found matching these credentials. Please check DOB and details.");
+    throw new Error("No user profile found. Please check your Phone number and Aadhaar digits.");
   }
   
   // Format matching fields in returned object
@@ -569,6 +586,102 @@ function loginUserAction(loginData) {
   return cleanedUser;
 }
 
+// --- OTP ACTIONS ---
+
+function sendOtpAction(payload) {
+  var email = payload.email ? payload.email.trim().toLowerCase() : "";
+  if (!email) throw new Error("Email address is required.");
+  
+  // Generate 6-digit OTP
+  var otp = Math.floor(100000 + Math.random() * 900000).toString();
+  var expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+  
+  // Store OTP in OTP sheet (overwrite if same email exists)
+  var otpSheet = getSheet("OTP");
+  var otpRows = otpSheet.getDataRange().getValues();
+  var headers = otpRows[0];
+  var emailCol = headers.indexOf("email");
+  var existingRow = -1;
+  
+  if (emailCol !== -1) {
+    for (var r = 1; r < otpRows.length; r++) {
+      if (otpRows[r][emailCol] && otpRows[r][emailCol].toString().trim().toLowerCase() === email) {
+        existingRow = r + 1; // 1-indexed sheet row
+        break;
+      }
+    }
+  }
+  
+  if (existingRow > 0) {
+    // Update existing row
+    var otpCol = headers.indexOf("otp");
+    var expiresCol = headers.indexOf("expires_at");
+    otpSheet.getRange(existingRow, otpCol + 1).setValue(otp);
+    otpSheet.getRange(existingRow, expiresCol + 1).setValue(expiresAt);
+  } else {
+    appendObjectToSheet(otpSheet, { email: email, otp: otp, expires_at: expiresAt });
+  }
+  
+  // Send email
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: "TN Sevai - Your OTP Verification Code",
+      htmlBody: '<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px;">'
+        + '<h2 style="color:#047857;text-align:center;">TN Sevai E-Service</h2>'
+        + '<p style="text-align:center;color:#64748b;">Your OTP verification code is:</p>'
+        + '<div style="text-align:center;margin:20px 0;">'
+        + '<span style="font-size:2rem;font-weight:900;letter-spacing:8px;color:#1e293b;background:#f0fdf4;padding:10px 20px;border-radius:8px;border:2px solid #10b981;">' + otp + '</span>'
+        + '</div>'
+        + '<p style="text-align:center;color:#94a3b8;font-size:0.8rem;">This code expires in 5 minutes. Do not share it with anyone.</p>'
+        + '</div>'
+    });
+  } catch (mailErr) {
+    throw new Error("Failed to send OTP email. Please try again later.");
+  }
+  
+  return { sent: true, email: email };
+}
+
+function verifyOtpAction(payload) {
+  var email = payload.email ? payload.email.trim().toLowerCase() : "";
+  var userOtp = payload.otp ? payload.otp.toString().trim() : "";
+  
+  if (!email || !userOtp) throw new Error("Email and OTP are required.");
+  
+  var otpSheet = getSheet("OTP");
+  var otpRows = otpSheet.getDataRange().getValues();
+  var headers = otpRows[0];
+  var emailCol = headers.indexOf("email");
+  var otpCol = headers.indexOf("otp");
+  var expiresCol = headers.indexOf("expires_at");
+  
+  for (var r = 1; r < otpRows.length; r++) {
+    var rowEmail = otpRows[r][emailCol] ? otpRows[r][emailCol].toString().trim().toLowerCase() : "";
+    if (rowEmail === email) {
+      var storedOtp = otpRows[r][otpCol] ? otpRows[r][otpCol].toString().trim() : "";
+      var expiresAt = otpRows[r][expiresCol] ? otpRows[r][expiresCol].toString() : "";
+      
+      // Check expiry
+      if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
+        // Delete expired row
+        otpSheet.deleteRow(r + 1);
+        throw new Error("OTP has expired. Please request a new one.");
+      }
+      
+      if (storedOtp === userOtp) {
+        // Valid OTP — delete row and return success
+        otpSheet.deleteRow(r + 1);
+        return { verified: true, email: email };
+      } else {
+        throw new Error("Invalid OTP. Please check and try again.");
+      }
+    }
+  }
+  
+  throw new Error("No OTP found for this email. Please request a new one.");
+}
+
 function updateUserProfileAction(userId, profileData) {
   var sheet = getSheet("Users");
   var rowIndex = findRowIndexById(sheet, userId);
@@ -576,17 +689,19 @@ function updateUserProfileAction(userId, profileData) {
   
   var existingUser = getRowObject(sheet, rowIndex);
   
-  // Map and update only defined values
+  // Map and update only defined values — but BLOCK permanent fields
   var keys = Object.keys(profileData);
   keys.forEach(function(key) {
     if (profileData[key] !== undefined && key !== "id") {
+      // Block permanent fields from being changed
+      if (key === "aadhar" || key === "email") {
+        return; // Skip — these are permanent and cannot be changed
+      }
       var val = profileData[key];
       if (key === "phone") {
         existingUser[key] = "'" + formatNumberString(val);
       } else if (key === "dob") {
         existingUser[key] = "'" + formatDateString(val);
-      } else if (key === "aadhar") {
-        existingUser[key] = val ? "'" + formatNumberString(val) : "";
       } else {
         existingUser[key] = val;
       }
@@ -830,17 +945,21 @@ function getUserStatusAction(phone, dob, aadhar) {
   var aadharClean = aadhar ? formatNumberString(aadhar) : "";
   
   var filtered = submissions.filter(function(sub) {
-    var subDob = sub.dob ? formatDateString(sub.dob) : "";
-    var matchDob = subDob === dobClean;
-    if (!matchDob) return false;
-    
     var subPhone = sub.phone ? formatNumberString(sub.phone) : "";
     var subAadhar = sub.aadhar ? formatNumberString(sub.aadhar) : "";
+    var subDob = sub.dob ? formatDateString(sub.dob) : "";
     
-    if (phoneClean) {
-      return subPhone === phoneClean;
-    } else if (aadharClean) {
-      return subAadhar === aadharClean;
+    // Match by Aadhar (primary identifier)
+    if (aadharClean && subAadhar === aadharClean) {
+      return true;
+    }
+    // Match by Phone
+    if (phoneClean && subPhone === phoneClean) {
+      // If DOB is provided, additionally match DOB
+      if (dobClean) {
+        return subDob === dobClean;
+      }
+      return true;
     }
     return false;
   });
@@ -983,9 +1102,10 @@ function initSpreadsheet() {
   
   // 2. USERS PROFILE SHEET
   var usersSheet = ensureSheetExists("Users", [
-    "id", "name", "name_tamil", "dob", "phone", "aadhar", "gender", "marital_status", "father_name", "father_name_tamil", "mother_name", "mother_name_tamil", "community", "address", "religion", "state", "district", "taluk", "revenue_village", "street_name", "door_no", "pincode", "photo_url", "aadhar_url_1", "aadhar_url_2", "smart_card_url_1", "smart_card_url_2", "voter_id_url_1", "voter_id_url_2", "signature_url_1", "custom_fields", "created_at"
+    "id", "name", "name_tamil", "dob", "phone", "aadhar", "email", "gender", "marital_status", "father_name", "father_name_tamil", "mother_name", "mother_name_tamil", "community", "address", "religion", "state", "district", "taluk", "revenue_village", "street_name", "door_no", "pincode", "photo_url", "aadhar_url_1", "aadhar_url_2", "smart_card_url_1", "smart_card_url_2", "voter_id_url_1", "voter_id_url_2", "signature_url_1", "custom_fields", "created_at"
   ]);
   ensureColumnExists(usersSheet, "custom_fields");
+  ensureColumnExists(usersSheet, "email");
   
   // 3. SUBMISSIONS SHEET
   var subSheet = ensureSheetExists("Submissions", [
@@ -1011,6 +1131,11 @@ function initSpreadsheet() {
   // 5B. FEEDBACK SHEET
   ensureSheetExists("Feedback", [
     "id", "user_name", "user_phone", "user_aadhar", "message", "rating", "created_at"
+  ]);
+
+  // 5C. OTP SHEET
+  ensureSheetExists("OTP", [
+    "email", "otp", "expires_at"
   ]);
 
   // 5. SYSTEM ERROR/LOG SHEET

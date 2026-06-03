@@ -248,6 +248,14 @@ export const loginUser = async (loginData) => {
   return await callApi("loginUser", { payload: loginData });
 };
 
+export const sendOtp = async (email) => {
+  return await callApi("sendOtp", { payload: { email } });
+};
+
+export const verifyOtp = async (email, otp) => {
+  return await callApi("verifyOtp", { payload: { email, otp } });
+};
+
 export const updateUserProfile = async (userId, profileData) => {
   return await callApi("updateUserProfile", { userId, payload: profileData });
 };

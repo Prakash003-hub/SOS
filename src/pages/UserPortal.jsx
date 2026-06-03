@@ -242,7 +242,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       
       // Refresh list
       const phoneVal = currentUser?.phone || lookupPhone;
-      const dobVal = currentUser?.dob || lookupDob;
+      const dobVal = lookupDob || '';
       const aadharVal = currentUser?.aadhar || lookupAadhar;
       const data = await getUserStatus(phoneVal, dobVal, aadharVal);
       setUserApplications(data);
@@ -416,7 +416,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     if (currentUser && currentUser.aadhar) {
       setLoading(true);
       try {
-        const userSubs = await getUserStatus(currentUser.phone, currentUser.dob, currentUser.aadhar);
+        const userSubs = await getUserStatus(currentUser.phone, '', currentUser.aadhar);
         if (Array.isArray(userSubs) && userSubs.some(s => s.form_id === form.id && s.payment_status !== 'draft')) {
           alert(`You have already applied for the ${form.title}. You cannot apply more than once.`);
           setLoading(false);
@@ -452,7 +452,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     setCheckingDuplicate(true);
     try {
       const targetPhone = formData.phone || currentUser?.phone || '';
-      const targetDob = formData.dob || currentUser?.dob || '';
+      const targetDob = '';
       const userSubs = await getUserStatus(targetPhone, targetDob, aadharValue);
       if (Array.isArray(userSubs) && userSubs.some(s => s.form_id === selectedForm.id && s.payment_status !== 'draft')) {
         setDuplicateSubmissionError(`You have already applied for "${selectedForm.title}". You cannot apply more than once. You are already applicable for this certificate.`);
@@ -677,7 +677,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       // Check if already applied (Form ID + User Aadhar check)
       const targetAadhar = formData.aadhar || currentUser?.aadhar || '';
       const targetPhone = formData.phone || currentUser?.phone || '';
-      const targetDob = formData.dob || currentUser?.dob || '';
+      const targetDob = '';
       
       if (targetAadhar) {
         const userSubs = await getUserStatus(targetPhone, targetDob, targetAadhar);
@@ -821,7 +821,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
       // Fetch latest profile state to sync document and custom URLs
       const phoneVal = currentUser?.phone || formData.phone || '';
-      const dobVal = currentUser?.dob || formData.dob || '';
+      const dobVal = '';
       const aadharVal = currentUser?.aadhar || formData.aadhar || '';
 
       console.log('[Upload Success] Form submission completed successfully.', {
@@ -836,7 +836,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       console.log('[Fetch] Waiting 2s for Google Sheets propagation before refreshing status...');
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      if (phoneVal && dobVal) {
+      if (phoneVal) {
         try {
           console.log('[Fetch] Re-fetching user applications after submission...');
           const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);
@@ -911,10 +911,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     const aadharVal = lookupType === 'aadhar' ? lookupAadhar.trim() : '';
     const dobVal = lookupDob.trim();
 
-    if (!dobVal) {
-      alert('Please enter your Date of Birth.');
-      return;
-    }
     if (lookupType === 'phone' && !phoneVal) {
       alert('Please enter your Phone number.');
       return;
@@ -962,7 +958,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
             phone: currentUser.phone,
             dob: currentUser.dob
           });
-          const data = await getUserStatus(currentUser.phone, currentUser.dob, currentUser.aadhar);
+          const data = await getUserStatus(currentUser.phone, '', currentUser.aadhar);
           console.log('[Fetch] Status useEffect received', data?.length, 'applications');
           setUserApplications(data);
           setHasSearchedStatus(true);
@@ -985,7 +981,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       
       // Refresh list
       const phoneVal = currentUser?.phone || lookupPhone;
-      const dobVal = currentUser?.dob || lookupDob;
+      const dobVal = lookupDob || '';
       const aadharVal = currentUser?.aadhar || lookupAadhar;
       const data = await getUserStatus(phoneVal, dobVal, aadharVal);
       setUserApplications(data);
@@ -1022,17 +1018,79 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   };
 
   const printReceipt = () => {
-    const printContent = document.getElementById('receipt-downloadable-card').innerHTML;
-    const originalContent = document.body.innerHTML;
-    
-    document.body.innerHTML = `
-      <div style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: 40px auto; border: 2px dashed #10b981; border-radius: 12px; background: white; color: #1e293b;">
-        ${printContent}
-      </div>
+    const applicantName = formData.name || currentUser?.name || 'N/A';
+    const phoneNo = submissionResult.phone || 'N/A';
+    const certName = selectedForm.title || 'N/A';
+    const fee = selectedForm.fee || 0;
+    const status = (submissionResult.payment_status || 'unpaid').toUpperCase();
+    const receiptId = submissionResult.id || 'N/A';
+    const submittedDate = submissionResult.submitted_at 
+      ? new Date(submissionResult.submitted_at) 
+      : new Date();
+    const dateStr = submittedDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = submittedDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const aadharNo = submissionResult.aadhar ? submissionResult.aadhar.replace(/(\d{4})/g, '$1 ').trim() : 'N/A';
+
+    const receiptHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>TN Sevai Receipt - ${receiptId}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', sans-serif; background: #fff; color: #1e293b; padding: 30px; }
+          .receipt { max-width: 480px; margin: 0 auto; border: 2px dashed #10b981; border-radius: 16px; padding: 28px; position: relative; }
+          .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; color: #10b981; opacity: 0.04; font-weight: 900; pointer-events: none; }
+          .header { text-align: center; border-bottom: 1.5px dashed #cbd5e1; padding-bottom: 14px; margin-bottom: 18px; }
+          .header h2 { font-size: 1.3rem; color: #047857; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; }
+          .header .sub { font-size: 0.75rem; color: #10b981; font-weight: 700; }
+          .header .sub2 { font-size: 0.65rem; color: #64748b; font-weight: 600; margin-top: 2px; }
+          .row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; }
+          .row:last-child { border-bottom: none; }
+          .label { color: #64748b; font-weight: 500; }
+          .value { font-weight: 700; color: #1e293b; text-align: right; max-width: 55%; word-break: break-all; }
+          .value.green { color: #10b981; }
+          .value.red { color: #ef4444; }
+          .divider { border-top: 1.5px dashed #cbd5e1; margin: 14px 0; }
+          .badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px; }
+          .badge-unpaid { background: #fef2f2; color: #ef4444; border: 1px solid #fca5a5; }
+          .badge-paid { background: #f0fdf4; color: #10b981; border: 1px solid #86efac; }
+          .footer { text-align: center; margin-top: 16px; font-size: 0.7rem; color: #94a3b8; }
+          @media print { body { padding: 10px; } .receipt { border-color: #333; } }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div class="watermark">TN SEVAI</div>
+          <div class="header">
+            <h2>${certName}</h2>
+            <div class="sub">TN SEVAI E-SERVICE</div>
+            <div class="sub2">Official E-Governance Receipt</div>
+          </div>
+          <div class="row"><span class="label">Receipt ID:</span><span class="value green">${receiptId}</span></div>
+          <div class="row"><span class="label">Applicant Name:</span><span class="value">${applicantName}</span></div>
+          <div class="row"><span class="label">Certificate / Service:</span><span class="value">${certName}</span></div>
+          <div class="row"><span class="label">Phone Number:</span><span class="value">${phoneNo}</span></div>
+          <div class="row"><span class="label">Aadhaar Number:</span><span class="value">${aadharNo}</span></div>
+          <div class="row"><span class="label">Date:</span><span class="value">${dateStr}</span></div>
+          <div class="row"><span class="label">Time:</span><span class="value">${timeStr}</span></div>
+          <div class="divider"></div>
+          <div class="row"><span class="label">Service Fee:</span><span class="value" style="font-size:1rem;font-weight:800;">Rs. ${fee}</span></div>
+          <div class="row"><span class="label">Payment Status:</span><span class="badge ${status === 'PAID' ? 'badge-paid' : 'badge-unpaid'}">${status}</span></div>
+          <div class="footer">Thank you for using TN Sevai E-Service Portal.<br/>Save this receipt for your records.</div>
+        </div>
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
     `;
-    window.print();
-    document.body.innerHTML = originalContent;
-    window.location.reload();
+
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (printWindow) {
+      printWindow.document.write(receiptHtml);
+      printWindow.document.close();
+    } else {
+      alert('Please allow pop-ups to download the receipt.');
+    }
   };
 
   const resumeApplicationDraft = (app) => {
@@ -1878,9 +1936,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                             // Synchronize status list immediately in-memory
                             const phoneVal = formData.phone || currentUser?.phone || '';
-                            const dobVal = formData.dob || currentUser?.dob || '';
+                            const dobVal = '';
                             const aadharVal = formData.aadhar || currentUser?.aadhar || '';
-                            if (phoneVal && dobVal) {
+                            if (phoneVal) {
                               try {
                                 console.log('[Fetch] Re-fetching user applications after draft save...');
                                 const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);

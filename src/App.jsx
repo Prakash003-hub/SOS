@@ -5,7 +5,7 @@ import Footer from './components/Footer';
 import UserPortal from './pages/UserPortal';
 import AdminPortal from './pages/AdminPortal';
 import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase } from 'lucide-react';
-import { registerUser, loginUser } from './services/db';
+import { registerUser, loginUser, sendOtp, verifyOtp } from './services/db';
 
 function TrollPage() {
   return (
@@ -121,16 +121,17 @@ function PortalLayout() {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   
   // Login form state
-  const [loginMethod, setLoginMethod] = useState('phone'); // 'phone' or 'aadhar'
-  const [loginDob, setLoginDob] = useState('');
   const [loginPhone, setLoginPhone] = useState('');
-  const [loginAadhar, setLoginAadhar] = useState('');
+  const [loginAadharPrefix, setLoginAadharPrefix] = useState('');
   
   // Register form state
   const [regName, setRegName] = useState('');
-  const [regDob, setRegDob] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regAadhar, setRegAadhar] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
   
   // Alerts and loading
   const [authError, setAuthError] = useState('');
@@ -168,14 +169,12 @@ function PortalLayout() {
     setIsLoading(true);
     
     try {
-      if (!loginDob) throw new Error('Please enter your Date of Birth.');
-      if (loginMethod === 'phone' && !loginPhone) throw new Error('Please enter your Phone number.');
-      if (loginMethod === 'aadhar' && !loginAadhar) throw new Error('Please enter your Aadhaar number.');
+      if (!loginPhone) throw new Error('Please enter your Phone number.');
+      if (!loginAadharPrefix || loginAadharPrefix.length !== 4) throw new Error('Please enter the first 4 digits of your Aadhaar number.');
       
       const payload = {
-        dob: loginDob,
-        phone: loginMethod === 'phone' ? loginPhone : undefined,
-        aadhar: loginMethod === 'aadhar' ? loginAadhar : undefined
+        phone: loginPhone,
+        aadhar_prefix: loginAadharPrefix
       };
       
       const user = await loginUser(payload);
@@ -184,9 +183,8 @@ function PortalLayout() {
       setAuthSuccess('Welcome back! Login successful.');
       setTimeout(() => {
         setIsAuthModalOpen(false);
-        setLoginDob('');
         setLoginPhone('');
-        setLoginAadhar('');
+        setLoginAadharPrefix('');
         setAuthSuccess('');
       }, 1000);
     } catch (err) {
@@ -204,14 +202,23 @@ function PortalLayout() {
     
     try {
       if (!regName) throw new Error('Please enter your full Name.');
-      if (!regDob) throw new Error('Please enter your Date of Birth.');
       if (!regPhone) throw new Error('Please enter your Phone number.');
+      if (!regAadhar || regAadhar.length !== 12) throw new Error('Please enter a valid 12-digit Aadhaar number.');
+      if (!regEmail) throw new Error('Please enter your Email ID.');
+      if (!otpSent) throw new Error('Please verify your email with OTP first.');
+      if (!otpValue) throw new Error('Please enter the OTP sent to your email.');
+      
+      // Verify OTP first
+      const otpResult = await verifyOtp(regEmail, otpValue);
+      if (!otpResult || !otpResult.verified) {
+        throw new Error('Invalid or expired OTP. Please request a new one.');
+      }
       
       const payload = {
         name: regName,
-        dob: regDob,
         phone: regPhone,
-        aadhar: regAadhar || undefined
+        aadhar: regAadhar,
+        email: regEmail
       };
       
       const user = await registerUser(payload);
@@ -221,15 +228,40 @@ function PortalLayout() {
       setTimeout(() => {
         setIsAuthModalOpen(false);
         setRegName('');
-        setRegDob('');
         setRegPhone('');
         setRegAadhar('');
+        setRegEmail('');
+        setOtpSent(false);
+        setOtpValue('');
         setAuthSuccess('');
       }, 1000);
     } catch (err) {
       setAuthError(err.message || 'Registration failed.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!regEmail) {
+      setAuthError('Please enter your Email ID first.');
+      return;
+    }
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail)) {
+      setAuthError('Please enter a valid email address.');
+      return;
+    }
+    setOtpSending(true);
+    setAuthError('');
+    try {
+      await sendOtp(regEmail);
+      setOtpSent(true);
+      setAuthSuccess('OTP sent to ' + regEmail + '. Please check your inbox.');
+    } catch (err) {
+      setAuthError(err.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setOtpSending(false);
     }
   };
 
@@ -407,55 +439,16 @@ function PortalLayout() {
               {!isRegisterMode ? (
                 // Login Form
                 <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  
-                  {/* Login Method Toggle */}
-                  <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '8px', padding: '2px', border: '1px solid #e2e8f0' }}>
-                    <button
-                      type="button"
-                      onClick={() => { setLoginMethod('phone'); setAuthError(''); }}
-                      style={{
-                        flex: 1,
-                        padding: '6px',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        backgroundColor: loginMethod === 'phone' ? '#10b981' : 'transparent',
-                        color: loginMethod === 'phone' ? '#ffffff' : '#64748b',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      Phone Number
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setLoginMethod('aadhar'); setAuthError(''); }}
-                      style={{
-                        flex: 1,
-                        padding: '6px',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        backgroundColor: loginMethod === 'aadhar' ? '#10b981' : 'transparent',
-                        color: loginMethod === 'aadhar' ? '#ffffff' : '#64748b',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      Aadhaar Number
-                    </button>
-                  </div>
-
-                  {/* DOB Input */}
+                  {/* Phone Input */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Date of Birth *</label>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Phone Number *</label>
                     <input 
-                      type="date" 
-                      value={loginDob}
-                      onChange={(e) => setLoginDob(e.target.value)}
+                      type="tel" 
+                      placeholder="Enter registered mobile number"
+                      value={loginPhone}
+                      onChange={(e) => setLoginPhone(e.target.value)}
                       required
+                      maxLength={10}
                       style={{
                         padding: '10px',
                         borderRadius: '8px',
@@ -467,48 +460,30 @@ function PortalLayout() {
                     />
                   </div>
 
-                  {/* Phone Input */}
-                  {loginMethod === 'phone' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Phone Number *</label>
-                      <input 
-                        type="tel" 
-                        placeholder="Enter registered mobile number"
-                        value={loginPhone}
-                        onChange={(e) => setLoginPhone(e.target.value)}
-                        required
-                        style={{
-                          padding: '10px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: '#1e293b',
-                          fontSize: '0.85rem'
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    // Aadhaar Input
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Aadhaar Number *</label>
-                      <input 
-                        type="text" 
-                        maxLength={12}
-                        placeholder="Enter 12-digit Aadhaar number"
-                        value={loginAadhar}
-                        onChange={(e) => setLoginAadhar(e.target.value.replace(/\D/g, ''))}
-                        required
-                        style={{
-                          padding: '10px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: '#1e293b',
-                          fontSize: '0.85rem'
-                        }}
-                      />
-                    </div>
-                  )}
+                  {/* Aadhar First 4 Digits */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Aadhaar First 4 Digits *</label>
+                    <input 
+                      type="text" 
+                      maxLength={4}
+                      placeholder="Enter first 4 digits of Aadhaar"
+                      value={loginAadharPrefix}
+                      onChange={(e) => setLoginAadharPrefix(e.target.value.replace(/\D/g, ''))}
+                      required
+                      style={{
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        color: '#1e293b',
+                        fontSize: '0.85rem',
+                        letterSpacing: '4px',
+                        textAlign: 'center',
+                        fontWeight: '700'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>For security, only the first 4 digits are needed</span>
+                  </div>
 
                   {/* Submit Button */}
                   <button
@@ -527,14 +502,14 @@ function PortalLayout() {
                       transition: 'background-color 0.2s'
                     }}
                   >
-                    {isLoading ? 'Verifying...' : 'Login Profile'}
+                    {isLoading ? 'Verifying...' : 'Login'}
                   </button>
                   
                   {/* Toggle Link */}
                   <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '0.8rem', color: '#64748b' }}>
                     Don't have a profile?{' '}
                     <span 
-                      onClick={() => { setIsRegisterMode(true); setAuthError(''); }}
+                      onClick={() => { setIsRegisterMode(true); setAuthError(''); setAuthSuccess(''); }}
                       style={{ color: '#10b981', cursor: 'pointer', fontWeight: '600' }}
                     >
                       Register Now
@@ -544,13 +519,12 @@ function PortalLayout() {
               ) : (
                 // Register Form
                 <form onSubmit={handleRegisterSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  
                   {/* Full Name */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Full Name *</label>
                     <input 
                       type="text" 
-                      placeholder="Enter English full name"
+                      placeholder="Enter full name"
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
                       required
@@ -565,26 +539,7 @@ function PortalLayout() {
                     />
                   </div>
 
-                  {/* DOB Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Date of Birth *</label>
-                    <input 
-                      type="date" 
-                      value={regDob}
-                      onChange={(e) => setRegDob(e.target.value)}
-                      required
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#ffffff',
-                        color: '#1e293b',
-                        fontSize: '0.85rem'
-                      }}
-                    />
-                  </div>
-
-                  {/* Phone Input */}
+                  {/* Phone */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Phone Number *</label>
                     <input 
@@ -593,6 +548,7 @@ function PortalLayout() {
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
                       required
+                      maxLength={10}
                       style={{
                         padding: '10px',
                         borderRadius: '8px',
@@ -604,15 +560,16 @@ function PortalLayout() {
                     />
                   </div>
 
-                  {/* Aadhaar Input (Optional) */}
+                  {/* Aadhaar */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Aadhaar Number (Optional)</label>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Aadhaar Number * <span style={{ fontSize: '0.6rem', color: '#ef4444' }}>(Permanent - cannot change later)</span></label>
                     <input 
                       type="text" 
                       maxLength={12}
-                      placeholder="Enter 12-digit Aadhaar"
+                      placeholder="Enter 12-digit Aadhaar number"
                       value={regAadhar}
                       onChange={(e) => setRegAadhar(e.target.value.replace(/\D/g, ''))}
+                      required
                       style={{
                         padding: '10px',
                         borderRadius: '8px',
@@ -623,32 +580,102 @@ function PortalLayout() {
                       }}
                     />
                   </div>
+
+                  {/* Email + OTP */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Email ID * <span style={{ fontSize: '0.6rem', color: '#ef4444' }}>(Permanent - cannot change later)</span></label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input 
+                        type="email" 
+                        placeholder="Enter email address"
+                        value={regEmail}
+                        onChange={(e) => { setRegEmail(e.target.value); if(otpSent) { setOtpSent(false); setOtpValue(''); } }}
+                        required
+                        disabled={otpSent}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: otpSent ? '#f1f5f9' : '#ffffff',
+                          color: '#1e293b',
+                          fontSize: '0.85rem',
+                          flex: 1
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={otpSending || otpSent}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          backgroundColor: otpSent ? '#10b981' : '#3b82f6',
+                          color: '#ffffff',
+                          fontWeight: '700',
+                          fontSize: '0.7rem',
+                          cursor: otpSent ? 'default' : 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {otpSending ? '...' : otpSent ? '✓ Sent' : 'Send OTP'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* OTP Input - only shown after OTP sent */}
+                  {otpSent && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Enter OTP *</label>
+                      <input 
+                        type="text" 
+                        maxLength={6}
+                        placeholder="Enter 6-digit OTP from email"
+                        value={otpValue}
+                        onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ''))}
+                        required
+                        style={{
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: '1px solid #10b981',
+                          backgroundColor: '#f0fdf4',
+                          color: '#1e293b',
+                          fontSize: '0.85rem',
+                          letterSpacing: '6px',
+                          textAlign: 'center',
+                          fontWeight: '700'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.65rem', color: '#10b981' }}>OTP sent to {regEmail}. Valid for 5 minutes.</span>
+                    </div>
+                  )}
 
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || !otpSent}
                     style={{
                       padding: '12px',
                       borderRadius: '8px',
                       border: 'none',
-                      backgroundColor: '#10b981',
+                      backgroundColor: (!otpSent) ? '#94a3b8' : '#10b981',
                       color: '#ffffff',
                       fontWeight: '600',
                       fontSize: '0.85rem',
-                      cursor: 'pointer',
+                      cursor: (!otpSent) ? 'not-allowed' : 'pointer',
                       marginTop: '8px',
                       transition: 'background-color 0.2s'
                     }}
                   >
-                    {isLoading ? 'Creating...' : 'Register Profile'}
+                    {isLoading ? 'Creating...' : 'Verify OTP & Register'}
                   </button>
                   
                   {/* Toggle Link */}
                   <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '0.8rem', color: '#64748b' }}>
                     Already registered?{' '}
                     <span 
-                      onClick={() => { setIsRegisterMode(false); setAuthError(''); }}
+                      onClick={() => { setIsRegisterMode(false); setAuthError(''); setAuthSuccess(''); }}
                       style={{ color: '#10b981', cursor: 'pointer', fontWeight: '600' }}
                     >
                       Login Now
