@@ -108,10 +108,13 @@ const getImageUrl = (url) => {
   return url;
 };
 
-const formatUpiVpa = (vpaOrPhone) => {
+const formatUpiVpa = (vpaOrPhone, method) => {
   if (!vpaOrPhone) return '';
   const trimmed = vpaOrPhone.trim();
   if (/^\d{10}$/.test(trimmed)) {
+    if (method === 'phonepe') {
+      return `${trimmed}@ybl`;
+    }
     return `${trimmed}@okaxis`; // default GPay handle
   }
   return trimmed;
@@ -176,6 +179,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   
   // Install Prompt State
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   // Wizard States
   const [selectedForm, setSelectedForm] = useState(null);
@@ -345,11 +349,32 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   }, []);
 
   useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      console.log('[PWA] beforeinstallprompt event fired & deferred.');
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  useEffect(() => {
     console.log('[Install Check] systemSettings loaded:', systemSettings);
     if (systemSettings && String(systemSettings.install_notification_enabled).toLowerCase() === 'true') {
-      const hidePrompt = sessionStorage.getItem('hide_install_prompt');
-      console.log('[Install Check] hidePrompt in sessionStorage:', hidePrompt);
-      if (!hidePrompt) {
+      const dismissedAt = sessionStorage.getItem('install_prompt_dismissed_at');
+      const lastReset = localStorage.getItem('install_prompt_last_reset');
+      
+      let shouldShow = true;
+      if (dismissedAt) {
+        if (!lastReset || Number(dismissedAt) >= Number(lastReset)) {
+          shouldShow = false;
+        }
+      }
+      
+      console.log('[Install Check] shouldShow:', shouldShow, '| dismissedAt:', dismissedAt, '| lastReset:', lastReset);
+      if (shouldShow) {
         console.log('[Install Check] Triggering installation prompt in 2 seconds...');
         const timer = setTimeout(() => {
           setShowInstallPrompt(true);
@@ -1048,21 +1073,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   };
 
-  const handleUpiPay = (fee, submissionId, paymentNo) => {
-    const pa = formatUpiVpa(paymentNo);
+  const handleUpiPay = (fee, submissionId, paymentNo, method) => {
+    const pa = formatUpiVpa(paymentNo, method);
     const am = fee;
-    const gpayUrl = `gpay://upi/pay?pa=${pa}&am=${am}&cu=INR`;
-    const upiUrl = `upi://pay?pa=${pa}&am=${am}&cu=INR`;
     
-    // Attempt to open Google Pay directly
-    window.location.href = gpayUrl;
+    let targetUrl = `upi://pay?pa=${pa}&am=${am}&cu=INR`;
+    if (method === 'phonepe') {
+      targetUrl = `phonepe://pay?pa=${pa}&am=${am}&cu=INR`;
+    } else if (method === 'gpay') {
+      targetUrl = `gpay://upi/pay?pa=${pa}&am=${am}&cu=INR`;
+    }
     
-    // Smart Fallback: If Google Pay is not installed, the browser remains in focus.
-    // After 1.5 seconds, we fall back to the generic upi:// scheme to trigger the system's
-    // UPI app chooser, completely avoiding any Google Play Store redirects!
+    // Attempt to open the specific payment application
+    window.location.href = targetUrl;
+    
+    // Smart Fallback: If the target app is not installed, the browser remains in focus.
+    // After 1.5 seconds, we fall back to the generic upi:// scheme to trigger the system chooser.
+    const fallbackUrl = `upi://pay?pa=${pa}&am=${am}&cu=INR`;
     setTimeout(() => {
       if (document.hasFocus()) {
-        window.location.href = upiUrl;
+        window.location.href = fallbackUrl;
       }
     }, 1500);
   };
@@ -2505,6 +2535,43 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               {/* Intent pay buttons */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '240px', justifyContent: 'center', alignItems: 'center' }}>
                                 <button 
+                                  onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo, 'phonepe')}
+                                  className="premium-btn"
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    gap: '8px', 
+                                    padding: '10px 16px', 
+                                    width: '100%', 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: '800',
+                                    borderRadius: '8px',
+                                    background: '#5f259f',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(95, 37, 159, 0.25)',
+                                    transition: 'all 0.25s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.03)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(95, 37, 159, 0.35)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(95, 37, 159, 0.25)';
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}>
+                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
+                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
+                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
+                                  </svg>
+                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>PhonePe</span>
+                                </button>
+
+                                <button 
                                   onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo, 'gpay')}
                                   className="premium-btn"
                                   style={{ 
@@ -2540,43 +2607,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                     <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
                                   </svg>
                                   Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>GPay</span>
-                                </button>
-
-                                <button 
-                                  onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo, 'phonepe')}
-                                  className="premium-btn"
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    gap: '8px', 
-                                    padding: '10px 16px', 
-                                    width: '100%', 
-                                    fontSize: '0.8rem', 
-                                    fontWeight: '800',
-                                    borderRadius: '8px',
-                                    background: '#5f259f',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(95, 37, 159, 0.25)',
-                                    transition: 'all 0.25s ease'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.03)';
-                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(95, 37, 159, 0.35)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(95, 37, 159, 0.25)';
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}>
-                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
-                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
-                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
-                                  </svg>
-                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>PhonePe</span>
                                 </button>
                               </div>
                             </div>
@@ -2906,6 +2936,43 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               {/* Pay Intent Buttons */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '240px', justifyContent: 'center', alignItems: 'center' }}>
                                 <button 
+                                  onClick={() => handleUpiPay(fee, app.id, paymentNo, 'phonepe')}
+                                  className="premium-btn"
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    gap: '8px', 
+                                    padding: '10px 16px', 
+                                    width: '100%', 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: '800',
+                                    borderRadius: '8px',
+                                    background: '#5f259f',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(95, 37, 159, 0.25)',
+                                    transition: 'all 0.25s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.03)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(95, 37, 159, 0.35)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(95, 37, 159, 0.25)';
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}>
+                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
+                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
+                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
+                                  </svg>
+                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>PhonePe</span>
+                                </button>
+
+                                <button 
                                   onClick={() => handleUpiPay(fee, app.id, paymentNo, 'gpay')}
                                   className="premium-btn"
                                   style={{ 
@@ -2941,43 +3008,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                     <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
                                   </svg>
                                   Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>GPay</span>
-                                </button>
-
-                                <button 
-                                  onClick={() => handleUpiPay(fee, app.id, paymentNo, 'phonepe')}
-                                  className="premium-btn"
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    gap: '8px', 
-                                    padding: '10px 16px', 
-                                    width: '100%', 
-                                    fontSize: '0.8rem', 
-                                    fontWeight: '800',
-                                    borderRadius: '8px',
-                                    background: '#5f259f',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(95, 37, 159, 0.25)',
-                                    transition: 'all 0.25s ease'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.03)';
-                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(95, 37, 159, 0.35)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(95, 37, 159, 0.25)';
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}>
-                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
-                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
-                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
-                                  </svg>
-                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>PhonePe</span>
                                 </button>
                               </div>
 
@@ -3396,17 +3426,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               <button 
                 onClick={() => {
                   setShowInstallPrompt(false);
-                  sessionStorage.setItem('hide_install_prompt', 'true');
+                  sessionStorage.setItem('install_prompt_dismissed_at', Date.now().toString());
                 }}
                 style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}
               >
                 Close
               </button>
               <button 
-                onClick={() => {
+                onClick={async () => {
                   setShowInstallPrompt(false);
-                  sessionStorage.setItem('hide_install_prompt', 'true');
-                  alert("To install: Tap the browser menu (⋮) and select 'Add to Home screen' or 'Install App'.");
+                  sessionStorage.setItem('install_prompt_dismissed_at', Date.now().toString());
+                  if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log('[PWA] User response to install prompt:', outcome);
+                    setDeferredPrompt(null);
+                  } else {
+                    alert("To install: Tap the browser menu (⋮) or Share icon and select 'Add to Home screen' or 'Install App'.");
+                  }
                 }}
                 className="premium-btn-primary"
                 style={{ flex: 1, padding: '12px', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', background: 'var(--primary)', color: 'white' }}

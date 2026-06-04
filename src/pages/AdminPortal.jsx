@@ -1950,6 +1950,7 @@ export default function AdminPortal() {
                     if (newVal === 'true') {
                       localStorage.removeItem('hide_install_prompt');
                       sessionStorage.removeItem('hide_install_prompt');
+                      localStorage.setItem('install_prompt_last_reset', Date.now().toString());
                     }
                     alert(`Installation Notification turned ${newVal === 'true' ? 'ON' : 'OFF'}!`);
                   } catch (err) {
