@@ -1968,26 +1968,40 @@ export default function AdminPortal() {
                 {/* Payment Number */}
                 <form onSubmit={async (e) => {
                   e.preventDefault();
+                  const num = (settings.payment_number || '').trim();
+                  if (!num) {
+                    alert('Please enter a payment UPI ID.');
+                    return;
+                  }
+                  if (/^\d{10}$/.test(num)) {
+                    const confirmUse = window.confirm(
+                      "You entered a 10-digit phone number instead of a full UPI ID / VPA.\n\n" +
+                      "For best compatibility, we recommend entering your full UPI ID (e.g., 9385497906@okaxis).\n\n" +
+                      "If you proceed, the system will automatically append '@okaxis' when generating Google Pay links for users.\n\n" +
+                      "Do you want to save this as a phone number?"
+                    );
+                    if (!confirmUse) return;
+                  }
                   try {
-                    await updateSettings({ payment_number: settings.payment_number });
-                    alert('Payment Number saved successfully!');
+                    await updateSettings({ payment_number: num });
+                    alert('Payment UPI ID saved successfully!');
                   } catch (err) {
-                    alert('Failed to save Payment Number.');
+                    alert('Failed to save Payment UPI ID.');
                   }
                 }} className="premium-input-group" style={{ margin: 0 }}>
-                  <label className="premium-label">Payment Number (UPI/GPay)</label>
+                  <label className="premium-label">Payment UPI ID / VPA</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input 
                       type="text" 
                       value={settings.payment_number || ''} 
                       onChange={(e) => setSettings({ ...settings, payment_number: e.target.value })} 
-                      placeholder="e.g. 9876543210"
+                      placeholder="e.g. 9876543210@okaxis"
                       className="premium-input" 
                     />
                     <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 16px' }}>Update</button>
                   </div>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', marginTop: '4px', display: 'block' }}>
-                    Used for direct UPI payments. This number will be hidden in the UI and linked dynamically via UPI.
+                    Used for direct UPI payments. Enter a full UPI ID (VPA). If you enter just a 10-digit phone number, it will default to Google Pay (@okaxis).
                   </span>
                 </form>
 

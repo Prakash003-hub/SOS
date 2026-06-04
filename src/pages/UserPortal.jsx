@@ -108,6 +108,15 @@ const getImageUrl = (url) => {
   return url;
 };
 
+const formatUpiVpa = (vpaOrPhone) => {
+  if (!vpaOrPhone) return '';
+  const trimmed = vpaOrPhone.trim();
+  if (/^\d{10}$/.test(trimmed)) {
+    return `${trimmed}@okaxis`; // default GPay handle
+  }
+  return trimmed;
+};
+
 const STANDARD_FIELDS = {
   name: { label: 'Applicant Name', type: 'text', required: true },
   name_tamil: { label: 'பெயர் ( தமிழில் )', type: 'text', required: false },
@@ -1024,20 +1033,20 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   };
 
   const handleUpiPay = (fee, submissionId, paymentNo) => {
-    const pa = paymentNo || "";
+    const pa = formatUpiVpa(paymentNo);
     const am = fee;
-    // Simplified UPI URL as requested: no extra data, just UPI ID and amount
-    const payUrl = `upi://pay?pa=${pa}&am=${am}`;
+    const gpayUrl = `gpay://upi/pay?pa=${pa}&am=${am}&cu=INR`;
+    const upiUrl = `upi://pay?pa=${pa}&am=${am}&cu=INR`;
     
     // Attempt to open Google Pay directly
-    window.location.href = payUrl;
+    window.location.href = gpayUrl;
     
     // Smart Fallback: If Google Pay is not installed, the browser remains in focus.
     // After 1.5 seconds, we fall back to the generic upi:// scheme to trigger the system's
     // UPI app chooser, completely avoiding any Google Play Store redirects!
     setTimeout(() => {
       if (document.hasFocus()) {
-        window.location.href = `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
+        window.location.href = upiUrl;
       }
     }, 1500);
   };
@@ -2447,8 +2456,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {submissionResult.payment_status !== 'paid' && (() => {
                         const fee = selectedForm.fee || 0;
                         const paymentNo = systemSettings.payment_number || '';
+                        const formattedVpa = formatUpiVpa(paymentNo);
                         // Keep UPI URL simple: just pa (payment address) and am (amount)
-                        const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
+                        const upiUrl = `upi://pay?pa=${formattedVpa}&am=${fee}`;
                         const qrCodeUrl = systemSettings.qr_code_url;
 
                         return (
@@ -2734,7 +2744,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         const formTemplate = forms.find(f => f.id === app.form_id);
                         const fee = formTemplate?.fee || 0;
                         const paymentNo = systemSettings.payment_number || '';
-                        const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
+                        const formattedVpa = formatUpiVpa(paymentNo);
+                        const upiUrl = `upi://pay?pa=${formattedVpa}&am=${fee}`;
                         const qrCodeUrl = systemSettings.qr_code_url;
 
                         if (app.payment_screenshot) {
