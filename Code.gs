@@ -224,6 +224,9 @@ function doPost(e) {
       case "updateSettings":
         responseData = updateSettingsAction(requestBody.payload);
         break;
+      case "verifyAdminLogin":
+        responseData = verifyAdminLoginAction(requestBody.payload);
+        break;
         
       default:
         return jsonResponse({ success: false, error: "Invalid POST Action: " + action }, 400);
@@ -1242,9 +1245,27 @@ function getSettingsAction() {
   var rows = getRowsFromSheet("Settings");
   var settings = {};
   rows.forEach(function(r) {
-    settings[r.key] = r.value;
+    if (r.key !== "admin_login_code") {
+      settings[r.key] = r.value;
+    }
   });
   return settings;
+}
+
+function verifyAdminLoginAction(payload) {
+  var rows = getRowsFromSheet("Settings");
+  var adminCode = "123456"; // Default
+  rows.forEach(function(r) {
+    if (r.key === "admin_login_code" && r.value) {
+      adminCode = r.value.toString().trim();
+    }
+  });
+  
+  if (payload.code === adminCode) {
+    return { success: true };
+  } else {
+    throw new Error("Invalid Admin Code");
+  }
 }
 
 function updateSettingsAction(payload) {

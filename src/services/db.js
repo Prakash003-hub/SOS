@@ -262,6 +262,10 @@ export const verifyOtp = async (email, otp) => {
   return await callApi("verifyOtp", { payload: { email, otp } });
 };
 
+export const verifyAdminLogin = async (code) => {
+  return await callApi("verifyAdminLogin", { payload: { code } });
+};
+
 export const updateUserProfile = async (userId, profileData) => {
   return await callApi("updateUserProfile", { userId, payload: profileData });
 };
@@ -836,11 +840,12 @@ const callMockFallback = (action, payload) => {
     }
     
     case "uploadFile":
-      // Return a simulated URL
+      // Return the base64 directly as a data URL for mock mode so images actually appear
+      const dataUrl = `data:${payload.mimeType || 'image/png'};base64,${payload.fileData}`;
       return {
         fileName: payload.fileName,
-        fileUrl: "https://drive.google.com/file/d/1MockDriveFileIDForDemoMode/view",
-        downloadUrl: "https://drive.google.com/uc?export=download&id=1MockDriveFileIDForDemoMode"
+        fileUrl: dataUrl,
+        downloadUrl: dataUrl
       };
       
     case "sendOtp":
@@ -854,6 +859,11 @@ const callMockFallback = (action, payload) => {
         return { success: true, verified: true };
       }
       return { success: false, verified: false };
+      
+    case "verifyAdminLogin":
+      console.log(`[Mock] Simulating Admin Login with code ${payload.payload.code}`);
+      if (payload.payload.code === "123456") return { success: true };
+      throw new Error("Invalid Admin Code");
       
     default:
       console.warn("Unimplemented mock action: " + action);

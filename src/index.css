@@ -53,6 +53,38 @@ body {
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   overflow-x: hidden;
+  
+  /* Prevent long-press text selection and copy across the app */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection inside inputs and textareas so user can type and copy their own inputs */
+input, textarea {
+  -webkit-user-select: text;
+  -khtml-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Prevent image dragging and downloading via long press globally */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  pointer-events: none; /* Safest way to disable long press menu on images */
+}
+
+/* Except for interactive elements where images need to be clicked */
+button img, a img, .cursor-pointer img, .interactive-img {
+  pointer-events: auto;
 }
 
 /* Master Layout Container - Centers the App in Desktop Viewports */

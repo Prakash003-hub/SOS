@@ -158,6 +158,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [postsLoading, setPostsLoading] = useState(false);
   const [formsLoading, setFormsLoading] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(false);
+
+  // Auto-scroll to top when tab or selected job changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTab, selectedJobDetails]);
   const [error, setError] = useState('');
   
   // Wizard States

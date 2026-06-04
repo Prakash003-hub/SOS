@@ -29,7 +29,8 @@ import {
   getSettings,
   updateSettings,
   uploadFormImage,
-  uploadFileToDrive
+  uploadFileToDrive,
+  verifyAdminLogin
 } from '../services/db';
 import { 
   Plus, 
@@ -176,6 +177,17 @@ export default function AdminPortal() {
     setSearchParams({ tab: tabName });
   };
   
+  // Authentication State
+  const [isAuth, setIsAuth] = useState(() => sessionStorage.getItem('whatsbro_admin_auth') === 'true');
+  const [loginPin, setLoginPin] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  // Auto-scroll to top when tab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTab]);
+  
   // Lists
   const [posts, setPosts] = useState([]);
   const [forms, setForms] = useState([]);
@@ -256,66 +268,48 @@ export default function AdminPortal() {
     info_request_type: 'text',
     other_doc_name: ''
   });
-  
-  // Secure Admin Login state
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return sessionStorage.getItem('whatsbro_admin_logged') === 'true';
-  });
-  const [adminUsername, setAdminUsername] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminAuthError, setAdminAuthError] = useState('');
 
-  const handleAdminLoginSubmit = (e) => {
+  // 1. Initial Load of DB Data - ONLY IF AUTHENTICATED
+  useEffect(() => {
+    if (!isAuth) return;
+    const loadAllData = async () => {
+      try {
+        const [postsData, formsData, usersData, jobsData, feedbackData, settingsData] = await Promise.all([
+          getPosts(), getForms(), getUsersList(), getJobs(), getFeedback(), getSettings()
+        ]);
+        setPosts(postsData);
+        setForms(formsData);
+        setUsers(usersData);
+        setJobs(jobsData);
+        setFeedbackList(feedbackData);
+        if (settingsData) setSettings(settingsData);
+      } catch (err) {
+        console.error("Initial data load error:", err);
+      }
+    };
+    loadAllData();
+  }, [isAuth]);
+
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
-    setAdminAuthError('');
-    if (adminPassword === '131003') {
-      sessionStorage.setItem('whatsbro_admin_logged', 'true');
-      setIsAdminLoggedIn(true);
-    } else {
-      setAdminAuthError('Invalid passcode. Access Denied.');
+    setLoginError('');
+    setIsLoggingIn(true);
+    try {
+      if (!loginPin) throw new Error("Please enter the Admin Code.");
+      await verifyAdminLogin(loginPin);
+      sessionStorage.setItem('whatsbro_admin_auth', 'true');
+      setIsAuth(true);
+    } catch (err) {
+      setLoginError(err.message || 'Invalid Admin Code.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleAdminLogout = () => {
-    sessionStorage.removeItem('whatsbro_admin_logged');
-    setIsAdminLoggedIn(false);
-    setAdminUsername('');
-    setAdminPassword('');
-  };
-
-  async function fetchInitialData() {
-    setLoading(true);
-    try {
-      const postsData = await getPosts();
-      const formsData = await getForms();
-      const usersData = await getUsersList();
-      const jobsData = await getJobs();
-      const feedbackData = await getFeedback();
-      const settingsData = await getSettings();
-      setPosts(postsData);
-      setForms(formsData);
-      setUsers(usersData);
-      setJobs(jobsData);
-      setFeedbackList(feedbackData);
-      if (settingsData) setSettings(settingsData);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to connect to Google Workspace Apps Script Web App. Please verify VITE_GOOGLE_SCRIPT_URL is configured in your .env file, or check your internet connection.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const handleDeleteFeedback = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this feedback?')) return;
-    try {
-      await deleteFeedback(id);
-      setFeedbackList(feedbackList.filter(f => f.id !== id));
-      alert('Feedback deleted.');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete feedback.');
-    }
+    sessionStorage.removeItem('whatsbro_admin_auth');
+    setIsAuth(false);
+    setLoginPin('');
   };
 
   const handleRefreshFeedback = async () => {
@@ -333,26 +327,16 @@ export default function AdminPortal() {
     (f.message && f.message.toLowerCase().includes(feedbackSearchTerm.toLowerCase()))
   );
 
-  useEffect(() => {
-    if (isAdminLoggedIn) {
-      fetchInitialData();
-    }
-  }, [isAdminLoggedIn]);
-
   const handleRefreshUsers = async () => {
     try {
-      const usersData = await getUsersList();
+      const [usersData, jobsData] = await Promise.all([getUsersList(), getJobs()]);
       setUsers(usersData);
-      const jobsData = await getJobs();
       setJobs(jobsData);
       if (selectedUser) {
         const latestUser = usersData.find(u => u.aadhar === selectedUser.aadhar);
-        if (latestUser) {
-          setSelectedUser(latestUser);
-        }
+        if (latestUser) setSelectedUser(latestUser);
         const subsData = await getSubmissionsByUser(selectedUser.aadhar);
         setUserSubmissions(subsData);
-        // Sync active submission if it's selected
         if (activeSubmission) {
           const updatedActive = subsData.find(s => s.id === activeSubmission.id);
           setActiveSubmission(updatedActive || null);
@@ -444,7 +428,6 @@ export default function AdminPortal() {
       img_url: post.img_url || '',
       apply_url: post.apply_url || ''
     });
-    // Scroll to editor form
     document.getElementById('post-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -693,7 +676,6 @@ export default function AdminPortal() {
       info_request_type: sub.info_request_type || 'text',
       other_doc_name: sub.other_doc_name || ''
     });
-    // Auto smooth-scroll to dashboard on mobile screens
     setTimeout(() => {
       document.getElementById('active-submission-dashboard')?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
@@ -798,7 +780,6 @@ export default function AdminPortal() {
     }
   };
 
-  // Filters users based on Search Term (Aadhaar, Phone, or Name matches) and sorts by last_active descending
   const filteredUsers = users
     .filter(u => 
       u.phone.includes(userSearchTerm) || 
@@ -807,72 +788,48 @@ export default function AdminPortal() {
     )
     .sort((a, b) => new Date(b.last_active) - new Date(a.last_active));
 
-  if (!isAdminLoggedIn) {
+  if (!isAuth) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '70vh',
-        padding: '24px',
-        background: 'transparent'
-      }}>
-        <div className="premium-card" style={{
-          width: '100%',
-          maxWidth: '360px',
-          borderTop: '6px solid var(--primary)',
-          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-          padding: '28px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          backgroundColor: '#ffffff',
-          borderRadius: '16px'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-light-main)', margin: 0 }}>
-              TN sevai Admin Console
-            </h3>
-            <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '6px', marginBottom: 0 }}>
-              Access restricted to authorized portal administrators.
-            </p>
+      <div className="layout-viewport-container" style={{ background: 'var(--bg-light)', alignItems: 'center' }}>
+        <div className="app-mobile-container" style={{ justifyContent: 'center', alignItems: 'center', background: 'white' }}>
+          <div className="premium-card" style={{ width: '90%', maxWidth: '400px', textAlign: 'center', borderTop: '6px solid var(--primary)' }}>
+            <h2 style={{ marginBottom: '8px' }}>Admin Portal</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-light-muted)', marginBottom: '24px' }}>Restricted Access. Please enter the Admin Code.</p>
+            
+            <form onSubmit={handleAdminLogin}>
+              <div className="premium-input-group">
+                <input 
+                  type="password" 
+                  value={loginPin} 
+                  onChange={(e) => setLoginPin(e.target.value)} 
+                  className="premium-input" 
+                  placeholder="Enter 6-digit Code" 
+                  style={{ textAlign: 'center', letterSpacing: '4px', fontSize: '1.2rem' }}
+                />
+              </div>
+              
+              {loginError && (
+                <div style={{ color: 'var(--error)', fontSize: '0.85rem', marginBottom: '16px' }}>
+                  {loginError}
+                </div>
+              )}
+              
+              <button 
+                type="submit" 
+                className="premium-btn premium-btn-primary" 
+                disabled={isLoggingIn}
+              >
+                {isLoggingIn ? 'Verifying...' : 'Login to Dashboard'}
+              </button>
+            </form>
           </div>
-
-          {adminAuthError && (
-            <div style={{ padding: '8px 12px', backgroundColor: '#fef2f2', borderLeft: '4px solid #ef4444', borderRadius: '4px', color: '#991b1b', fontSize: '0.75rem' }}>
-              {adminAuthError}
-            </div>
-          )}
-
-          <form onSubmit={handleAdminLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div className="premium-input-group" style={{ marginBottom: 0 }}>
-              <label className="premium-label">Enter Admin Passcode *</label>
-              <input 
-                type="password" 
-                placeholder="Enter 6-digit passcode"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                required
-                className="premium-input"
-                style={{ padding: '12px 16px', fontSize: '0.95rem', letterSpacing: '0.1em', textAlign: 'center' }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="premium-btn premium-btn-primary"
-              style={{ padding: '11px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: 'pointer', marginTop: '8px' }}
-            >
-              Verify Credentials
-            </button>
-          </form>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="layout-viewport-container">
       
       {/* Secure Console Terminal Status Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#0f172a', color: 'white', borderRadius: '12px', margin: '16px 16px 0 16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
@@ -1920,26 +1877,38 @@ export default function AdminPortal() {
                         <img src={settings.qr_code_url} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                     )}
-                    <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)', width: 'fit-content' }}>
-                      <Upload size={16} style={{ color: 'var(--primary)' }} />
-                      <span>{settings.qr_code_url ? 'Replace QR Code' : 'Upload QR Code'}</span>
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            try {
-                              const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "System_Settings"]);
-                              setSettings({ ...settings, qr_code_url: url });
-                            } catch (err) {
-                              alert("Failed to upload QR code: " + err.message);
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)', width: 'fit-content' }}>
+                        <Upload size={16} style={{ color: 'var(--primary)' }} />
+                        <span>{settings.qr_code_url ? 'Replace QR Code' : 'Upload QR Code'}</span>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              try {
+                                const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "System_Settings"]);
+                                setSettings({ ...settings, qr_code_url: url });
+                              } catch (err) {
+                                alert("Failed to upload QR code: " + err.message);
+                              }
                             }
-                          }
-                        }}
-                        style={{ display: 'none' }}
-                      />
-                    </label>
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                      {settings.qr_code_url && (
+                        <button 
+                          type="button" 
+                          onClick={() => setSettings({ ...settings, qr_code_url: '' })}
+                          className="premium-btn premium-btn-danger" 
+                          style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', width: 'fit-content' }}
+                        >
+                          <Trash2 size={16} /> Delete QR Code
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
                     Upload your GPay/UPI QR Code image. If uploaded, it will be shown to users instead of a dynamically generated one. If hidden, the QR section will be removed.
