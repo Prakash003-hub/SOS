@@ -1946,6 +1946,9 @@ export default function AdminPortal() {
                     const newVal = settings.install_notification_enabled === 'true' ? 'false' : 'true';
                     await updateSettings({ install_notification_enabled: newVal });
                     setSettings({ ...settings, install_notification_enabled: newVal });
+                    if (newVal === 'true') {
+                      localStorage.removeItem('hide_install_prompt');
+                    }
                     alert(`Installation Notification turned ${newVal === 'true' ? 'ON' : 'OFF'}!`);
                   } catch (err) {
                     alert('Failed to toggle notification setting.');

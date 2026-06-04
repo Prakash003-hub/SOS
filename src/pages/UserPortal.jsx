@@ -345,6 +345,18 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   }, []);
 
   useEffect(() => {
+    if (systemSettings && systemSettings.install_notification_enabled === 'true') {
+      const hidePrompt = localStorage.getItem('hide_install_prompt');
+      if (!hidePrompt) {
+        const timer = setTimeout(() => {
+          setShowInstallPrompt(true);
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [systemSettings]);
+
+  useEffect(() => {
     if (initialCategory) {
       setSelectedCategory(initialCategory);
     }
@@ -2486,45 +2498,83 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 </div>
                               )}
 
-                              {/* Intent pay button */}
-                              <button 
-                                onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo)}
-                                className="premium-btn"
-                                style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center', 
-                                  gap: '8px', 
-                                  padding: '10px 16px', 
-                                  width: '100%', 
-                                  maxWidth: '220px', 
-                                  fontSize: '0.8rem', 
-                                  fontWeight: '800',
-                                  borderRadius: '8px',
-                                  background: '#000000',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                  transition: 'all 0.25s ease'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1.03)';
-                                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.25)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1)';
-                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                                }}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" style={{ marginRight: '2px' }}>
-                                  <path fill="#4285F4" d="M24 12.27c0-.81-.07-1.59-.2-2.34H12v4.42h6.08c-.26 1.39-1.04 2.57-2.21 3.34v2.73h3.64c2.13-1.96 3.36-4.85 3.36-8.15z"/>
-                                  <path fill="#34A853" d="M12 24c3.04 0 5.58-1.01 7.44-2.73l-3.64-2.73c-1.01.68-2.3 1.08-3.8 1.08-2.92 0-5.39-1.97-6.27-4.62H2.04v2.81C3.88 21.05 7.55 24 12 24z"/>
-                                  <path fill="#FBBC05" d="M5.73 15.02c-.22-.68-.35-1.41-.35-2.18s.13-1.5.35-2.18V7.85H2.04c-.7 1.4-1.1 2.97-1.1 4.63s.4 3.23 1.1 4.63l3.69-2.87z"/>
-                                  <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
-                                </svg>
-                                Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px' }}>GPay</span>
-                              </button>
+                              {/* Intent pay buttons */}
+                              <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '280px', justifyContent: 'center' }}>
+                                <button 
+                                  onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo, 'gpay')}
+                                  className="premium-btn"
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    gap: '6px', 
+                                    padding: '10px', 
+                                    flex: 1,
+                                    fontSize: '0.75rem', 
+                                    fontWeight: '800',
+                                    borderRadius: '8px',
+                                    background: '#000000',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    transition: 'all 0.25s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.03)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.25)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" style={{ marginRight: '1px' }}>
+                                    <path fill="#4285F4" d="M24 12.27c0-.81-.07-1.59-.2-2.34H12v4.42h6.08c-.26 1.39-1.04 2.57-2.21 3.34v2.73h3.64c2.13-1.96 3.36-4.85 3.36-8.15z"/>
+                                    <path fill="#34A853" d="M12 24c3.04 0 5.58-1.01 7.44-2.73l-3.64-2.73c-1.01.68-2.3 1.08-3.8 1.08-2.92 0-5.39-1.97-6.27-4.62H2.04v2.81C3.88 21.05 7.55 24 12 24z"/>
+                                    <path fill="#FBBC05" d="M5.73 15.02c-.22-.68-.35-1.41-.35-2.18s.13-1.5.35-2.18V7.85H2.04c-.7 1.4-1.1 2.97-1.1 4.63s.4 3.23 1.1 4.63l3.69-2.87z"/>
+                                    <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
+                                  </svg>
+                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '2px' }}>GPay</span>
+                                </button>
+
+                                <button 
+                                  onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo, 'phonepe')}
+                                  className="premium-btn"
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    gap: '6px', 
+                                    padding: '10px', 
+                                    flex: 1,
+                                    fontSize: '0.75rem', 
+                                    fontWeight: '800',
+                                    borderRadius: '8px',
+                                    background: '#5f259f',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(95, 37, 159, 0.25)',
+                                    transition: 'all 0.25s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.03)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(95, 37, 159, 0.35)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(95, 37, 159, 0.25)';
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '1px' }}>
+                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
+                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
+                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
+                                  </svg>
+                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '2px' }}>PhonePe</span>
+                                </button>
+                              </div>
                             </div>
 
                             <label className="premium-btn premium-btn-success" style={{ padding: '8px 12px', fontSize: '0.75rem', display: 'flex', gap: '8px', cursor: 'pointer', justifyContent: 'center' }}>
@@ -2849,45 +2899,83 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 </div>
                               )}
 
-                              {/* Pay Intent Button */}
-                              <button 
-                                onClick={() => handleUpiPay(fee, app.id, paymentNo)}
-                                className="premium-btn"
-                                style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center', 
-                                  gap: '8px', 
-                                  padding: '10px 16px', 
-                                  width: '100%', 
-                                  maxWidth: '220px', 
-                                  fontSize: '0.8rem', 
-                                  fontWeight: '800',
-                                  borderRadius: '8px',
-                                  background: '#000000',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                  transition: 'all 0.25s ease'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1.03)';
-                                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.25)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1)';
-                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                                }}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" style={{ marginRight: '2px' }}>
-                                  <path fill="#4285F4" d="M24 12.27c0-.81-.07-1.59-.2-2.34H12v4.42h6.08c-.26 1.39-1.04 2.57-2.21 3.34v2.73h3.64c2.13-1.96 3.36-4.85 3.36-8.15z"/>
-                                  <path fill="#34A853" d="M12 24c3.04 0 5.58-1.01 7.44-2.73l-3.64-2.73c-1.01.68-2.3 1.08-3.8 1.08-2.92 0-5.39-1.97-6.27-4.62H2.04v2.81C3.88 21.05 7.55 24 12 24z"/>
-                                  <path fill="#FBBC05" d="M5.73 15.02c-.22-.68-.35-1.41-.35-2.18s.13-1.5.35-2.18V7.85H2.04c-.7 1.4-1.1 2.97-1.1 4.63s.4 3.23 1.1 4.63l3.69-2.87z"/>
-                                  <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
-                                </svg>
-                                Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px' }}>GPay</span>
-                              </button>
+                              {/* Pay Intent Buttons */}
+                              <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '280px', justifyContent: 'center' }}>
+                                <button 
+                                  onClick={() => handleUpiPay(fee, app.id, paymentNo, 'gpay')}
+                                  className="premium-btn"
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    gap: '6px', 
+                                    padding: '10px', 
+                                    flex: 1,
+                                    fontSize: '0.75rem', 
+                                    fontWeight: '800',
+                                    borderRadius: '8px',
+                                    background: '#000000',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    transition: 'all 0.25s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.03)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.25)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" style={{ marginRight: '1px' }}>
+                                    <path fill="#4285F4" d="M24 12.27c0-.81-.07-1.59-.2-2.34H12v4.42h6.08c-.26 1.39-1.04 2.57-2.21 3.34v2.73h3.64c2.13-1.96 3.36-4.85 3.36-8.15z"/>
+                                    <path fill="#34A853" d="M12 24c3.04 0 5.58-1.01 7.44-2.73l-3.64-2.73c-1.01.68-2.3 1.08-3.8 1.08-2.92 0-5.39-1.97-6.27-4.62H2.04v2.81C3.88 21.05 7.55 24 12 24z"/>
+                                    <path fill="#FBBC05" d="M5.73 15.02c-.22-.68-.35-1.41-.35-2.18s.13-1.5.35-2.18V7.85H2.04c-.7 1.4-1.1 2.97-1.1 4.63s.4 3.23 1.1 4.63l3.69-2.87z"/>
+                                    <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
+                                  </svg>
+                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '2px' }}>GPay</span>
+                                </button>
+
+                                <button 
+                                  onClick={() => handleUpiPay(fee, app.id, paymentNo, 'phonepe')}
+                                  className="premium-btn"
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    gap: '6px', 
+                                    padding: '10px', 
+                                    flex: 1,
+                                    fontSize: '0.75rem', 
+                                    fontWeight: '800',
+                                    borderRadius: '8px',
+                                    background: '#5f259f',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(95, 37, 159, 0.25)',
+                                    transition: 'all 0.25s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.03)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(95, 37, 159, 0.35)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(95, 37, 159, 0.25)';
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '1px' }}>
+                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
+                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
+                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
+                                  </svg>
+                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '2px' }}>PhonePe</span>
+                                </button>
+                              </div>
 
                             </div>
 
