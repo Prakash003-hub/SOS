@@ -3185,10 +3185,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           </div>
         )}
       </div>
-
-
-      )}
-
       {loading && (
         <div style={{
           position: 'fixed',
