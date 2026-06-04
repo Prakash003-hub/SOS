@@ -345,7 +345,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   }, []);
 
   useEffect(() => {
-    if (systemSettings && systemSettings.install_notification_enabled === 'true') {
+    if (systemSettings && String(systemSettings.install_notification_enabled) === 'true') {
       const hidePrompt = localStorage.getItem('hide_install_prompt');
       if (!hidePrompt) {
         const timer = setTimeout(() => {
