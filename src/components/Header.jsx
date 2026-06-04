@@ -77,7 +77,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
   };
 
   return (
-    <header className="fixed-header" style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 9999 }}>
+    <header className="fixed-header" style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 9999 }}>
       <div className="logo-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <img 
           src="/whatsbro_logo.png" 

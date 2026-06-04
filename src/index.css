@@ -928,10 +928,10 @@ select.premium-input:focus {
   background: linear-gradient(135deg, #168c54 0%, #0d5c36 100%);
   color: #bbf7d0;
   border-top: none;
-  padding: 30px 24px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
 }
 
 .footer-content-wrap {
@@ -939,11 +939,11 @@ select.premium-input:focus {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 24px;
+  gap: 12px;
 }
 
 .footer-left-side {
-  flex: 1 1 300px;
+  flex: 1 1 250px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -951,9 +951,9 @@ select.premium-input:focus {
 }
 
 .footer-right-side {
-  flex: 1 1 300px;
+  flex: 1 1 250px;
   display: flex;
-  gap: 16px;
+  gap: 10px;
   align-items: center;
   justify-content: flex-end;
 }
@@ -967,28 +967,28 @@ select.premium-input:focus {
 
 .footer-bottom-row-new {
   border-top: 1px solid #15803d;
-  padding-top: 16px;
+  padding-top: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 0.7rem;
+  gap: 8px;
+  font-size: 0.65rem;
   color: #86efac;
 }
 
 /* Mobile Responsiveness for Footer */
 @media (max-width: 640px) {
   .premium-footer-new {
-    padding: 28px 16px;
-    gap: 20px;
+    padding: 14px 14px;
+    gap: 10px;
   }
   
   .footer-content-wrap {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 20px;
+    gap: 12px;
   }
   
   .footer-left-side {
@@ -1007,7 +1007,7 @@ select.premium-input:focus {
     justify-content: center;
     text-align: center;
     width: 100%;
-    gap: 12px;
+    gap: 8px;
   }
   
   .footer-contact-details {
@@ -1019,7 +1019,7 @@ select.premium-input:focus {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 8px;
+    gap: 4px;
   }
 }
 
