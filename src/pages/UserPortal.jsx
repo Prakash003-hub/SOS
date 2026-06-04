@@ -1491,7 +1491,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                             <span className="badge badge-info">{form.category}</span>
                             {isUpcoming ? (
-                              <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>Upcoming</span>
+                              <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>Coming Soon</span>
                             ) : (
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Apply</span>
                             )}
@@ -1517,7 +1517,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             style={{ padding: '10px', opacity: isUpcoming ? 0.7 : 1, cursor: isUpcoming ? 'not-allowed' : 'pointer' }}
                             disabled={isUpcoming}
                           >
-                            {isUpcoming ? 'Upcoming soon' : 'Click to Apply'}
+                            {isUpcoming ? 'Coming Soon' : 'Click to Apply'}
                           </button>
                         </div>
                       );
@@ -2449,8 +2449,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         const paymentNo = systemSettings.payment_number || '';
                         // Keep UPI URL simple: just pa (payment address) and am (amount)
                         const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
+                        // If no uploaded QR code exists, dynamically generate one using the UPI url
                         const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
-                        const hideQr = !systemSettings.qr_code_url;
 
                         return (
                           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '16px' }}>
@@ -2466,7 +2466,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               </div>
 
                               {/* QR Code */}
-                              {!hideQr && (
+                              {qrCodeUrl && (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '6px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                                   <img 
                                     src={qrCodeUrl} 
@@ -2733,9 +2733,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           ) : app.payment_status === 'paid' ? (
                             <span className="badge badge-success">Paid</span>
                           ) : app.payment_screenshot ? (
-                            <span className="badge badge-warning">Verification Pending</span>
+                            <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b' }}>Verification Pending</span>
                           ) : (
-                            <span className="badge badge-danger">Unpaid</span>
+                            <span className="badge badge-danger" style={{ backgroundColor: '#ef4444' }}>Unpaid</span>
                           )}
                         </div>
                       </div>
@@ -2744,10 +2744,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {app.payment_status === 'unpaid' && (() => {
                         const formTemplate = forms.find(f => f.id === app.form_id);
                         const fee = formTemplate?.fee || 0;
-                        const paymentNo = systemSettings.payment_number;
+                        const paymentNo = systemSettings.payment_number || '';
                         const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
                         const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
-                        const hideQr = !systemSettings.qr_code_url;
 
                         if (app.payment_screenshot) {
                           const isProofPdf = checkIfPdf(app.payment_screenshot);
@@ -2839,7 +2838,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               </div>
                               
                               {/* QR Code Container */}
-                              {!hideQr && (
+                              {qrCodeUrl && (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '8px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                                   <img 
                                     src={qrCodeUrl} 
