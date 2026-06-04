@@ -2449,8 +2449,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         const paymentNo = systemSettings.payment_number || '';
                         // Keep UPI URL simple: just pa (payment address) and am (amount)
                         const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
-                        // If no uploaded QR code exists, dynamically generate one using the UPI url
-                        const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+                        // If no uploaded QR code exists, it will be hidden
+                        const qrCodeUrl = systemSettings.qr_code_url;
 
                         return (
                           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '16px' }}>
@@ -2516,16 +2516,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 </svg>
                                 Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px' }}>GPay</span>
                               </button>
-
-                              {/* Direct number */}
-                              <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '8px', width: '100%' }}>
-                                <p style={{ fontSize: '0.7rem', color: '#475569', margin: '0 0 2px 0' }}>
-                                  send direct via GPay 
-                                </p>
-                                <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#1e293b', background: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                                  {paymentNo}
-                                </span>
-                              </div>
                             </div>
 
                             <label className="premium-btn premium-btn-success" style={{ padding: '8px 12px', fontSize: '0.75rem', display: 'flex', gap: '8px', cursor: 'pointer', justifyContent: 'center' }}>
@@ -2733,9 +2723,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           ) : app.payment_status === 'paid' ? (
                             <span className="badge badge-success">Paid</span>
                           ) : app.payment_screenshot ? (
-                            <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b' }}>Verification Pending</span>
+                            <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: 'white' }}>Verification Pending</span>
                           ) : (
-                            <span className="badge badge-danger" style={{ backgroundColor: '#ef4444' }}>Unpaid</span>
+                            <span className="badge badge-danger" style={{ backgroundColor: '#ef4444', color: 'white' }}>Unpaid</span>
                           )}
                         </div>
                       </div>
@@ -2746,7 +2736,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         const fee = formTemplate?.fee || 0;
                         const paymentNo = systemSettings.payment_number || '';
                         const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
-                        const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+                        const qrCodeUrl = systemSettings.qr_code_url;
 
                         if (app.payment_screenshot) {
                           const isProofPdf = checkIfPdf(app.payment_screenshot);
@@ -2889,15 +2879,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px' }}>GPay</span>
                               </button>
 
-                              {/* Direct number */}
-                              <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '10px', width: '100%' }}>
-                                <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0 0 4px 0', fontWeight: '600' }}>
-                                  Or send direct via GPay / UPI to number:
-                                </p>
-                                <span style={{ fontSize: '0.9rem', fontWeight: '900', color: '#1e293b', background: '#f1f5f9', padding: '4px 12px', borderRadius: '4px', display: 'inline-block' }}>
-                                  {paymentNo}
-                                </span>
-                              </div>
                             </div>
 
                             {/* Screenshot Upload Block */}
@@ -3281,57 +3262,56 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         </div>
       )}
 
-      {/* App Install Notification Popup */}
+      {/* App Install Notification Modal */}
       {showInstallPrompt && (
         <div style={{
           position: 'fixed',
-          bottom: showBottomNav ? '80px' : '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '90%',
-          maxWidth: '400px',
-          background: 'white',
-          borderRadius: '16px',
-          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)',
-          padding: '16px',
-          zIndex: 99999,
-          border: '1px solid #e2e8f0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          animation: 'slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999
         }}>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f8fafc', padding: '4px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
-              <img src="/whatsbro_logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '24px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            width: '85%', maxWidth: '320px',
+            display: 'flex', flexDirection: 'column', gap: '20px',
+            animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', textAlign: 'center' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: '#f8fafc', padding: '8px', border: '1px solid #e2e8f0' }}>
+                <img src="/whatsbro_logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b', fontWeight: '800' }}>Install TN sevai</h4>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', marginTop: '6px', lineHeight: '1.4' }}>Add our app to your home screen for quick and easy access!</p>
+              </div>
             </div>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b', fontWeight: '800' }}>Add TN sevai to Home Screen</h4>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Install our app for faster access and a better experience.</p>
+            
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button 
+                onClick={() => {
+                  setShowInstallPrompt(false);
+                  localStorage.setItem('hide_install_prompt', 'true');
+                }}
+                style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  setShowInstallPrompt(false);
+                  localStorage.setItem('hide_install_prompt', 'true');
+                  alert("To install: Tap the browser menu (⋮) and select 'Add to Home screen' or 'Install App'.");
+                }}
+                className="premium-btn-primary"
+                style={{ flex: 1, padding: '12px', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', background: 'var(--primary)', color: 'white' }}
+              >
+                Install
+              </button>
             </div>
-          </div>
-          
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={() => {
-                setShowInstallPrompt(false);
-                localStorage.setItem('hide_install_prompt', 'true');
-              }}
-              style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              Close
-            </button>
-            <button 
-              onClick={() => {
-                setShowInstallPrompt(false);
-                localStorage.setItem('hide_install_prompt', 'true');
-                alert("To install: Tap the browser menu (⋮) and select 'Add to Home screen' or 'Install App'.");
-              }}
-              className="premium-btn-primary"
-              style={{ flex: 2, padding: '10px', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              OK, Show me how
-            </button>
           </div>
         </div>
       )}
