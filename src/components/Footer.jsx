@@ -9,7 +9,7 @@ export default function Footer({ systemSettings }) {
     <footer className="premium-footer-new">
       <div className="footer-content-wrap">
         
-        {/* Left Side: Brand Details & Served Count on a single line */}
+        {/* Left Side: Brand Details & Served Count */}
         <div className="footer-left-side">
           <div className="logo-footer-section" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <img 
@@ -20,14 +20,17 @@ export default function Footer({ systemSettings }) {
             <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>TN sevai</span>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '12px', fontSize: '0.6rem', fontWeight: 'bold', color: '#ffffff' }}>
               <span style={{ display: 'inline-block', width: '4px', height: '4px', borderRadius: '50%', background: '#4ade80' }}></span>
-              Served: {totalCount}+
+              Served: {totalCount}+ Users
             </div>
+          </div>
+          <div style={{ fontSize: '0.65rem', color: '#dcfce7', marginTop: '3px', opacity: 0.9 }}>
+            Govt Registration Assistant
           </div>
         </div>
 
         {/* Right Side: Compact Help Desk WhatsApp Badge */}
         <div className="footer-right-side">
-          <div className="footer-contact-details">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '0.7rem', color: 'white', fontWeight: 'bold' }}>Support:</span>
             <a 
               href="https://wa.me/918300183615" 
@@ -62,6 +65,9 @@ export default function Footer({ systemSettings }) {
               </svg>
               <span>WhatsApp</span>
             </a>
+          </div>
+          <div style={{ fontSize: '0.6rem', color: '#86efac', marginTop: '3px', opacity: 0.8 }}>
+            Quick Online Support
           </div>
         </div>
 

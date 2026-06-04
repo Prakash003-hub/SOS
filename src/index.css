@@ -928,37 +928,32 @@ select.premium-input:focus {
   background: linear-gradient(135deg, #168c54 0%, #0d5c36 100%);
   color: #bbf7d0;
   border-top: none;
-  padding: 10px 16px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .footer-content-wrap {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+  gap: 12px;
 }
 
 .footer-left-side {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .footer-right-side {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.footer-contact-details {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
 }
 
 .footer-bottom-row-new {
@@ -967,46 +962,39 @@ select.premium-input:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  width: 100%;
   font-size: 0.62rem;
   color: #86efac;
 }
 
-/* Mobile Responsiveness for Footer */
+/* Mobile Responsiveness for Footer (Left & Right Aligned) */
 @media (max-width: 640px) {
   .premium-footer-new {
-    padding: 8px 12px;
+    padding: 10px 12px;
     gap: 6px;
   }
   
   .footer-content-wrap {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 6px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
   }
   
   .footer-left-side {
-    justify-content: center;
-    width: 100%;
+    align-items: flex-start;
+    text-align: left;
   }
   
   .footer-right-side {
-    justify-content: center;
-    width: 100%;
-    gap: 6px;
-  }
-  
-  .footer-contact-details {
-    justify-content: center;
+    align-items: flex-end;
+    text-align: right;
   }
   
   .footer-bottom-row-new {
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-between;
     align-items: center;
-    text-align: center;
-    gap: 4px;
   }
 }
 
