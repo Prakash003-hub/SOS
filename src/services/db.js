@@ -70,7 +70,7 @@ const callApiGet = async (action, queryParams = {}) => {
   }
 
   try {
-    const urlParams = new URLSearchParams({ action, ...queryParams });
+    const urlParams = new URLSearchParams({ action, ...queryParams, _t: Date.now() });
     const response = await fetch(`${GOOGLE_SCRIPT_URL}?${urlParams.toString()}`, {
       method: 'GET',
       headers: {

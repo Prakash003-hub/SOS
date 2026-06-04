@@ -345,11 +345,15 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   }, []);
 
   useEffect(() => {
+    console.log('[Install Check] systemSettings loaded:', systemSettings);
     if (systemSettings && String(systemSettings.install_notification_enabled) === 'true') {
-      const hidePrompt = localStorage.getItem('hide_install_prompt');
+      const hidePrompt = sessionStorage.getItem('hide_install_prompt');
+      console.log('[Install Check] hidePrompt in sessionStorage:', hidePrompt);
       if (!hidePrompt) {
+        console.log('[Install Check] Triggering installation prompt in 2 seconds...');
         const timer = setTimeout(() => {
           setShowInstallPrompt(true);
+          console.log('[Install Check] showInstallPrompt set to true');
         }, 2000);
         return () => clearTimeout(timer);
       }
@@ -3392,7 +3396,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               <button 
                 onClick={() => {
                   setShowInstallPrompt(false);
-                  localStorage.setItem('hide_install_prompt', 'true');
+                  sessionStorage.setItem('hide_install_prompt', 'true');
                 }}
                 style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}
               >
@@ -3401,7 +3405,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               <button 
                 onClick={() => {
                   setShowInstallPrompt(false);
-                  localStorage.setItem('hide_install_prompt', 'true');
+                  sessionStorage.setItem('hide_install_prompt', 'true');
                   alert("To install: Tap the browser menu (⋮) and select 'Add to Home screen' or 'Install App'.");
                 }}
                 className="premium-btn-primary"
