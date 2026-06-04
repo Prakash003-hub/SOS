@@ -1789,7 +1789,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <button
                         type="button"
                         onClick={() => handleWhatsAppShare(post.title, post.description, `/user?tab=home&postId=${post.id}`)}
-                        className="premium-btn premium-btn-secondary"
+                        className="premium-btn premium-btn-primary"
                         style={{ 
                           width: post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' ? '42px' : '100%', 
                           padding: '11px 0', 
@@ -1797,9 +1797,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           alignItems: 'center', 
                           justifyContent: 'center', 
                           gap: '6px',
-                          backgroundColor: '#25D366', 
-                          color: 'white', 
-                          border: 'none',
                           fontWeight: 'bold'
                         }}
                         title="Share on WhatsApp"
@@ -1874,8 +1871,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <button
                         type="button"
                         onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/user?tab=home&jobId=${selectedJobDetails.id}`)}
-                        className="premium-btn premium-btn-secondary"
-                        style={{ width: '52px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', color: 'white', border: 'none', borderRadius: '8px' }}
+                        className="premium-btn premium-btn-primary"
+                        style={{ width: '52px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}
                         title="Share on WhatsApp"
                       >
                         <Share2 size={22} />
@@ -1886,8 +1883,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <button
                         type="button"
                         onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/user?tab=home&jobId=${selectedJobDetails.id}`)}
-                        className="premium-btn premium-btn-secondary"
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem', backgroundColor: '#25D366', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}
+                        className="premium-btn premium-btn-primary"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem', borderRadius: '8px', fontWeight: 'bold' }}
                         title="Share on WhatsApp"
                       >
                         <Share2 size={20} /> Share on WhatsApp
@@ -1936,8 +1933,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         <button
                           type="button"
                           onClick={() => handleWhatsAppShare(job.title, job.description, `/user?tab=home&jobId=${job.id}`)}
-                          className="premium-btn premium-btn-secondary"
-                          style={{ width: '42px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', color: 'white', border: 'none' }}
+                          className="premium-btn premium-btn-primary"
+                          style={{ width: '42px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           title="Share on WhatsApp"
                         >
                           <Share2 size={18} />
@@ -2026,8 +2023,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               <button
                                 type="button"
                                 onClick={() => handleWhatsAppShare(form.title, `Apply for ${form.title} easily through our E-Sevai portal.`, `/user?tab=apply&formId=${form.id}`)}
-                                className="premium-btn premium-btn-secondary"
-                                style={{ width: '42px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', color: 'white', border: 'none' }}
+                                className="premium-btn premium-btn-primary"
+                                style={{ width: '42px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 title="Share on WhatsApp"
                               >
                                 <Share2 size={18} />
