@@ -1491,7 +1491,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                             <span className="badge badge-info">{form.category}</span>
                             {isUpcoming ? (
-                              <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>Coming Soon</span>
+                              <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>Upcoming</span>
                             ) : (
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Apply</span>
                             )}
@@ -1517,7 +1517,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             style={{ padding: '10px', opacity: isUpcoming ? 0.7 : 1, cursor: isUpcoming ? 'not-allowed' : 'pointer' }}
                             disabled={isUpcoming}
                           >
-                            {isUpcoming ? 'Coming Soon' : 'Click to Apply'}
+                            {isUpcoming ? 'Upcoming soon' : 'Click to Apply'}
                           </button>
                         </div>
                       );
@@ -2449,7 +2449,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         const paymentNo = systemSettings.payment_number || '';
                         // Keep UPI URL simple: just pa (payment address) and am (amount)
                         const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
-                        // If no uploaded QR code exists, it will be hidden
                         const qrCodeUrl = systemSettings.qr_code_url;
 
                         return (

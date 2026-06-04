@@ -603,7 +603,16 @@ export default function AdminPortal() {
 
   const handleFormBuilderSubmit = async (e) => {
     e.preventDefault();
-    const hasEmptyLabels = false;
+    if (formBuilder.required_fields.length === 0 && formBuilder.fields.length === 0) {
+      alert('Please select at least one standard field or add a custom question.');
+      return;
+    }
+    
+    const hasEmptyLabels = formBuilder.fields.some(f => !f.label.trim());
+    if (hasEmptyLabels) {
+      alert('All custom questions must have a valid label.');
+      return;
+    }
 
     const payload = {
       title: formBuilder.title,
@@ -1380,6 +1389,437 @@ export default function AdminPortal() {
                     <option value="voter id">Voter ID</option>
                     <option value="others">Others</option>
                   </select>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Form Image (Optional)</label>
+                  {formBuilder.img_url && (
+                    <div style={{ marginBottom: '10px', position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                      <img 
+                        src={getImageUrl(formBuilder.img_url)} 
+                        alt="Uploaded preview" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f8fafc' }} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setFormBuilder(prev => ({ ...prev, img_url: '' }))} 
+                        className="premium-btn premium-btn-danger"
+                        style={{ position: 'absolute', right: '6px', bottom: '6px', width: 'auto', padding: '4px 8px', fontSize: '0.7rem' }}
+                      >
+                        Remove Image
+                      </button>
+                    </div>
+                  )}
+                  <label className="premium-btn premium-btn-secondary" style={{ padding: '12px', fontSize: '0.85rem', display: 'flex', gap: '8px', cursor: 'pointer', background: 'white', border: '1.5px dashed var(--primary)' }}>
+                    <Upload size={16} style={{ color: 'var(--primary)' }} /> 
+                    {uploadingFormImg ? 'Uploading image...' : formBuilder.img_url ? 'Change Uploaded Image' : 'Upload Local Image File'}
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      disabled={uploadingFormImg}
+                      onChange={(e) => handleFormImageUpload(e.target.files[0])}
+                    />
+                  </label>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Service Fee (Receipt Amount in INR) *</label>
+                  <input 
+                    type="number" 
+                    value={formBuilder.fee} 
+                    onChange={(e) => setFormBuilder({ ...formBuilder, fee: parseInt(e.target.value) || 0 })} 
+                    placeholder="e.g. 50"
+                    className="premium-input" 
+                    required 
+                  />
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Instructions / Terms & Conditions (Step 1 - one item per line)</label>
+                  <textarea 
+                    rows={3}
+                    value={formBuilder.instructions} 
+                    onChange={(e) => setFormBuilder({ ...formBuilder, instructions: e.target.value })} 
+                    placeholder="e.g. Applicant must reside in Tamil Nadu.&#10;Must upload original Aadhaar card."
+                    className="premium-input" 
+                  />
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label" style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>Select Required Fields</label>
+                  
+                  {formBuilder.required_fields.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px', background: 'rgba(16,185,129,0.06)', border: '1.5px solid var(--primary)', borderRadius: '8px', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--primary)', width: '100%' }}>Currently Selected Required Fields ({formBuilder.required_fields.length}):</span>
+                      {formBuilder.required_fields.map(fieldId => {
+                        const label = [
+                          { id: 'name', label: 'Name (English)' },
+                          { id: 'name_tamil', label: 'பெயர் ( தமிழில் )' },
+                          { id: 'dob', label: 'Date of Birth (DOB)' },
+                          { id: 'phone', label: 'Phone no' },
+                          { id: 'aadhar', label: 'Aadhaar no' },
+                          { id: 'gender', label: 'Gender' },
+                          { id: 'marital_status', label: 'Status (married/unmarried)' },
+                          { id: 'father_name', label: "Father's Name" },
+                          { id: 'father_name_tamil', label: 'தந்தை பெயர் ( தமிழில் )' },
+                          { id: 'mother_name', label: "Mother's name" },
+                          { id: 'mother_name_tamil', label: 'தாயின் பெயர் ( தமிழில் )' },
+                          { id: 'community', label: 'Community' },
+                          { id: 'address', label: 'Address' },
+                          { id: 'religion', label: 'Religion' },
+                          { id: 'state', label: 'State' },
+                          { id: 'district', label: 'District' },
+                          { id: 'taluk', label: 'Taluk' },
+                          { id: 'revenue_village', label: 'Revenue Village ( பாஞ்சாயத்து )' },
+                          { id: 'street_name', label: 'Street Name' },
+                          { id: 'door_no', label: 'Door no' },
+                          { id: 'pincode', label: 'Pin Code' }
+                        ].find(x => x.id === fieldId)?.label || fieldId;
+                        
+                        return (
+                          <span key={fieldId} className="badge badge-info" style={{ fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', background: 'var(--primary)', color: 'white' }}>
+                            {label}
+                            <X 
+                              size={12} 
+                              style={{ cursor: 'pointer' }} 
+                              onClick={() => {
+                                setFormBuilder(prev => ({
+                                  ...prev,
+                                  required_fields: prev.required_fields.filter(x => x !== fieldId)
+                                }));
+                              }}
+                            />
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="admin-fields-grid" style={{ display: 'grid', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                    {[
+                      { id: 'name', label: 'Name (English)' },
+                      { id: 'name_tamil', label: 'பெயர் ( தமிழில் )' },
+                      { id: 'dob', label: 'Date of Birth (DOB)' },
+                      { id: 'phone', label: 'Phone no' },
+                      { id: 'aadhar', label: 'Aadhaar no' },
+                      { id: 'gender', label: 'Gender' },
+                      { id: 'marital_status', label: 'Status (married/unmarried)' },
+                      { id: 'father_name', label: "Father's Name" },
+                      { id: 'father_name_tamil', label: 'தந்தை பெயர் ( தமிழில் )' },
+                      { id: 'mother_name', label: "Mother's name" },
+                      { id: 'mother_name_tamil', label: 'தாயின் பெயர் ( தமிழில் )' },
+                      { id: 'community', label: 'Community' },
+                      { id: 'address', label: 'Address' },
+                      { id: 'religion', label: 'Religion' },
+                      { id: 'state', label: 'State' },
+                      { id: 'district', label: 'District' },
+                      { id: 'taluk', label: 'Taluk' },
+                      { id: 'revenue_village', label: 'Revenue Village ( பாஞ்சாயத்து )' },
+                      { id: 'street_name', label: 'Street Name' },
+                      { id: 'door_no', label: 'Door no' },
+                      { id: 'pincode', label: 'Pin Code' }
+                    ].map(f => {
+                      const isChecked = formBuilder.required_fields.includes(f.id);
+                      return (
+                        <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#1e293b' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const list = e.target.checked 
+                                ? [...formBuilder.required_fields, f.id]
+                                : formBuilder.required_fields.filter(x => x !== f.id);
+                              setFormBuilder({ ...formBuilder, required_fields: list });
+                            }}
+                          />
+                          <span>{f.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label" style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>Select Document Uploads</label>
+                  
+                  {formBuilder.required_docs.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px', background: 'rgba(16,185,129,0.06)', border: '1.5px solid var(--primary)', borderRadius: '8px', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--primary)', width: '100%' }}>Currently Selected Documents ({formBuilder.required_docs.length}):</span>
+                      {formBuilder.required_docs.map(docId => {
+                        const label = [
+                          { id: 'photo', label: 'Photo Upload (image < 7MB)' },
+                          { id: 'aadhar', label: 'Aadhaar Upload (img/pdf < 5MB)' },
+                          { id: 'smart_card', label: 'Smart Card Upload (img/pdf < 5MB)' },
+                          { id: 'voter_id', label: 'Voter ID Upload (img/pdf < 5MB)' },
+                          { id: 'signature', label: 'Signature Upload (img/pdf < 5MB)' }
+                        ].find(x => x.id === docId)?.label || docId;
+                        
+                        return (
+                          <span key={docId} className="badge badge-info" style={{ fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', background: 'var(--primary)', color: 'white' }}>
+                            {label}
+                            <X 
+                              size={12} 
+                              style={{ cursor: 'pointer' }} 
+                              onClick={() => {
+                                setFormBuilder(prev => ({
+                                  ...prev,
+                                  required_docs: prev.required_docs.filter(x => x !== docId)
+                                }));
+                              }}
+                            />
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '12px' }}>
+                    {[
+                      { id: 'photo', label: 'Photo Upload (image < 7MB)' },
+                      { id: 'aadhar', label: 'Aadhaar Upload (img/pdf < 5MB)' },
+                      { id: 'smart_card', label: 'Smart Card Upload (img/pdf < 5MB)' },
+                      { id: 'voter_id', label: 'Voter ID Upload (img/pdf < 5MB)' },
+                      { id: 'signature', label: 'Signature Upload (img/pdf < 5MB)' }
+                    ].map(d => {
+                      const isChecked = formBuilder.required_docs.includes(d.id);
+                      return (
+                        <label key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#1e293b' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const list = e.target.checked 
+                                ? [...formBuilder.required_docs, d.id]
+                                : formBuilder.required_docs.filter(x => x !== d.id);
+                              setFormBuilder({ ...formBuilder, required_docs: list });
+                            }}
+                          />
+                          <span>{d.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1e293b' }}>Custom Uploads Required</span>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setFormBuilder({ ...formBuilder, custom_docs: [...formBuilder.custom_docs, ''] });
+                        }}
+                        className="premium-btn premium-btn-success"
+                        style={{ padding: '2px 8px', fontSize: '0.7rem', width: 'auto' }}
+                      >
+                        + Add Custom Label
+                      </button>
+                    </div>
+                    {formBuilder.custom_docs.map((docLabel, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Self Declaration Form" 
+                          value={docLabel}
+                          onChange={(e) => {
+                            const list = [...formBuilder.custom_docs];
+                            list[idx] = e.target.value;
+                            setFormBuilder({ ...formBuilder, custom_docs: list });
+                          }}
+                          className="premium-input"
+                          style={{ padding: '6px', fontSize: '0.8rem' }}
+                          required
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const list = formBuilder.custom_docs.filter((_, i) => i !== idx);
+                            setFormBuilder({ ...formBuilder, custom_docs: list });
+                          }}
+                          className="premium-btn premium-btn-danger"
+                          style={{ width: '28px', height: '28px', padding: 0 }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Question fields list */}
+                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '16px', marginTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ fontSize: '0.9rem' }}>Form Fields ({formBuilder.fields.length})</h4>
+                    <button 
+                      type="button" 
+                      onClick={addFieldToBuilder} 
+                      className="premium-btn premium-btn-success"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', width: 'auto' }}
+                    >
+                      <Plus size={14} /> Add Input Question
+                    </button>
+                  </div>
+
+                  {formBuilder.fields.map((field, idx) => (
+                    <div key={field.id} className="premium-card form-builder-question" style={{ margin: '0 0 12px 0', padding: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)' }}>Field #{idx + 1}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => removeFieldFromBuilder(idx)}
+                          className="premium-btn premium-btn-danger"
+                          style={{ width: '28px', height: '28px', padding: 0 }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      <div className="premium-input-group" style={{ marginBottom: '8px' }}>
+                        <label className="premium-label">Question Label</label>
+                        <input 
+                          type="text" 
+                          value={field.label}
+                          onChange={(e) => updateFieldInBuilder(idx, 'label', e.target.value)}
+                          placeholder="e.g. Enter Annual Income"
+                          className="premium-input"
+                          style={{ padding: '8px' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label className="premium-label">Input Type</label>
+                          <select 
+                            value={field.type}
+                            onChange={(e) => updateFieldInBuilder(idx, 'type', e.target.value)}
+                            className="premium-input"
+                            style={{ padding: '8px' }}
+                          >
+                            <option value="text">Text Input</option>
+                            <option value="textarea">Textarea Box</option>
+                            <option value="number">Number Box</option>
+                            <option value="date">Date picker</option>
+                            <option value="select">Dropdown Select</option>
+                            <option value="tel">Phone/Mobile Input</option>
+                            <option value="checkbox">Multiple Checkbox Options</option>
+                            <option value="radio">Radio Button Selection</option>
+                            <option value="repeated">Repeated Dynamic Inputs (0-8 Loop)</option>
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-end', height: '36px' }}>
+                          <input 
+                            type="checkbox" 
+                            id={`req-${field.id}`}
+                            checked={field.required}
+                            onChange={(e) => updateFieldInBuilder(idx, 'required', e.target.checked)}
+                          />
+                          <label htmlFor={`req-${field.id}`} style={{ fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>Required</label>
+                        </div>
+                      </div>
+
+                      {['select', 'checkbox', 'radio'].includes(field.type) && (
+                        <div className="premium-input-group" style={{ marginBottom: 0 }}>
+                          <label className="premium-label">Options (comma-separated)</label>
+                          <input 
+                            type="text"
+                            value={field.options ? field.options.join(', ') : ''}
+                            onChange={(e) => updateFieldInBuilder(idx, 'options', e.target.value)}
+                            placeholder="Option 1, Option 2, Option 3"
+                            className="premium-input"
+                            style={{ padding: '8px' }}
+                          />
+                        </div>
+                      )}
+
+                      {field.type === 'repeated' && (
+                        <div style={{ marginTop: '10px', padding: '12px', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Configure Sub-Fields (0-8 Loop)</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = [...formBuilder.fields];
+                                const sub = list[idx].subFields || [];
+                                list[idx].subFields = [...sub, { id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`, label: '', type: 'text', required: true, options: [] }];
+                                setFormBuilder({ ...formBuilder, fields: list });
+                              }}
+                              className="premium-btn premium-btn-success"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem', width: 'auto' }}
+                            >
+                              + Add Sub-Field
+                            </button>
+                          </div>
+                          {(!field.subFields || field.subFields.length === 0) ? (
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, fontStyle: 'italic' }}>No sub-fields added yet. Click "+ Add Sub-Field" to create fields to repeat.</p>
+                          ) : (
+                            field.subFields.map((subField, sIdx) => (
+                              <div key={subField.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', background: '#ffffff', borderRadius: '6px', border: '1px solid #cbd5e1', marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--primary)' }}>Sub-Field #{sIdx + 1}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields = list[idx].subFields.filter((_, i) => i !== sIdx);
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Sub-Field Label (e.g. Member Name)"
+                                    value={subField.label}
+                                    onChange={(e) => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields[sIdx].label = e.target.value;
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    className="premium-input"
+                                    style={{ padding: '6px', fontSize: '0.75rem', flex: 2 }}
+                                    required
+                                  />
+                                  <select
+                                    value={subField.type}
+                                    onChange={(e) => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields[sIdx].type = e.target.value;
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    className="premium-input"
+                                    style={{ padding: '6px', fontSize: '0.75rem', flex: 1.5 }}
+                                  >
+                                    <option value="text">Text Input</option>
+                                    <option value="number">Number Box</option>
+                                    <option value="date">Date picker</option>
+                                    <option value="select">Dropdown Select</option>
+                                  </select>
+                                </div>
+                                {subField.type === 'select' && (
+                                  <input
+                                    type="text"
+                                    placeholder="Options (comma-separated)"
+                                    value={subField.options ? subField.options.join(', ') : ''}
+                                    onChange={(e) => {
+                                      const list = [...formBuilder.fields];
+                                      list[idx].subFields[sIdx].options = e.target.value.split(',').map(x => x.trim()).filter(Boolean);
+                                      setFormBuilder({ ...formBuilder, fields: list });
+                                    }}
+                                    className="premium-input"
+                                    style={{ padding: '6px', fontSize: '0.75rem' }}
+                                    required
+                                  />
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
