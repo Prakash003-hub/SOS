@@ -78,29 +78,28 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
 
   return (
     <header className="fixed-header" style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 9999 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div className="logo-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <img 
-            src="/whatsbro_logo.png" 
-            alt="WhatsBro Logo" 
-            style={{ 
-              width: '48px', 
-              height: '48px', 
-              objectFit: 'contain',
-              pointerEvents: 'none',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-              WebkitTouchCallout: 'none'
-            }} 
-          />
-          <div>
-            <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>TN sevai</div>
-            <div className="brand-subtitle" style={{ fontSize: '0.8rem' }}>Online Service Portal</div>
-          </div>
+      <div className="logo-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <img 
+          src="/whatsbro_logo.png" 
+          alt="WhatsBro Logo" 
+          style={{ 
+            width: '48px', 
+            height: '48px', 
+            objectFit: 'contain',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none'
+          }} 
+        />
+        <div>
+          <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>TN sevai</div>
+          <div className="brand-subtitle" style={{ fontSize: '0.8rem' }}>Online Service Portal</div>
         </div>
-        
-        {!isAdmin && (
-          <div className="header-auth-section" style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+      </div>
+      
+      {!isAdmin && (
+        <div className="header-auth-section" style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
           {currentUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
               
@@ -139,6 +138,9 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                     onError={(e) => { e.target.onerror = null; e.target.src = '/default_avatar.png'; }}
                   />
                 </div>
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                  Hi, {currentUser.name.split(' ')[0]}
+                </span>
                 <ChevronDown size={14} style={{ color: '#64748b' }} />
               </button>
 
@@ -267,10 +269,6 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
           )}
         </div>
       )}
-      </div>
-      
-      {/* Empty div to keep flex space-between balanced if needed */}
-      <div></div>
 
       {/* Floating Modal for feedback form */}
       {isFeedbackOpen && (

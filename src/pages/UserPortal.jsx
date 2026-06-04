@@ -1293,13 +1293,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {/* --- TAB 1: HOME POSTS --- */}
         {activeTab === 'home' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
-            {currentUser && (
-              <div style={{ gridColumn: 'span 2', padding: '16px 8px 8px 8px' }}>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>
-                  Hi! {currentUser.name}
-                </h2>
-              </div>
-            )}
+
             {postsLoading ? (
               renderMintGreenLoader("LOADING...")
             ) : posts.length === 0 ? (
