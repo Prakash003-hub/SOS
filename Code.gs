@@ -111,6 +111,9 @@ function doGet(e) {
       case "getSettings":
         responseData = getSettingsAction();
         break;
+      case "getAnnouncements":
+        responseData = getAnnouncementsAction();
+        break;
       default:
         return jsonResponse({ success: false, error: "Invalid GET Action: " + action }, 400);
     }
@@ -226,6 +229,17 @@ function doPost(e) {
         break;
       case "verifyAdminLogin":
         responseData = verifyAdminLoginAction(requestBody.payload);
+        break;
+        
+      // Announcement Operations
+      case "createAnnouncement":
+        responseData = createAnnouncementAction(requestBody.payload);
+        break;
+      case "updateAnnouncement":
+        responseData = updateAnnouncementAction(requestBody.id, requestBody.payload);
+        break;
+      case "deleteAnnouncement":
+        responseData = deleteAnnouncementAction(requestBody.id);
         break;
         
       default:
@@ -1402,6 +1416,11 @@ function initSpreadsheet() {
   ensureSheetExists("SystemLog", [
     "timestamp", "context", "message"
   ]);
+
+  // 8. ANNOUNCEMENTS SHEET
+  ensureSheetExists("Announcements", [
+    "id", "title", "description", "content", "button_name", "button_url", "enabled", "created_at"
+  ]);
   
   // Add initial mockup posts if Posts sheet is empty
   var postsSheet = getSheet("Posts");
@@ -1561,6 +1580,56 @@ function getOrCreateFolderPath(pathArray) {
     }
   }
   return folder;
+}
+
+// --- 4D. ANNOUNCEMENT ACTIONS ---
+
+function getAnnouncementsAction() {
+  return getRowsFromSheet("Announcements");
+}
+
+function createAnnouncementAction(annData) {
+  var sheet = getSheet("Announcements");
+  var newAnn = {
+    id: generateUniqueId(),
+    title: annData.title || "",
+    description: annData.description || "",
+    content: annData.content || "",
+    button_name: annData.button_name || "",
+    button_url: annData.button_url || "",
+    enabled: annData.enabled !== undefined ? String(annData.enabled) : "true",
+    created_at: new Date().toISOString()
+  };
+  appendObjectToSheet(sheet, newAnn);
+  SpreadsheetApp.flush();
+  return getAnnouncementsAction();
+}
+
+function updateAnnouncementAction(id, annData) {
+  var sheet = getSheet("Announcements");
+  var rowIndex = findRowIndexById(sheet, id);
+  if (rowIndex === -1) throw new Error("Announcement not found.");
+  
+  var existingRow = getRowObject(sheet, rowIndex);
+  if (annData.title !== undefined) existingRow.title = annData.title;
+  if (annData.description !== undefined) existingRow.description = annData.description;
+  if (annData.content !== undefined) existingRow.content = annData.content;
+  if (annData.button_name !== undefined) existingRow.button_name = annData.button_name;
+  if (annData.button_url !== undefined) existingRow.button_url = annData.button_url;
+  if (annData.enabled !== undefined) existingRow.enabled = String(annData.enabled);
+  
+  updateRowObject(sheet, rowIndex, existingRow);
+  SpreadsheetApp.flush();
+  return getAnnouncementsAction();
+}
+
+function deleteAnnouncementAction(id) {
+  var sheet = getSheet("Announcements");
+  var rowIndex = findRowIndexById(sheet, id);
+  if (rowIndex === -1) throw new Error("Announcement not found.");
+  sheet.deleteRow(rowIndex);
+  SpreadsheetApp.flush();
+  return { success: true };
 }
 
 function parseJsonField(val) {

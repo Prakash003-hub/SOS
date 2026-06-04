@@ -562,6 +562,28 @@ export const updateSettings = async (settingsData) => {
   return await callApi("updateSettings", { payload: settingsData });
 };
 
+// --- ANNOUNCEMENTS SERVICE ---
+export const getAnnouncements = async () => {
+  try {
+    return await callApiGet("getAnnouncements");
+  } catch (err) {
+    console.error("Error in getAnnouncements:", err);
+    return [];
+  }
+};
+
+export const createAnnouncement = async (payload) => {
+  return await callApi("createAnnouncement", { payload });
+};
+
+export const updateAnnouncement = async (id, payload) => {
+  return await callApi("updateAnnouncement", { id, payload });
+};
+
+export const deleteAnnouncement = async (id) => {
+  return await callApi("deleteAnnouncement", { id });
+};
+
 // --- MOCK DATABASE FALLBACK SYSTEM (LOCALSTORAGE) ---
 const callMockFallback = (action, payload) => {
   console.log(`[Offline Mode] Simulating Action: ${action}`, payload);
@@ -839,6 +861,40 @@ const callMockFallback = (action, payload) => {
       const mergedSettings = { ...currentSettings, ...payload.payload };
       localStorage.setItem('mock_settings', JSON.stringify(mergedSettings));
       return mergedSettings;
+    }
+
+    case "getAnnouncements":
+      return JSON.parse(localStorage.getItem('mock_announcements') || '[]');
+      
+    case "createAnnouncement": {
+      const annList = JSON.parse(localStorage.getItem('mock_announcements') || '[]');
+      const newAnn = {
+        id: 'ann-' + Date.now(),
+        title: payload.payload.title || "",
+        description: payload.payload.description || "",
+        content: payload.payload.content || "",
+        button_name: payload.payload.button_name || "",
+        button_url: payload.payload.button_url || "",
+        enabled: payload.payload.enabled !== undefined ? String(payload.payload.enabled) : "true",
+        created_at: new Date().toISOString()
+      };
+      annList.push(newAnn);
+      localStorage.setItem('mock_announcements', JSON.stringify(annList));
+      return newAnn;
+    }
+    
+    case "updateAnnouncement": {
+      let annList = JSON.parse(localStorage.getItem('mock_announcements') || '[]');
+      annList = annList.map(a => a.id === payload.id ? { ...a, ...payload.payload } : a);
+      localStorage.setItem('mock_announcements', JSON.stringify(annList));
+      return annList;
+    }
+    
+    case "deleteAnnouncement": {
+      let annList = JSON.parse(localStorage.getItem('mock_announcements') || '[]');
+      annList = annList.filter(a => a.id !== payload.id);
+      localStorage.setItem('mock_announcements', JSON.stringify(annList));
+      return { success: true };
     }
     
     case "uploadFile":

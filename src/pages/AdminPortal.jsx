@@ -30,7 +30,11 @@ import {
   updateSettings,
   uploadFormImage,
   uploadFileToDrive,
-  verifyAdminLogin
+  verifyAdminLogin,
+  getAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement
 } from '../services/db';
 import { 
   Plus, 
@@ -55,7 +59,8 @@ import {
   Copy,
   Briefcase,
   MessageSquare,
-  Star
+  Star,
+  Megaphone
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -245,6 +250,16 @@ export default function AdminPortal() {
   const [forms, setForms] = useState([]);
   const [users, setUsers] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [editingAnnId, setEditingAnnId] = useState(null);
+  const [annForm, setAnnForm] = useState({
+    title: '',
+    description: '',
+    content: '',
+    button_name: '',
+    button_url: '',
+    enabled: 'true'
+  });
   const [feedbackList, setFeedbackList] = useState([]);
   const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
   const [feedbackSearchTerm, setFeedbackSearchTerm] = useState('');
@@ -334,8 +349,8 @@ export default function AdminPortal() {
     if (!isAuth) return;
     const loadAllData = async () => {
       try {
-        const [postsData, formsData, usersData, jobsData, feedbackData, settingsData] = await Promise.all([
-          getPosts(), getForms(), getUsersList(), getJobs(), getFeedback(), getSettings()
+        const [postsData, formsData, usersData, jobsData, feedbackData, settingsData, announcementsData] = await Promise.all([
+          getPosts(), getForms(), getUsersList(), getJobs(), getFeedback(), getSettings(), getAnnouncements()
         ]);
         setPosts(postsData);
         setForms(formsData);
@@ -343,6 +358,7 @@ export default function AdminPortal() {
         setJobs(jobsData);
         setFeedbackList(feedbackData);
         if (settingsData) setSettings(settingsData);
+        if (announcementsData) setAnnouncements(announcementsData);
       } catch (err) {
         console.error("Initial data load error:", err);
       }
@@ -2073,119 +2089,219 @@ export default function AdminPortal() {
                   </span>
                 </div>
                 
-                {/* Public Announcement / Alert Notification */}
+                {/* Public Announcement / Alert Notification Manager */}
                 <div style={{ borderTop: '1.5px dashed var(--border-light)', paddingTop: '20px', marginTop: '20px' }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-light-main)', marginBottom: '16px' }}>Public Announcement Banner</h3>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-light-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Megaphone size={18} style={{ color: 'var(--primary)' }} />
+                    Public Announcement Manager
+                  </h3>
                   
+                  {/* Form to Create/Edit Announcement */}
                   <form onSubmit={async (e) => {
                     e.preventDefault();
-                    try {
-                      await updateSettings({
-                        notification_title: settings.notification_title || '',
-                        notification_desc: settings.notification_desc || '',
-                        notification_content: settings.notification_content || ''
-                      });
-                      alert('Public Announcement saved successfully!');
-                    } catch (err) {
-                      alert('Failed to save announcement details.');
+                    if (!annForm.title.trim()) {
+                      alert('Please enter an announcement title.');
+                      return;
                     }
-                  }} className="premium-input-group" style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: 0 }}>
+                    try {
+                      if (editingAnnId) {
+                        const updated = await updateAnnouncement(editingAnnId, annForm);
+                        setAnnouncements(updated);
+                        setEditingAnnId(null);
+                        alert('Announcement updated successfully!');
+                      } else {
+                        await createAnnouncement(annForm);
+                        const updatedList = await getAnnouncements();
+                        setAnnouncements(updatedList);
+                        alert('Announcement created successfully!');
+                      }
+                      setAnnForm({
+                        title: '',
+                        description: '',
+                        content: '',
+                        button_name: '',
+                        button_url: '',
+                        enabled: 'true'
+                      });
+                    } catch (err) {
+                      alert('Failed to save announcement: ' + err.message);
+                    }
+                  }} className="premium-card" style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-light-main)', fontWeight: '800' }}>
+                      {editingAnnId ? 'Edit Announcement' : 'Add New Announcement'}
+                    </h4>
                     
                     <div>
-                      <label className="premium-label">Announcement Title</label>
+                      <label className="premium-label" style={{ fontSize: '0.75rem' }}>Announcement Title</label>
                       <input 
                         type="text" 
-                        value={settings.notification_title || ''} 
-                        onChange={(e) => setSettings({ ...settings, notification_title: e.target.value })} 
+                        value={annForm.title} 
+                        onChange={(e) => setAnnForm({ ...annForm, title: e.target.value })} 
                         placeholder="e.g. Server Maintenance / Important Update"
                         className="premium-input" 
+                        style={{ padding: '8px 12px', fontSize: '0.85rem', height: '38px' }}
                       />
                     </div>
                     
                     <div>
-                      <label className="premium-label">Brief Description (Shows in Banner)</label>
+                      <label className="premium-label" style={{ fontSize: '0.75rem' }}>Brief Description (Shows in preview)</label>
                       <input 
                         type="text" 
-                        value={settings.notification_desc || ''} 
-                        onChange={(e) => setSettings({ ...settings, notification_desc: e.target.value })} 
-                        placeholder="e.g. The portal will be offline on Sunday from 2 PM to 5 PM."
+                        value={annForm.description} 
+                        onChange={(e) => setAnnForm({ ...annForm, description: e.target.value })} 
+                        placeholder="e.g. Service offline on Sunday from 2 PM to 5 PM."
                         className="premium-input" 
+                        style={{ padding: '8px 12px', fontSize: '0.85rem', height: '38px' }}
                       />
                     </div>
 
                     <div>
-                      <label className="premium-label">Detailed Content (Shows inside Popup Modal)</label>
+                      <label className="premium-label" style={{ fontSize: '0.75rem' }}>Detailed Content (Shows inside Popup Modal)</label>
                       <textarea 
-                        value={settings.notification_content || ''} 
-                        onChange={(e) => setSettings({ ...settings, notification_content: e.target.value })} 
+                        value={annForm.content} 
+                        onChange={(e) => setAnnForm({ ...annForm, content: e.target.value })} 
                         placeholder="Provide detailed instructions, timings or contact info..."
                         className="premium-input" 
-                        rows={4}
-                        style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                        rows={3}
+                        style={{ resize: 'vertical', fontFamily: 'inherit', padding: '8px 12px', fontSize: '0.85rem' }}
                       />
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                      <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 20px', height: '44px' }}>
-                        Save Details
-                      </button>
-                      
-                      <button 
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            const isCurrentTrue = String(settings.notification_enabled).toLowerCase() === 'true';
-                            const newVal = isCurrentTrue ? 'false' : 'true';
-                            await updateSettings({ notification_enabled: newVal });
-                            setSettings({ ...settings, notification_enabled: newVal });
-                            alert(`Announcement turned ${newVal === 'true' ? 'ON' : 'OFF'}!`);
-                          } catch (err) {
-                            alert('Failed to toggle announcement status.');
-                          }
-                        }}
-                        className={`premium-btn ${String(settings.notification_enabled).toLowerCase() === 'true' ? 'premium-btn-danger' : 'premium-btn-success'}`}
-                        style={{ width: 'auto', padding: '0 20px', height: '44px', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
-                      >
-                        {String(settings.notification_enabled).toLowerCase() === 'true' ? 'Turn OFF' : 'Turn ON'}
-                      </button>
-
-                      <button 
-                        type="button" 
-                        onClick={async () => {
-                          const confirmClear = window.confirm("Are you sure you want to clear/delete the announcement?");
-                          if (!confirmClear) return;
-                          try {
-                            const cleared = {
-                              notification_title: '',
-                              notification_desc: '',
-                              notification_content: '',
-                              notification_enabled: 'false'
-                            };
-                            await updateSettings(cleared);
-                            setSettings({ ...settings, ...cleared });
-                            alert('Announcement cleared successfully!');
-                          } catch (err) {
-                            alert('Failed to clear announcement.');
-                          }
-                        }}
-                        className="premium-btn premium-btn-secondary" 
-                        style={{ width: 'auto', padding: '0 16px', height: '44px', color: '#ef4444', border: '1px solid #fee2e2', background: '#fef2f2', cursor: 'pointer' }}
-                      >
-                        Delete Announcement
-                      </button>
+                    {/* Button Config */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label className="premium-label" style={{ fontSize: '0.75rem' }}>Action Button Label (Optional)</label>
+                        <input 
+                          type="text" 
+                          value={annForm.button_name} 
+                          onChange={(e) => setAnnForm({ ...annForm, button_name: e.target.value })} 
+                          placeholder="e.g. Learn More / View Document"
+                          className="premium-input" 
+                          style={{ padding: '8px 12px', fontSize: '0.85rem', height: '38px' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="premium-label" style={{ fontSize: '0.75rem' }}>Action Button URL (Optional)</label>
+                        <input 
+                          type="text" 
+                          value={annForm.button_url} 
+                          onChange={(e) => setAnnForm({ ...annForm, button_url: e.target.value })} 
+                          placeholder="e.g. https://example.com/info"
+                          className="premium-input" 
+                          style={{ padding: '8px 12px', fontSize: '0.85rem', height: '38px' }}
+                        />
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569' }}>Status:</span>
-                      {String(settings.notification_enabled).toLowerCase() === 'true' ? (
-                        <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 'bold' }}>● ON (Active on Citizen UI)</span>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 'bold' }}>○ OFF (Hidden)</span>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 16px', height: '38px', fontSize: '0.8rem' }}>
+                        {editingAnnId ? 'Update Announcement' : 'Add Announcement'}
+                      </button>
+                      {editingAnnId && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setEditingAnnId(null);
+                            setAnnForm({ title: '', description: '', content: '', button_name: '', button_url: '', enabled: 'true' });
+                          }}
+                          className="premium-btn premium-btn-secondary" 
+                          style={{ width: 'auto', padding: '0 16px', height: '38px', fontSize: '0.8rem' }}
+                        >
+                          Cancel
+                        </button>
                       )}
                     </div>
                   </form>
+
+                  {/* List of Current Announcements */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+                    <h4 style={{ margin: '8px 0', fontSize: '0.9rem', color: '#475569', fontWeight: '800', textAlign: 'left' }}>Active Announcements ({announcements.length})</h4>
+                    {announcements.length === 0 ? (
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: 0, textAlign: 'left' }}>No announcements added yet.</p>
+                    ) : (
+                      announcements.map((ann) => {
+                        const isEnabled = String(ann.enabled).toLowerCase() === 'true';
+                        return (
+                          <div key={ann.id} style={{ background: '#ffffff', border: '1.5px solid var(--border-light)', borderRadius: '10px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left', flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#1e293b' }}>{ann.title}</span>
+                                <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', background: isEnabled ? '#dcfce7' : '#fee2e2', color: isEnabled ? '#15803d' : '#b91c1c' }}>
+                                  {isEnabled ? 'ACTIVE' : 'DISABLED'}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: '#475569', lineHeight: '1.4' }}>{ann.description || '(No description)'}</span>
+                              {ann.button_name && ann.button_url && (
+                                <span style={{ fontSize: '0.65rem', color: '#0f766e', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                  🔗 Link Button: "{ann.button_name}" ({ann.button_url})
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                              <button 
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const nextVal = isEnabled ? 'false' : 'true';
+                                    const updated = await updateAnnouncement(ann.id, { enabled: nextVal });
+                                    setAnnouncements(updated);
+                                    alert(`Announcement turned ${nextVal === 'true' ? 'ON' : 'OFF'}!`);
+                                  } catch (err) {
+                                    alert('Failed to toggle announcement: ' + err.message);
+                                  }
+                                }}
+                                className={`premium-btn ${isEnabled ? 'premium-btn-secondary' : 'premium-btn-success'}`}
+                                style={{ padding: '6px 10px', fontSize: '0.75rem', height: '32px', width: 'auto', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              >
+                                {isEnabled ? 'Disable' : 'Enable'}
+                              </button>
+                              
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setEditingAnnId(ann.id);
+                                  setAnnForm({
+                                    title: ann.title || '',
+                                    description: ann.description || '',
+                                    content: ann.content || '',
+                                    button_name: ann.button_name || '',
+                                    button_url: ann.button_url || '',
+                                    enabled: ann.enabled || 'true'
+                                  });
+                                }}
+                                className="premium-btn premium-btn-secondary"
+                                style={{ padding: '6px 8px', fontSize: '0.75rem', height: '32px', width: 'auto', display: 'flex', alignItems: 'center', gap: '4px', border: 'none', cursor: 'pointer' }}
+                              >
+                                <Edit size={12} /> Edit
+                              </button>
+
+                              <button 
+                                type="button"
+                                onClick={async () => {
+                                  const confirmDelete = window.confirm('Are you sure you want to delete this announcement?');
+                                  if (!confirmDelete) return;
+                                  try {
+                                    await deleteAnnouncement(ann.id);
+                                    setAnnouncements(announcements.filter(a => a.id !== ann.id));
+                                    alert('Announcement deleted!');
+                                  } catch (err) {
+                                    alert('Failed to delete announcement: ' + err.message);
+                                  }
+                                }}
+                                className="premium-btn premium-btn-danger"
+                                style={{ padding: '6px 8px', fontSize: '0.75rem', height: '32px', width: 'auto', display: 'flex', alignItems: 'center', gap: '4px', border: 'none', cursor: 'pointer' }}
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
-                
               </div>
             </div>
           </div>

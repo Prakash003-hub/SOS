@@ -15,7 +15,8 @@ import {
   loginUser,
   getJobs,
   uploadFileToDrive,
-  getSettings
+  getSettings,
+  getAnnouncements
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -182,6 +183,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [announcements, setAnnouncements] = useState([]);
+  const [activeAnnIndex, setActiveAnnIndex] = useState(0);
 
   // Wizard States
   const [selectedForm, setSelectedForm] = useState(null);
@@ -348,6 +351,15 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     getSettings().then(data => {
       if (data) setSystemSettings(data);
     }).catch(err => console.error('Failed to load settings', err));
+    getAnnouncements().then(data => {
+      if (data) {
+        const activeAnns = data.filter(a => String(a.enabled).toLowerCase() === 'true');
+        setAnnouncements(activeAnns);
+        if (activeAnns.length > 0) {
+          setShowAnnouncementModal(true);
+        }
+      }
+    }).catch(err => console.error('Failed to load announcements', err));
   }, []);
 
   useEffect(() => {
@@ -1341,40 +1353,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       )}
       
       <div style={{ flex: 1 }}>
-        {/* Public Announcement Banner */}
-        {systemSettings && String(systemSettings.notification_enabled).toLowerCase() === 'true' && (
-          <div 
-            onClick={() => setShowAnnouncementModal(true)}
-            style={{ 
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)', 
-              border: '1.5px solid #fde68a', 
-              borderRadius: '12px', 
-              padding: '12px 16px', 
-              margin: '12px 8px', 
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ background: '#f59e0b', color: 'white', padding: '6px', borderRadius: '50%', display: 'flex' }}>
-                <Megaphone size={14} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#78350f' }}>
-                  {systemSettings.notification_title || 'Announcement'}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#92400e', fontWeight: '500', marginTop: '2px' }}>
-                  {systemSettings.notification_desc || 'Click to view details'}
-                </span>
-              </div>
-            </div>
-            <ChevronRight size={18} style={{ color: '#b45309', flexShrink: 0 }} />
-          </div>
-        )}
 
         {error && (
           <div className="premium-card" style={{ borderLeft: '4px solid var(--error)', background: '#fee2e2', color: '#991b1b', margin: '16px' }}>
@@ -3493,51 +3471,128 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       )}
 
       {/* Detailed Announcement Popup Modal */}
-      {showAnnouncementModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999,
-          padding: '16px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '16px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-            width: '100%', maxWidth: '380px',
-            display: 'flex', flexDirection: 'column', gap: '16px',
-            animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#1e293b', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
-                <Megaphone size={16} style={{ color: '#d97706', flexShrink: 0 }} /> 
-                {systemSettings.notification_title || 'Announcement'}
-              </h4>
-              <button 
-                onClick={() => setShowAnnouncementModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 0 }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
-              {systemSettings.notification_content || systemSettings.notification_desc || 'No details provided.'}
-            </div>
+      {showAnnouncementModal && announcements.length > 0 && (() => {
+        const activeAnn = announcements[activeAnnIndex];
+        if (!activeAnn) return null;
 
-            <button 
-              onClick={() => setShowAnnouncementModal(false)}
-              className="premium-btn-primary"
-              style={{ padding: '12px', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', background: 'var(--primary)', color: 'white', width: '100%' }}
-            >
-              OK, Got it
-            </button>
+        const hasNext = activeAnnIndex < announcements.length - 1;
+        const hasPrev = activeAnnIndex > 0;
+        const hasButton = activeAnn.button_name && activeAnn.button_name.trim() !== '' && activeAnn.button_url && activeAnn.button_url.trim() !== '';
+
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              width: '100%', maxWidth: '380px',
+              display: 'flex', flexDirection: 'column', gap: '16px',
+              animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+                <div style={{ textAlign: 'left' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#1e293b', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Megaphone size={16} style={{ color: '#d97706', flexShrink: 0 }} /> 
+                    {activeAnn.title || 'Announcement'}
+                  </h4>
+                  {announcements.length > 1 && (
+                    <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginTop: '2px' }}>
+                      Notice {activeAnnIndex + 1} of {announcements.length}
+                    </span>
+                  )}
+                </div>
+                <button 
+                  onClick={() => setShowAnnouncementModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 0 }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              
+              {/* Body */}
+              <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+                {activeAnn.content || activeAnn.description || 'No details provided.'}
+              </div>
+
+              {/* Navigation Indicators / Dots */}
+              {announcements.length > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', margin: '4px 0' }}>
+                  {announcements.map((_, idx) => (
+                    <span 
+                      key={idx} 
+                      onClick={() => setActiveAnnIndex(idx)}
+                      style={{ 
+                        width: '6px', 
+                        height: '6px', 
+                        borderRadius: '50%', 
+                        background: idx === activeAnnIndex ? 'var(--primary)' : '#cbd5e1',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Action Buttons Block */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                
+                {/* Navigation (Prev/Next) */}
+                {announcements.length > 1 && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      onClick={() => setActiveAnnIndex(prev => Math.max(0, prev - 1))}
+                      disabled={!hasPrev}
+                      className="premium-btn premium-btn-secondary"
+                      style={{ flex: 1, padding: '10px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 'bold', cursor: hasPrev ? 'pointer' : 'not-allowed', opacity: hasPrev ? 1 : 0.4 }}
+                    >
+                      Prev
+                    </button>
+                    <button 
+                      onClick={() => setActiveAnnIndex(prev => Math.min(announcements.length - 1, prev + 1))}
+                      disabled={!hasNext}
+                      className="premium-btn premium-btn-secondary"
+                      style={{ flex: 1, padding: '10px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 'bold', cursor: hasNext ? 'pointer' : 'not-allowed', opacity: hasNext ? 1 : 0.4 }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {/* Close and Admin Action Buttons side-by-side */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => setShowAnnouncementModal(false)}
+                    className="premium-btn premium-btn-secondary"
+                    style={{ flex: 1, padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', background: '#f1f5f9', color: '#334155' }}
+                  >
+                    Close
+                  </button>
+
+                  {hasButton && (
+                    <button 
+                      onClick={() => window.open(activeAnn.button_url, '_blank')}
+                      className="premium-btn-primary"
+                      style={{ flex: 1.5, padding: '12px', border: 'none', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    >
+                      {activeAnn.button_name} <ExternalLink size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );
