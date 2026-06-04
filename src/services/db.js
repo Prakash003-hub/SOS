@@ -835,8 +835,10 @@ const callMockFallback = (action, payload) => {
       return JSON.parse(localStorage.getItem('mock_settings') || '{"admin_email":""}');
       
     case "updateSettings": {
-      localStorage.setItem('mock_settings', JSON.stringify(payload.payload));
-      return payload.payload;
+      const currentSettings = JSON.parse(localStorage.getItem('mock_settings') || '{"admin_email":""}');
+      const mergedSettings = { ...currentSettings, ...payload.payload };
+      localStorage.setItem('mock_settings', JSON.stringify(mergedSettings));
+      return mergedSettings;
     }
     
     case "uploadFile":

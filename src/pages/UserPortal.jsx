@@ -1024,7 +1024,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   };
 
   const handleUpiPay = (fee, submissionId, paymentNo) => {
-    const pa = paymentNo || "9385497906";
+    const pa = paymentNo || "";
     const am = fee;
     // Simplified UPI URL as requested: no extra data, just UPI ID and amount
     const payUrl = `upi://pay?pa=${pa}&am=${am}`;
@@ -2446,7 +2446,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {/* Instant screenshot upload direct link in Receipt */}
                       {submissionResult.payment_status !== 'paid' && (() => {
                         const fee = selectedForm.fee || 0;
-                        const paymentNo = systemSettings.payment_number || '9385497906';
+                        const paymentNo = systemSettings.payment_number || '';
                         // Keep UPI URL simple: just pa (payment address) and am (amount)
                         const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
                         const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
@@ -2520,7 +2520,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               {/* Direct number */}
                               <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '8px', width: '100%' }}>
                                 <p style={{ fontSize: '0.7rem', color: '#475569', margin: '0 0 2px 0' }}>
-                                  Or send direct via GPay / UPI to number:
+                                  send direct via GPay 
                                 </p>
                                 <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#1e293b', background: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
                                   {paymentNo}
@@ -2744,7 +2744,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {app.payment_status === 'unpaid' && (() => {
                         const formTemplate = forms.find(f => f.id === app.form_id);
                         const fee = formTemplate?.fee || 0;
-                        const paymentNo = systemSettings.payment_number || '9385497906';
+                        const paymentNo = systemSettings.payment_number;
                         const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
                         const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
                         const hideQr = !systemSettings.qr_code_url;
