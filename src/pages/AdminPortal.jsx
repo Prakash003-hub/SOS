@@ -1943,7 +1943,7 @@ export default function AdminPortal() {
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   try {
-                    const isCurrentTrue = String(settings.install_notification_enabled) === 'true';
+                    const isCurrentTrue = String(settings.install_notification_enabled).toLowerCase() === 'true';
                     const newVal = isCurrentTrue ? 'false' : 'true';
                     await updateSettings({ install_notification_enabled: newVal });
                     setSettings({ ...settings, install_notification_enabled: newVal });
@@ -1959,7 +1959,7 @@ export default function AdminPortal() {
                   <label className="premium-label">Mobile App Installation Notification</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ flex: 1, padding: '12px 16px', background: '#f8fafc', border: '1.5px solid var(--border-light)', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                      Status: {String(settings.install_notification_enabled) === 'true' ? <span style={{ color: 'var(--success)' }}>ON (Visible to Users)</span> : <span style={{ color: 'var(--error)' }}>OFF (Hidden)</span>}
+                      Status: {String(settings.install_notification_enabled).toLowerCase() === 'true' ? <span style={{ color: 'var(--success)' }}>ON (Visible to Users)</span> : <span style={{ color: 'var(--error)' }}>OFF (Hidden)</span>}
                     </div>
                     <button type="submit" className="premium-btn premium-btn-secondary" style={{ width: 'auto', padding: '0 24px', height: '48px' }}>
                       Toggle
