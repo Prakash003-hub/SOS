@@ -843,6 +843,18 @@ const callMockFallback = (action, payload) => {
         downloadUrl: "https://drive.google.com/uc?export=download&id=1MockDriveFileIDForDemoMode"
       };
       
+    case "sendOtp":
+      console.log(`[Mock] Simulating OTP send to ${payload.payload.email}`);
+      return { success: true, message: `OTP sent to ${payload.payload.email}` };
+
+    case "verifyOtp":
+      console.log(`[Mock] Simulating OTP verification for ${payload.payload.email} with OTP ${payload.payload.otp}`);
+      // Accept any 6-digit OTP for testing, or specifically '123456'
+      if (payload.payload.otp === '123456' || (payload.payload.otp && payload.payload.otp.length === 6)) {
+        return { success: true, verified: true };
+      }
+      return { success: false, verified: false };
+      
     default:
       console.warn("Unimplemented mock action: " + action);
       return null;
