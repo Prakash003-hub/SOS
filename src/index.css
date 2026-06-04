@@ -928,10 +928,10 @@ select.premium-input:focus {
   background: linear-gradient(135deg, #168c54 0%, #0d5c36 100%);
   color: #bbf7d0;
   border-top: none;
-  padding: 16px 20px;
+  padding: 10px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .footer-content-wrap {
@@ -939,80 +939,67 @@ select.premium-input:focus {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
 .footer-left-side {
-  flex: 1 1 250px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
+  align-items: center;
+  gap: 8px;
 }
 
 .footer-right-side {
-  flex: 1 1 250px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   justify-content: flex-end;
 }
 
 .footer-contact-details {
-  text-align: right;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
 .footer-bottom-row-new {
   border-top: 1px solid #15803d;
-  padding-top: 8px;
+  padding-top: 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: #86efac;
 }
 
 /* Mobile Responsiveness for Footer */
 @media (max-width: 640px) {
   .premium-footer-new {
-    padding: 14px 14px;
-    gap: 10px;
+    padding: 8px 12px;
+    gap: 6px;
   }
   
   .footer-content-wrap {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 12px;
+    gap: 6px;
   }
   
   .footer-left-side {
-    align-items: center;
-    text-align: center;
-    width: 100%;
-  }
-
-  .footer-left-side .logo-footer-section {
     justify-content: center;
+    width: 100%;
   }
   
   .footer-right-side {
-    flex-direction: column-reverse;
-    align-items: center;
     justify-content: center;
-    text-align: center;
     width: 100%;
-    gap: 8px;
+    gap: 6px;
   }
   
   .footer-contact-details {
-    align-items: center;
-    text-align: center;
+    justify-content: center;
   }
   
   .footer-bottom-row-new {
