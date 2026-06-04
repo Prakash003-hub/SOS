@@ -250,7 +250,15 @@ export default function AdminPortal() {
   const [feedbackSearchTerm, setFeedbackSearchTerm] = useState('');
   
   // Settings
-  const [settings, setSettings] = useState({ admin_email: '', payment_number: '', qr_code_url: '' });
+  const [settings, setSettings] = useState({ 
+    admin_email: '', 
+    payment_number: '', 
+    qr_code_url: '',
+    notification_title: '',
+    notification_desc: '',
+    notification_content: '',
+    notification_enabled: 'false'
+  });
   
   // Selected user details (Aadhaar click)
   const [selectedUser, setSelectedUser] = useState(null);
@@ -2063,6 +2071,119 @@ export default function AdminPortal() {
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
                     Upload your GPay/UPI QR Code image. If uploaded, it will be shown to users instead of a dynamically generated one. If hidden, the QR section will be removed.
                   </span>
+                </div>
+                
+                {/* Public Announcement / Alert Notification */}
+                <div style={{ borderTop: '1.5px dashed var(--border-light)', paddingTop: '20px', marginTop: '20px' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-light-main)', marginBottom: '16px' }}>Public Announcement Banner</h3>
+                  
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await updateSettings({
+                        notification_title: settings.notification_title || '',
+                        notification_desc: settings.notification_desc || '',
+                        notification_content: settings.notification_content || ''
+                      });
+                      alert('Public Announcement saved successfully!');
+                    } catch (err) {
+                      alert('Failed to save announcement details.');
+                    }
+                  }} className="premium-input-group" style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: 0 }}>
+                    
+                    <div>
+                      <label className="premium-label">Announcement Title</label>
+                      <input 
+                        type="text" 
+                        value={settings.notification_title || ''} 
+                        onChange={(e) => setSettings({ ...settings, notification_title: e.target.value })} 
+                        placeholder="e.g. Server Maintenance / Important Update"
+                        className="premium-input" 
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="premium-label">Brief Description (Shows in Banner)</label>
+                      <input 
+                        type="text" 
+                        value={settings.notification_desc || ''} 
+                        onChange={(e) => setSettings({ ...settings, notification_desc: e.target.value })} 
+                        placeholder="e.g. The portal will be offline on Sunday from 2 PM to 5 PM."
+                        className="premium-input" 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="premium-label">Detailed Content (Shows inside Popup Modal)</label>
+                      <textarea 
+                        value={settings.notification_content || ''} 
+                        onChange={(e) => setSettings({ ...settings, notification_content: e.target.value })} 
+                        placeholder="Provide detailed instructions, timings or contact info..."
+                        className="premium-input" 
+                        rows={4}
+                        style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 20px', height: '44px' }}>
+                        Save Details
+                      </button>
+                      
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const isCurrentTrue = String(settings.notification_enabled).toLowerCase() === 'true';
+                            const newVal = isCurrentTrue ? 'false' : 'true';
+                            await updateSettings({ notification_enabled: newVal });
+                            setSettings({ ...settings, notification_enabled: newVal });
+                            alert(`Announcement turned ${newVal === 'true' ? 'ON' : 'OFF'}!`);
+                          } catch (err) {
+                            alert('Failed to toggle announcement status.');
+                          }
+                        }}
+                        className={`premium-btn ${String(settings.notification_enabled).toLowerCase() === 'true' ? 'premium-btn-danger' : 'premium-btn-success'}`}
+                        style={{ width: 'auto', padding: '0 20px', height: '44px', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        {String(settings.notification_enabled).toLowerCase() === 'true' ? 'Turn OFF' : 'Turn ON'}
+                      </button>
+
+                      <button 
+                        type="button" 
+                        onClick={async () => {
+                          const confirmClear = window.confirm("Are you sure you want to clear/delete the announcement?");
+                          if (!confirmClear) return;
+                          try {
+                            const cleared = {
+                              notification_title: '',
+                              notification_desc: '',
+                              notification_content: '',
+                              notification_enabled: 'false'
+                            };
+                            await updateSettings(cleared);
+                            setSettings({ ...settings, ...cleared });
+                            alert('Announcement cleared successfully!');
+                          } catch (err) {
+                            alert('Failed to clear announcement.');
+                          }
+                        }}
+                        className="premium-btn premium-btn-secondary" 
+                        style={{ width: 'auto', padding: '0 16px', height: '44px', color: '#ef4444', border: '1px solid #fee2e2', background: '#fef2f2', cursor: 'pointer' }}
+                      >
+                        Delete Announcement
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569' }}>Status:</span>
+                      {String(settings.notification_enabled).toLowerCase() === 'true' ? (
+                        <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 'bold' }}>● ON (Active on Citizen UI)</span>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 'bold' }}>○ OFF (Hidden)</span>
+                      )}
+                    </div>
+                  </form>
                 </div>
                 
               </div>

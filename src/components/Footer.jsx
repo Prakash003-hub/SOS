@@ -1,7 +1,10 @@
 import React from 'react';
 import { Phone, ExternalLink } from 'lucide-react';
 
-export default function Footer() {
+export default function Footer({ systemSettings }) {
+  const userCount = systemSettings?.user_count || 0;
+  const totalCount = 124 + Number(userCount);
+
   return (
     <footer className="premium-footer" style={{ background: 'linear-gradient(135deg, #168c54 0%, #0d5c36 100%)', color: '#bbf7d0', borderTop: 'none', padding: '24px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
@@ -16,9 +19,13 @@ export default function Footer() {
             />
             <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>TN sevai</span>
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#dcfce7', marginTop: '8px', lineHeight: '1.4' }}>
+          <p style={{ fontSize: '0.75rem', color: '#dcfce7', marginTop: '8px', lineHeight: '1.4', marginBottom: 0 }}>
               Assistant for E-Sevai , PAN card, Voter ID, and other certificate registrations.
           </p>
+          <div style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold', color: '#ffffff' }}>
+            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80' }}></span>
+            Customers served: {totalCount}+
+          </div>
         </div>
 
         {/* Right Side: Contact Circle and description */}

@@ -38,7 +38,8 @@ import {
   X,
   ShieldAlert,
   Trash2,
-  Clock
+  Clock,
+  Megaphone
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -180,6 +181,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // Install Prompt State
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
 
   // Wizard States
   const [selectedForm, setSelectedForm] = useState(null);
@@ -1339,6 +1341,41 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       )}
       
       <div style={{ flex: 1 }}>
+        {/* Public Announcement Banner */}
+        {systemSettings && String(systemSettings.notification_enabled).toLowerCase() === 'true' && (
+          <div 
+            onClick={() => setShowAnnouncementModal(true)}
+            style={{ 
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)', 
+              border: '1.5px solid #fde68a', 
+              borderRadius: '12px', 
+              padding: '12px 16px', 
+              margin: '12px 8px', 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ background: '#f59e0b', color: 'white', padding: '6px', borderRadius: '50%', display: 'flex' }}>
+                <Megaphone size={14} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#78350f' }}>
+                  {systemSettings.notification_title || 'Announcement'}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: '#92400e', fontWeight: '500', marginTop: '2px' }}>
+                  {systemSettings.notification_desc || 'Click to view details'}
+                </span>
+              </div>
+            </div>
+            <ChevronRight size={18} style={{ color: '#b45309', flexShrink: 0 }} />
+          </div>
+        )}
+
         {error && (
           <div className="premium-card" style={{ borderLeft: '4px solid var(--error)', background: '#fee2e2', color: '#991b1b', margin: '16px' }}>
             <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{error}</p>
@@ -3451,6 +3488,53 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 Install
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detailed Announcement Popup Modal */}
+      {showAnnouncementModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '24px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            width: '100%', maxWidth: '380px',
+            display: 'flex', flexDirection: 'column', gap: '16px',
+            animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#1e293b', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
+                <Megaphone size={16} style={{ color: '#d97706', flexShrink: 0 }} /> 
+                {systemSettings.notification_title || 'Announcement'}
+              </h4>
+              <button 
+                onClick={() => setShowAnnouncementModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 0 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+              {systemSettings.notification_content || systemSettings.notification_desc || 'No details provided.'}
+            </div>
+
+            <button 
+              onClick={() => setShowAnnouncementModal(false)}
+              className="premium-btn-primary"
+              style={{ padding: '12px', border: 'none', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', background: 'var(--primary)', color: 'white', width: '100%' }}
+            >
+              OK, Got it
+            </button>
           </div>
         </div>
       )}

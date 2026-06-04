@@ -5,7 +5,7 @@ import Footer from './components/Footer';
 import UserPortal from './pages/UserPortal';
 import AdminPortal from './pages/AdminPortal';
 import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase } from 'lucide-react';
-import { registerUser, loginUser, sendOtp, verifyOtp } from './services/db';
+import { registerUser, loginUser, sendOtp, verifyOtp, getSettings } from './services/db';
 
 function TrollPage() {
   return (
@@ -116,6 +116,14 @@ function PortalLayout() {
     const saved = localStorage.getItem('whatsbro_user');
     return saved ? JSON.parse(saved) : null;
   });
+  
+  const [systemSettings, setSystemSettings] = useState({});
+
+  useEffect(() => {
+    getSettings().then(data => {
+      if (data) setSystemSettings(data);
+    }).catch(err => console.error('Failed to load settings in App.jsx', err));
+  }, []);
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -300,7 +308,7 @@ function PortalLayout() {
         </div>
 
         {/* Footer - Fixed at the bottom above bottom nav */}
-        <Footer />
+        <Footer systemSettings={systemSettings} />
 
         {/* Global Bottom Sticky Menu */}
         {isAdmin ? (

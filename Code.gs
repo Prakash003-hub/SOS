@@ -1249,6 +1249,16 @@ function getSettingsAction() {
       settings[r.key] = r.value;
     }
   });
+  
+  // Expose user count dynamically
+  try {
+    var usersSheet = getSheet("Users");
+    var userCount = Math.max(0, usersSheet.getLastRow() - 1);
+    settings["user_count"] = userCount;
+  } catch (e) {
+    settings["user_count"] = 0;
+  }
+  
   return settings;
 }
 
@@ -1291,6 +1301,7 @@ function updateSettingsAction(payload) {
       appendObjectToSheet(sheet, { key: k, value: payload[k] });
     }
   });
+  SpreadsheetApp.flush();
   return getSettingsAction();
 }
 
