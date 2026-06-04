@@ -125,6 +125,58 @@ const getImageUrl = (url) => {
   return url;
 };
 
+const resizeQRImage = (file) => {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxSize = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const resizedFile = new File([blob], file.name, {
+            type: file.type || 'image/png',
+            lastModified: Date.now(),
+          });
+          resolve(resizedFile);
+        }, file.type || 'image/png', 0.85);
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
 const handleExportToCsv = (submissionsList, customTitle = "submissions_export") => {
   if (!submissionsList || submissionsList.length === 0) {
     alert("No submissions available to export.");
@@ -1505,7 +1557,7 @@ export default function AdminPortal() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {settings.qr_code_url && (
                       <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
-                        <img src={settings.qr_code_url} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={getImageUrl(settings.qr_code_url)} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                     )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1519,7 +1571,8 @@ export default function AdminPortal() {
                             const file = e.target.files[0];
                             if (file) {
                               try {
-                                const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "System_Settings"]);
+                                const resized = await resizeQRImage(file);
+                                const url = await uploadFileToDrive(resized, ["WhatsBroTNService_Uploads", "System_Settings"]);
                                 setSettings({ ...settings, qr_code_url: url });
                                 await updateSettings({ qr_code_url: url });
                                 alert('QR Code updated successfully!');

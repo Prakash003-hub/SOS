@@ -2469,7 +2469,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               {qrCodeUrl && (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '6px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                                   <img 
-                                    src={qrCodeUrl} 
+                                    src={getImageUrl(qrCodeUrl)} 
                                     alt="UPI Payment QR Code" 
                                     style={{ width: '120px', height: '120px', objectFit: 'contain' }} 
                                   />
@@ -2831,7 +2831,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               {qrCodeUrl && (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '8px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                                   <img 
-                                    src={qrCodeUrl} 
+                                    src={getImageUrl(qrCodeUrl)} 
                                     alt="UPI Payment QR Code" 
                                     style={{ width: '130px', height: '130px', objectFit: 'contain' }} 
                                   />
