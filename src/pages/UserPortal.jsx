@@ -40,7 +40,8 @@ import {
   ShieldAlert,
   Trash2,
   Clock,
-  Megaphone
+  Megaphone,
+  Share2
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -52,6 +53,29 @@ const safeJsonParse = (str, fallback = []) => {
     console.error("JSON parse error:", e, str);
     return fallback;
   }
+};
+
+const normalizeRequiredDocs = (docs) => {
+  if (!Array.isArray(docs)) return [];
+  return docs.map(d => {
+    if (!d) return null;
+    if (typeof d === 'string') {
+      const defaultVal = ['aadhar', 'smart_card', 'voter_id'].includes(d) ? 2 : 1;
+      return { id: d, val: defaultVal };
+    }
+    return d;
+  }).filter(Boolean);
+};
+
+const normalizeCustomDocs = (docs) => {
+  if (!Array.isArray(docs)) return [];
+  return docs.map(d => {
+    if (!d) return null;
+    if (typeof d === 'string') {
+      return { label: d, val: 1 };
+    }
+    return d;
+  }).filter(Boolean);
 };
 
 const getGoogleDriveId = (url) => {
@@ -361,6 +385,69 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       }
     }).catch(err => console.error('Failed to load announcements', err));
   }, []);
+
+  // Redirect to correct tab if shared link parameters are present
+  useEffect(() => {
+    const formIdParam = searchParams.get('formId');
+    const jobIdParam = searchParams.get('jobId');
+    const postIdParam = searchParams.get('postId');
+    
+    if (formIdParam && activeTab !== 'apply') {
+      setSearchParams({ tab: 'apply', formId: formIdParam });
+    } else if (jobIdParam && activeTab !== 'home') {
+      setSearchParams({ tab: 'home', jobId: jobIdParam });
+    } else if (postIdParam && activeTab !== 'home') {
+      setSearchParams({ tab: 'home', postId: postIdParam });
+    }
+  }, [searchParams, activeTab]);
+
+  // Deep linking: Auto-select Form
+  useEffect(() => {
+    const formIdParam = searchParams.get('formId');
+    if (formIdParam && forms.length > 0 && activeTab === 'apply') {
+      const targetForm = forms.find(f => String(f.id) === String(formIdParam));
+      if (targetForm && (!selectedForm || selectedForm.id !== targetForm.id)) {
+        selectFormToFill(targetForm);
+      }
+    }
+  }, [forms, searchParams, activeTab, selectedForm]);
+
+  // Deep linking: Auto-open Job Detail Modal
+  useEffect(() => {
+    const jobIdParam = searchParams.get('jobId');
+    if (jobIdParam && jobs.length > 0 && activeTab === 'home') {
+      const targetJob = jobs.find(j => String(j.id) === String(jobIdParam));
+      if (targetJob && (!selectedJobDetails || selectedJobDetails.id !== targetJob.id)) {
+        setSelectedJobDetails(targetJob);
+      }
+    }
+  }, [jobs, searchParams, activeTab, selectedJobDetails]);
+
+  // Deep linking: Auto-scroll to Post
+  useEffect(() => {
+    const postIdParam = searchParams.get('postId');
+    if (postIdParam && posts.length > 0 && activeTab === 'home') {
+      setTimeout(() => {
+        const el = document.getElementById(`post-${postIdParam}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('highlight-flash');
+          setTimeout(() => el.classList.remove('highlight-flash'), 2500);
+        }
+      }, 500);
+    }
+  }, [posts, searchParams, activeTab]);
+
+  // WhatsApp share utility
+  const handleWhatsAppShare = (title, text, url) => {
+    const absoluteUrl = url.startsWith('http') 
+      ? url 
+      : `${window.location.protocol}//${window.location.host}${url}`;
+    
+    const message = `*${title}*\n${text}\n\nApply/View here: ${absoluteUrl}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+  };
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
@@ -704,7 +791,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     return () => clearInterval(interval);
   }, [uploadStatuses]);
 
-  const handleImmediateUpload = async (docKey, uploadType, fileInputIdx, file) => {
+  const handleImmediateUpload = async (docKey, maxFiles, fileInputIdx, file) => {
     if (!file) return;
 
     // Check size limit (10MB limit for each upload)
@@ -714,7 +801,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       return;
     }
 
-    setUploadStatuses(prev => ({ ...prev, [docKey]: 'uploading' }));
+    setUploadStatuses(prev => ({ ...prev, [docKey]: `uploading_${fileInputIdx}` }));
     if (!uploadProgress) setUploadProgress('Uploading.');
 
     try {
@@ -726,16 +813,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       const fileUrl = await uploadFileToDrive(file, folderPath);
       
       setUploadedUrls(prev => {
-        const current = prev[docKey] || { type: uploadType };
+        const current = prev[docKey] || { maxFiles };
         let nextUrls;
-        if (uploadType === 'pdf') {
-          nextUrls = { type: 'pdf', url1: fileUrl, name1: file.name };
+        if (maxFiles === 1) {
+          nextUrls = { maxFiles: 1, url1: fileUrl, name1: file.name };
         } else {
-          nextUrls = { ...current, type: 'images', [`url${fileInputIdx}`]: fileUrl, [`name${fileInputIdx}`]: file.name };
+          nextUrls = { ...current, maxFiles, [`url${fileInputIdx}`]: fileUrl, [`name${fileInputIdx}`]: file.name };
         }
         
         // Determine if upload is fully complete
-        const isComplete = nextUrls.type === 'pdf' || (nextUrls.url1 && nextUrls.url2);
+        let isComplete = false;
+        if (maxFiles === 1) {
+          isComplete = !!nextUrls.url1;
+        } else if (maxFiles === 2) {
+          isComplete = !!(nextUrls.url1 && nextUrls.url2);
+        } else if (maxFiles === 3) {
+          isComplete = !!(nextUrls.url1 && nextUrls.url2 && nextUrls.url3);
+        }
+        
         setUploadStatuses(statusPrev => ({ ...statusPrev, [docKey]: isComplete ? 'uploaded' : 'partial' }));
         
         return { ...prev, [docKey]: nextUrls };
@@ -747,10 +842,292 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   };
 
+  const renderDocumentUploadZone = (docKeyOrLabel, isCustom) => {
+    // Get saved profile URL (only for required standard fields)
+    const getSavedDocUrl = () => {
+      if (isCustom || !currentUser) return null;
+      if (docKeyOrLabel === 'photo') return currentUser.photo_url;
+      if (docKeyOrLabel === 'signature') return currentUser.signature_url_1;
+      return currentUser[`${docKeyOrLabel}_url_1`] || currentUser[`${docKeyOrLabel}_url` || ''];
+    };
+    
+    const savedUrl = getSavedDocUrl();
+    const hasSavedDoc = !!savedUrl && !deletedSavedDocs[docKeyOrLabel];
+
+    if (hasSavedDoc) {
+      // Render beautiful premium small preview card with Replace/Delete button
+      return (
+        <div key={docKeyOrLabel} className="document-upload-zone" style={{ padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #10b981', background: '#f0fdf4', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Small Display Thumbnail */}
+            {checkIfPdf(savedUrl) ? (
+              <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                <FileText size={22} />
+              </div>
+            ) : (
+              <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img 
+                  src={getImageUrl(savedUrl)} 
+                  alt="Preview" 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                />
+              </div>
+            )}
+            
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize', display: 'block' }}>
+                {STANDARD_FIELDS[docKeyOrLabel]?.label || docKeyOrLabel} <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold' }}>[Saved]</span>
+              </span>
+              <a 
+                href={getImageUrl(savedUrl)} 
+                target="_blank" 
+                rel="noreferrer"
+                style={{ fontSize: '0.75rem', color: '#047857', textDecoration: 'underline', fontWeight: '700' }}
+              >
+                View File
+              </a>
+            </div>
+          </div>
+          {/* Delete/Replace button */}
+          <button
+            type="button"
+            onClick={() => handleDeleteSavedDoc(docKeyOrLabel)}
+            className="premium-btn premium-btn-danger"
+            style={{ width: 'auto', padding: '6px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+          >
+            <Trash2 size={14} /> Delete & Replace
+          </button>
+        </div>
+      );
+    }
+
+    // Determine max files (1, 2, or 3) from selectedForm config
+    let maxFiles = 1;
+    if (isCustom) {
+      const custDocs = normalizeCustomDocs(safeJsonParse(selectedForm.custom_docs, []));
+      const docConfig = custDocs.find(x => x.label === docKeyOrLabel);
+      if (docConfig) maxFiles = docConfig.val || 1;
+    } else {
+      const reqDocs = normalizeRequiredDocs(safeJsonParse(selectedForm.required_docs, []));
+      const docConfig = reqDocs.find(x => x.id === docKeyOrLabel);
+      if (docConfig) maxFiles = docConfig.val || 1;
+      // photo and signature are always 1
+      if (['photo', 'signature'].includes(docKeyOrLabel)) maxFiles = 1;
+    }
+
+    const uploadStatus = uploadStatuses[docKeyOrLabel];
+    const isUploaded = uploadStatus === 'uploaded';
+    const freshlyUploaded = uploadedUrls[docKeyOrLabel];
+
+    return (
+      <div key={docKeyOrLabel} className="document-upload-zone" style={{ padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f8fafc', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize' }}>
+            {STANDARD_FIELDS[docKeyOrLabel]?.label || docKeyOrLabel} <span style={{ color: 'var(--error)' }}>*</span>
+          </span>
+          {isUploaded && (
+            <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <CheckCircle size={14} /> Uploaded
+            </span>
+          )}
+        </div>
+
+        {isUploaded && freshlyUploaded ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#f0fdf4', border: '1px solid #10b981', borderRadius: '6px' }}>
+            <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', flex: 1, marginRight: '8px', wordBreak: 'break-all' }}>
+              {maxFiles === 1 
+                ? freshlyUploaded.name1 
+                : maxFiles === 2 
+                  ? `${freshlyUploaded.name1} & ${freshlyUploaded.name2}`
+                  : `${freshlyUploaded.name1}, ${freshlyUploaded.name2} & ${freshlyUploaded.name3}`
+              }
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <a 
+                href={getImageUrl(freshlyUploaded.url1)} 
+                target="_blank" 
+                rel="noreferrer"
+                className="premium-btn premium-btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
+              >
+                {maxFiles === 1 ? 'View' : 'View Front'}
+              </a>
+              {maxFiles >= 2 && freshlyUploaded.url2 && (
+                <a 
+                  href={getImageUrl(freshlyUploaded.url2)} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="premium-btn premium-btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
+                >
+                  View Back
+                </a>
+              )}
+              {maxFiles >= 3 && freshlyUploaded.url3 && (
+                <a 
+                  href={getImageUrl(freshlyUploaded.url3)} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="premium-btn premium-btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
+                >
+                  View Part 3
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadedUrls(prev => {
+                    const copy = { ...prev };
+                    delete copy[docKeyOrLabel];
+                    return copy;
+                  });
+                  setUploadStatuses(prev => {
+                    const copy = { ...prev };
+                    delete copy[docKeyOrLabel];
+                    return copy;
+                  });
+                }}
+                className="premium-btn premium-btn-danger"
+                style={{ padding: '4px 10px', fontSize: '0.75rem', border: 'none', cursor: 'pointer' }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {/* Input 1 */}
+              <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    {maxFiles === 1 ? 'File:' : 'Front Side:'}
+                  </span>
+                  {freshlyUploaded?.url1 && (
+                    <span style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 'bold' }}>✓ Uploaded</span>
+                  )}
+                </div>
+                {uploadStatus === 'uploading_1' ? (
+                  <div style={{ padding: '8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', border: '1px solid #0369a1' }}>
+                    <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid #0369a1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                    <span>Uploading...</span>
+                  </div>
+                ) : (
+                  <label className="premium-btn premium-btn-secondary" style={{ 
+                    padding: '8px', 
+                    fontSize: '0.75rem', 
+                    display: 'flex', 
+                    gap: '4px', 
+                    justifyContent: 'center',
+                    cursor: 'pointer', 
+                    background: freshlyUploaded?.url1 ? '#f0fdf4' : 'white', 
+                    border: freshlyUploaded?.url1 ? '1px solid #10b981' : '1px dashed var(--primary)',
+                    color: freshlyUploaded?.url1 ? '#166534' : 'inherit'
+                  }}>
+                    <Upload size={14} style={{ color: freshlyUploaded?.url1 ? '#10b981' : 'var(--primary)' }} />
+                    <span>{freshlyUploaded?.url1 ? 'Replace File' : 'Upload File'}</span>
+                    <input 
+                      type="file" 
+                      accept={maxFiles === 1 && !['photo', 'signature'].includes(docKeyOrLabel) ? 'application/pdf,image/*' : 'image/*'}
+                      onChange={(e) => handleImmediateUpload(docKeyOrLabel, maxFiles, 1, e.target.files[0])}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Input 2 */}
+              {maxFiles >= 2 && (
+                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Back Side:</span>
+                    {freshlyUploaded?.url2 && (
+                      <span style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 'bold' }}>✓ Uploaded</span>
+                    )}
+                  </div>
+                  {uploadStatus === 'uploading_2' ? (
+                    <div style={{ padding: '8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', border: '1px solid #0369a1' }}>
+                      <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid #0369a1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                      <span>Uploading...</span>
+                    </div>
+                  ) : (
+                    <label className="premium-btn premium-btn-secondary" style={{ 
+                      padding: '8px', 
+                      fontSize: '0.75rem', 
+                      display: 'flex', 
+                      gap: '4px', 
+                      justifyContent: 'center',
+                      cursor: 'pointer', 
+                      background: freshlyUploaded?.url2 ? '#f0fdf4' : 'white', 
+                      border: freshlyUploaded?.url2 ? '1px solid #10b981' : '1px dashed var(--primary)',
+                      color: freshlyUploaded?.url2 ? '#166534' : 'inherit'
+                    }}>
+                      <Upload size={14} style={{ color: freshlyUploaded?.url2 ? '#10b981' : 'var(--primary)' }} />
+                      <span>{freshlyUploaded?.url2 ? 'Replace Back' : 'Upload Back'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => handleImmediateUpload(docKeyOrLabel, maxFiles, 2, e.target.files[0])}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {/* Input 3 */}
+              {maxFiles >= 3 && (
+                <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Additional Side:</span>
+                    {freshlyUploaded?.url3 && (
+                      <span style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 'bold' }}>✓ Uploaded</span>
+                    )}
+                  </div>
+                  {uploadStatus === 'uploading_3' ? (
+                    <div style={{ padding: '8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', border: '1px solid #0369a1' }}>
+                      <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid #0369a1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                      <span>Uploading...</span>
+                    </div>
+                  ) : (
+                    <label className="premium-btn premium-btn-secondary" style={{ 
+                      padding: '8px', 
+                      fontSize: '0.75rem', 
+                      display: 'flex', 
+                      gap: '4px', 
+                      justifyContent: 'center',
+                      cursor: 'pointer', 
+                      background: freshlyUploaded?.url3 ? '#f0fdf4' : 'white', 
+                      border: freshlyUploaded?.url3 ? '1px solid #10b981' : '1px dashed var(--primary)',
+                      color: freshlyUploaded?.url3 ? '#166534' : 'inherit'
+                    }}>
+                      <Upload size={14} style={{ color: freshlyUploaded?.url3 ? '#10b981' : 'var(--primary)' }} />
+                      <span>{freshlyUploaded?.url3 ? 'Replace Extra' : 'Upload Extra'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => handleImmediateUpload(docKeyOrLabel, maxFiles, 3, e.target.files[0])}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Proceed from Step 4 (Upload Docs) to Step 5 (Receipt) - Perform uploads and save submission
   const handleFinalWizardSubmit = async () => {
-    const requiredDocsList = safeJsonParse(selectedForm.required_docs, []);
-    const customDocsList = safeJsonParse(selectedForm.custom_docs, []);
+    const rawRequiredDocs = safeJsonParse(selectedForm.required_docs, []);
+    const rawCustomDocs = safeJsonParse(selectedForm.custom_docs, []);
+    
+    const requiredDocsList = normalizeRequiredDocs(rawRequiredDocs).map(d => d.id);
+    const customDocsList = normalizeCustomDocs(rawCustomDocs).map(d => d.label);
     const missing = [];
 
     // Verify all required documents are selected OR exist in profile
@@ -761,7 +1138,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         currentUser[`${docKey}_url_1`] ||
         currentUser[`${docKey}_url`]
       );
-      const isSelectedLocal = uploadedUrls[docKey] && (uploadedUrls[docKey].url1 || uploadedUrls[docKey].url2);
+      const isSelectedLocal = uploadedUrls[docKey] && (uploadedUrls[docKey].url1 || uploadedUrls[docKey].url2 || uploadedUrls[docKey].url3);
       
       if (!isAlreadyUploaded && !isSelectedLocal) {
         missing.push(STANDARD_FIELDS[docKey]?.label || docKey);
@@ -769,7 +1146,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     });
 
     customDocsList.forEach(docLabel => {
-      const isSelectedLocal = uploadedUrls[docLabel] && uploadedUrls[docLabel].url1;
+      const isSelectedLocal = uploadedUrls[docLabel] && (uploadedUrls[docLabel].url1 || uploadedUrls[docLabel].url2 || uploadedUrls[docLabel].url3);
       if (!isSelectedLocal) {
         missing.push(docLabel);
       }
@@ -837,9 +1214,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         const freshlyUploaded = uploadedUrls[docKey];
         
         if (freshlyUploaded) {
-           docReferencesPack[docKey] = freshlyUploaded.type === 'pdf' 
-             ? [freshlyUploaded.url1] 
-             : [freshlyUploaded.url1, freshlyUploaded.url2].filter(Boolean);
+           docReferencesPack[docKey] = [freshlyUploaded.url1, freshlyUploaded.url2, freshlyUploaded.url3].filter(Boolean);
         } else if (isPhotoSavedUrl) {
            docReferencesPack['photo'] = [currentUser.photo_url];
         } else if (isSignatureSavedUrl) {
@@ -853,9 +1228,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       customDocsList.forEach(docLabel => {
         const freshlyUploaded = uploadedUrls[docLabel];
         if (freshlyUploaded) {
-           docReferencesPack[docLabel] = freshlyUploaded.type === 'pdf' 
-             ? [freshlyUploaded.url1] 
-             : [freshlyUploaded.url1, freshlyUploaded.url2].filter(Boolean);
+           docReferencesPack[docLabel] = [freshlyUploaded.url1, freshlyUploaded.url2, freshlyUploaded.url3].filter(Boolean);
         }
       });
 
@@ -1377,7 +1750,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
             ) : (
               posts.map((post) => {
                 return (
-                  <div key={post.id} className="instagram-post-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div id={`post-${post.id}`} className="instagram-post-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-light-main)', margin: 0, lineHeight: '1.3' }}>
                       {post.title}
                     </h3>
@@ -1396,22 +1769,45 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {post.description}
                     </p>
 
-                    {post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' && (
-                      <button 
-                        onClick={() => {
-                          if (post.apply_url.startsWith('/user')) {
-                            const urlParams = new URLSearchParams(post.apply_url.split('?')[1]);
-                            setSearchParams(urlParams);
-                          } else {
-                            window.open(post.apply_url, '_blank');
-                          }
+                    <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
+                      {post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' && (
+                        <button 
+                          onClick={() => {
+                            if (post.apply_url.startsWith('/user')) {
+                              const urlParams = new URLSearchParams(post.apply_url.split('?')[1]);
+                              setSearchParams(urlParams);
+                            } else {
+                              window.open(post.apply_url, '_blank');
+                            }
+                          }}
+                          className="premium-btn premium-btn-primary"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                        >
+                          Apply Now <ChevronRight size={18} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleWhatsAppShare(post.title, post.description, `/user?tab=home&postId=${post.id}`)}
+                        className="premium-btn premium-btn-secondary"
+                        style={{ 
+                          width: post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' ? '42px' : '100%', 
+                          padding: '11px 0', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '6px',
+                          backgroundColor: '#25D366', 
+                          color: 'white', 
+                          border: 'none',
+                          fontWeight: 'bold'
                         }}
-                        className="premium-btn premium-btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', marginTop: '4px', width: '100%', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                        title="Share on WhatsApp"
                       >
-                        Apply Now <ChevronRight size={18} />
+                        <Share2 size={18} />
+                        {!(post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none') && <span>Share on WhatsApp</span>}
                       </button>
-                    )}
+                    </div>
                   </div>
                 );
               })
@@ -1457,8 +1853,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     {parseDetailsDoc(selectedJobDetails.details_doc)}
                   </div>
 
-                  {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' && (
-                    <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px' }}>
+                  {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' ? (
+                    <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px', display: 'flex', gap: '10px' }}>
                       <button 
                         onClick={() => {
                           const url = selectedJobDetails.apply_url;
@@ -1471,9 +1867,30 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           }
                         }}
                         className="premium-btn premium-btn-primary"
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem' }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem' }}
                       >
                         {selectedJobDetails.button_name || 'Apply Now'} <ChevronRight size={20} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/user?tab=home&jobId=${selectedJobDetails.id}`)}
+                        className="premium-btn premium-btn-secondary"
+                        style={{ width: '52px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', color: 'white', border: 'none', borderRadius: '8px' }}
+                        title="Share on WhatsApp"
+                      >
+                        <Share2 size={22} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/user?tab=home&jobId=${selectedJobDetails.id}`)}
+                        className="premium-btn premium-btn-secondary"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem', backgroundColor: '#25D366', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}
+                        title="Share on WhatsApp"
+                      >
+                        <Share2 size={20} /> Share on WhatsApp
                       </button>
                     </div>
                   )}
@@ -1508,13 +1925,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     </p>
 
                     {((job.apply_url && job.apply_url.trim() !== '' && job.apply_url.trim().toLowerCase() !== 'none') || (job.details_doc && job.details_doc.trim() !== '')) && (
-                      <button 
-                        onClick={() => setSelectedJobDetails(job)}
-                        className="premium-btn premium-btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', marginTop: '4px', width: '100%', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-                      >
-                        View Details & Apply <ChevronRight size={18} />
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
+                        <button 
+                          onClick={() => setSelectedJobDetails(job)}
+                          className="premium-btn premium-btn-primary"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                        >
+                          View Details & Apply <ChevronRight size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppShare(job.title, job.description, `/user?tab=home&jobId=${job.id}`)}
+                          className="premium-btn premium-btn-secondary"
+                          style={{ width: '42px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', color: 'white', border: 'none' }}
+                          title="Share on WhatsApp"
+                        >
+                          <Share2 size={18} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -1585,14 +2013,27 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           </div>
                           
                           <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '16px' }}>{form.description}</p>
-                          <button 
-                            onClick={() => !isUpcoming && selectFormToFill(form)}
-                            className={`premium-btn ${isUpcoming ? 'premium-btn-secondary' : 'premium-btn-primary'}`}
-                            style={{ padding: '10px', opacity: isUpcoming ? 0.7 : 1, cursor: isUpcoming ? 'not-allowed' : 'pointer' }}
-                            disabled={isUpcoming}
-                          >
-                            {isUpcoming ? 'Upcoming soon' : 'Click to Apply'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                            <button 
+                              onClick={() => !isUpcoming && selectFormToFill(form)}
+                              className={`premium-btn ${isUpcoming ? 'premium-btn-secondary' : 'premium-btn-primary'}`}
+                              style={{ flex: 1, padding: '10px', opacity: isUpcoming ? 0.7 : 1, cursor: isUpcoming ? 'not-allowed' : 'pointer' }}
+                              disabled={isUpcoming}
+                            >
+                              {isUpcoming ? 'Upcoming soon' : 'Click to Apply'}
+                            </button>
+                            {!isUpcoming && (
+                              <button
+                                type="button"
+                                onClick={() => handleWhatsAppShare(form.title, `Apply for ${form.title} easily through our E-Sevai portal.`, `/user?tab=apply&formId=${form.id}`)}
+                                className="premium-btn premium-btn-secondary"
+                                style={{ width: '42px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', color: 'white', border: 'none' }}
+                                title="Share on WhatsApp"
+                              >
+                                <Share2 size={18} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -2193,335 +2634,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       )}
 
                       {/* Dynamic docs list (chosen by Admin) */}
-                      {safeJsonParse(selectedForm.required_docs, []).map(docKey => {
-                        const localFile = uploadedFiles[docKey] || {};
-                        
-                        // Get saved profile URL
-                        const getSavedDocUrl = () => {
-                          if (!currentUser) return null;
-                          if (docKey === 'photo') return currentUser.photo_url;
-                          if (docKey === 'signature') return currentUser.signature_url_1;
-                          return currentUser[`${docKey}_url_1`] || currentUser[`${docKey}_url` || ''];
-                        };
-                        
-                        const savedUrl = getSavedDocUrl();
-                        const hasSavedDoc = !!savedUrl && !deletedSavedDocs[docKey];
-                        
-                        // Handle dual image vs PDF toggle state
-                        const selectedType = localFile.type || 'pdf';
-
-                        if (hasSavedDoc) {
-                          // Render beautiful premium small preview card with Replace/Delete button
-                          return (
-                            <div key={docKey} className="document-upload-zone" style={{ padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #10b981', background: '#f0fdf4', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.05)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                {/* Small Display Thumbnail */}
-                                {checkIfPdf(savedUrl) ? (
-                                  <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
-                                    <FileText size={22} />
-                                  </div>
-                                ) : (
-                                  <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <img 
-                                      src={getImageUrl(savedUrl)} 
-                                      alt="Preview" 
-                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                                    />
-                                  </div>
-                                )}
-                                
-                                <div>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize', display: 'block' }}>
-                                    {STANDARD_FIELDS[docKey]?.label || docKey} <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold' }}>[Saved]</span>
-                                  </span>
-                                  <a 
-                                    href={getImageUrl(savedUrl)} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    style={{ fontSize: '0.75rem', color: '#047857', textDecoration: 'underline', fontWeight: '700' }}
-                                  >
-                                    View File
-                                  </a>
-                                </div>
-                              </div>
-                              {/* Delete/Replace button */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSavedDoc(docKey)}
-                                className="premium-btn premium-btn-danger"
-                                style={{ width: 'auto', padding: '6px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
-                              >
-                                <Trash2 size={14} /> Delete & Replace
-                              </button>
-                            </div>
-                          );
-                        }
-
-                        const isUploading = uploadStatuses[docKey] === 'uploading';
-                        const isUploaded = uploadStatuses[docKey] === 'uploaded';
-                        const freshlyUploaded = uploadedUrls[docKey];
-
-                        return (
-                          <div key={docKey} className="document-upload-zone" style={{ padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f8fafc', marginBottom: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize' }}>
-                                {STANDARD_FIELDS[docKey]?.label || docKey} <span style={{ color: 'var(--error)' }}>*</span>
-                              </span>
-                              {isUploaded && (
-                                <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <CheckCircle size={14} /> Uploaded
-                                </span>
-                              )}
-                            </div>
-
-                            {isUploading ? (
-                              <div style={{ padding: '12px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid #0369a1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                {uploadProgress || 'Uploading...'}
-                              </div>
-                            ) : isUploaded && freshlyUploaded ? (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#f0fdf4', border: '1px solid #10b981', borderRadius: '6px' }}>
-                                <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', flex: 1, marginRight: '8px', wordBreak: 'break-all' }}>
-                                  {freshlyUploaded.type === 'pdf' ? freshlyUploaded.name1 : `${freshlyUploaded.name1} & ${freshlyUploaded.name2}`}
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                                  <a 
-                                    href={getImageUrl(freshlyUploaded.url1)} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="premium-btn premium-btn-secondary"
-                                    style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
-                                  >
-                                    {freshlyUploaded.type === 'pdf' ? 'View' : 'View Front'}
-                                  </a>
-                                  {freshlyUploaded.url2 && (
-                                    <a 
-                                      href={getImageUrl(freshlyUploaded.url2)} 
-                                      target="_blank" 
-                                      rel="noreferrer"
-                                      className="premium-btn premium-btn-secondary"
-                                      style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
-                                    >
-                                      View Back
-                                    </a>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setUploadedUrls(prev => {
-                                        const copy = { ...prev };
-                                        delete copy[docKey];
-                                        return copy;
-                                      });
-                                      setUploadStatuses(prev => {
-                                        const copy = { ...prev };
-                                        delete copy[docKey];
-                                        return copy;
-                                      });
-                                    }}
-                                    className="premium-btn premium-btn-danger"
-                                    style={{ padding: '4px 10px', fontSize: '0.75rem', border: 'none', cursor: 'pointer' }}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                {/* Options Toggle for Aadhaar, Voter, Smart Card (images vs PDF) */}
-                                {docKey !== 'photo' && docKey !== 'signature' && (
-                                  <div style={{ display: 'flex', backgroundColor: '#e2e8f0', borderRadius: '6px', padding: '2px', border: '1px solid #cbd5e1', marginBottom: '10px', maxWidth: '240px' }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'pdf' } }));
-                                        setUploadedUrls(prev => {
-                                          const copy = { ...prev };
-                                          delete copy[docKey];
-                                          return copy;
-                                        });
-                                        setUploadStatuses(prev => {
-                                          const copy = { ...prev };
-                                          delete copy[docKey];
-                                          return copy;
-                                        });
-                                      }}
-                                      style={{
-                                        flex: 1, padding: '4px 8px', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '600',
-                                        backgroundColor: selectedType === 'pdf' ? '#10b981' : 'transparent',
-                                        color: selectedType === 'pdf' ? '#ffffff' : '#64748b', cursor: 'pointer'
-                                      }}
-                                    >
-                                      One PDF File
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'images' } }));
-                                        setUploadedUrls(prev => {
-                                          const copy = { ...prev };
-                                          delete copy[docKey];
-                                          return copy;
-                                        });
-                                        setUploadStatuses(prev => {
-                                          const copy = { ...prev };
-                                          delete copy[docKey];
-                                          return copy;
-                                        });
-                                      }}
-                                      style={{
-                                        flex: 1, padding: '4px 8px', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '600',
-                                        backgroundColor: selectedType === 'images' ? '#10b981' : 'transparent',
-                                        color: selectedType === 'images' ? '#ffffff' : '#64748b', cursor: 'pointer'
-                                      }}
-                                    >
-                                      2 Images
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Render Upload inputs */}
-                                {docKey === 'photo' || docKey === 'signature' || selectedType === 'pdf' ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                                      <Upload size={16} style={{ color: 'var(--primary)' }} />
-                                      <span>Choose PDF / Image File to Upload</span>
-                                      <input 
-                                        type="file" 
-                                        accept={['photo', 'signature'].includes(docKey) ? 'image/*' : 'application/pdf,image/*'}
-                                        onChange={(e) => handleImmediateUpload(docKey, 'pdf', 1, e.target.files[0])}
-                                        style={{ display: 'none' }}
-                                      />
-                                    </label>
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'flex', gap: '10px' }}>
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Front Side:</span>
-                                        {uploadedUrls[docKey]?.url1 && (
-                                          <span style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 'bold' }}>✓ Uploaded</span>
-                                        )}
-                                      </div>
-                                      <label className="premium-btn premium-btn-secondary" style={{ 
-                                        padding: '8px', 
-                                        fontSize: '0.75rem', 
-                                        display: 'flex', 
-                                        gap: '4px', 
-                                        cursor: 'pointer', 
-                                        background: uploadedUrls[docKey]?.url1 ? '#f0fdf4' : 'white', 
-                                        border: uploadedUrls[docKey]?.url1 ? '1px solid #10b981' : '1px dashed var(--primary)',
-                                        color: uploadedUrls[docKey]?.url1 ? '#166534' : 'inherit'
-                                      }}>
-                                        <Upload size={14} style={{ color: uploadedUrls[docKey]?.url1 ? '#10b981' : 'var(--primary)' }} />
-                                        <span>{uploadedUrls[docKey]?.url1 ? 'Replace Front' : 'Upload Front'}</span>
-                                        <input 
-                                          type="file" 
-                                          accept="image/*"
-                                          onChange={(e) => handleImmediateUpload(docKey, 'images', 1, e.target.files[0])}
-                                          style={{ display: 'none' }}
-                                        />
-                                      </label>
-                                    </div>
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Back Side:</span>
-                                        {uploadedUrls[docKey]?.url2 && (
-                                          <span style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 'bold' }}>✓ Uploaded</span>
-                                        )}
-                                      </div>
-                                      <label className="premium-btn premium-btn-secondary" style={{ 
-                                        padding: '8px', 
-                                        fontSize: '0.75rem', 
-                                        display: 'flex', 
-                                        gap: '4px', 
-                                        cursor: 'pointer', 
-                                        background: uploadedUrls[docKey]?.url2 ? '#f0fdf4' : 'white', 
-                                        border: uploadedUrls[docKey]?.url2 ? '1px solid #10b981' : '1px dashed var(--primary)',
-                                        color: uploadedUrls[docKey]?.url2 ? '#166534' : 'inherit'
-                                      }}>
-                                        <Upload size={14} style={{ color: uploadedUrls[docKey]?.url2 ? '#10b981' : 'var(--primary)' }} />
-                                        <span>{uploadedUrls[docKey]?.url2 ? 'Replace Back' : 'Upload Back'}</span>
-                                        <input 
-                                          type="file" 
-                                          accept="image/*"
-                                          onChange={(e) => handleImmediateUpload(docKey, 'images', 2, e.target.files[0])}
-                                          style={{ display: 'none' }}
-                                        />
-                                      </label>
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        );
+                      {normalizeRequiredDocs(safeJsonParse(selectedForm.required_docs, [])).map(doc => {
+                        return renderDocumentUploadZone(doc.id, false);
                       })}
 
                       {/* Custom Documents list */}
-                      {safeJsonParse(selectedForm.custom_docs, []).map(docLabel => {
-                        const isUploading = uploadStatuses[docLabel] === 'uploading';
-                        const isUploaded = uploadStatuses[docLabel] === 'uploaded';
-                        const freshlyUploaded = uploadedUrls[docLabel];
-
-                        return (
-                          <div key={docLabel} className="document-upload-zone" style={{ padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f8fafc', marginBottom: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', display: 'block' }}>
-                                {docLabel} <span style={{ color: 'var(--error)' }}>*</span>
-                              </span>
-                              {isUploaded && (
-                                <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <CheckCircle size={14} /> Uploaded
-                                </span>
-                              )}
-                            </div>
-
-                            {isUploading ? (
-                              <div style={{ padding: '12px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid #0369a1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                {uploadProgress || 'Uploading...'}
-                              </div>
-                            ) : isUploaded && freshlyUploaded ? (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#f0fdf4', border: '1px solid #10b981', borderRadius: '6px' }}>
-                                <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600' }}>
-                                  {freshlyUploaded.name1}
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                  <a 
-                                    href={getImageUrl(freshlyUploaded.url1)} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="premium-btn premium-btn-secondary"
-                                    style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
-                                  >
-                                    View
-                                  </a>
-                                  <label className="premium-btn premium-btn-primary" style={{ padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', margin: 0 }}>
-                                    Replace
-                                    <input 
-                                      type="file" 
-                                      accept="application/pdf,image/*"
-                                      onChange={(e) => handleImmediateUpload(docLabel, 'pdf', 1, e.target.files[0])}
-                                      style={{ display: 'none' }}
-                                    />
-                                  </label>
-                                </div>
-                              </div>
-                            ) : (
-                              <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                                <Upload size={16} style={{ color: 'var(--primary)' }} />
-                                <span>Choose File to Upload</span>
-                                <input 
-                                  type="file" 
-                                  accept="application/pdf,image/*"
-                                  onChange={(e) => handleImmediateUpload(docLabel, 'pdf', 1, e.target.files[0])}
-                                  style={{ display: 'none' }}
-                                />
-                              </label>
-                            )}
-                          </div>
-                        );
+                      {normalizeCustomDocs(safeJsonParse(selectedForm.custom_docs, [])).map(doc => {
+                        return renderDocumentUploadZone(doc.label, true);
                       })}
                     </div>
 

@@ -74,6 +74,29 @@ const safeJsonParse = (str, fallback = []) => {
   }
 };
 
+const normalizeRequiredDocs = (docs) => {
+  if (!Array.isArray(docs)) return [];
+  return docs.map(d => {
+    if (!d) return null;
+    if (typeof d === 'string') {
+      const defaultVal = ['aadhar', 'smart_card', 'voter_id'].includes(d) ? 2 : 1;
+      return { id: d, val: defaultVal };
+    }
+    return d;
+  }).filter(Boolean);
+};
+
+const normalizeCustomDocs = (docs) => {
+  if (!Array.isArray(docs)) return [];
+  return docs.map(d => {
+    if (!d) return null;
+    if (typeof d === 'string') {
+      return { label: d, val: 1 };
+    }
+    return d;
+  }).filter(Boolean);
+};
+
 const getGoogleDriveId = (url) => {
   if (!url) return null;
   const fileDMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -677,8 +700,8 @@ export default function AdminPortal() {
       fee: form.fee || 0,
       instructions: form.instructions || '',
       required_fields: safeJsonParse(form.required_fields),
-      required_docs: safeJsonParse(form.required_docs),
-      custom_docs: safeJsonParse(form.custom_docs),
+      required_docs: normalizeRequiredDocs(safeJsonParse(form.required_docs)),
+      custom_docs: normalizeCustomDocs(safeJsonParse(form.custom_docs)),
       fields: safeJsonParse(form.fields),
       img_url: form.img_url || ''
     });
@@ -1570,25 +1593,31 @@ export default function AdminPortal() {
                   {formBuilder.required_docs.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px', background: 'rgba(16,185,129,0.06)', border: '1.5px solid var(--primary)', borderRadius: '8px', marginBottom: '10px' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--primary)', width: '100%' }}>Currently Selected Documents ({formBuilder.required_docs.length}):</span>
-                      {formBuilder.required_docs.map(docId => {
+                      {normalizeRequiredDocs(formBuilder.required_docs).map(doc => {
+                        const docId = doc.id;
                         const label = [
-                          { id: 'photo', label: 'Photo Upload (image < 7MB)' },
-                          { id: 'aadhar', label: 'Aadhaar Upload (img/pdf < 5MB)' },
-                          { id: 'smart_card', label: 'Smart Card Upload (img/pdf < 5MB)' },
-                          { id: 'voter_id', label: 'Voter ID Upload (img/pdf < 5MB)' },
-                          { id: 'signature', label: 'Signature Upload (img/pdf < 5MB)' }
+                          { id: 'photo', label: 'Photo' },
+                          { id: 'aadhar', label: 'Aadhaar' },
+                          { id: 'smart_card', label: 'Smart Card' },
+                          { id: 'voter_id', label: 'Voter ID' },
+                          { id: 'signature', label: 'Signature' }
                         ].find(x => x.id === docId)?.label || docId;
                         
+                        let modeLabel = '';
+                        if (doc.val === 1) modeLabel = '(1 File)';
+                        else if (doc.val === 2) modeLabel = '(2 Images)';
+                        else if (doc.val === 3) modeLabel = '(3 Images)';
+
                         return (
                           <span key={docId} className="badge badge-info" style={{ fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', background: 'var(--primary)', color: 'white' }}>
-                            {label}
+                            {label} {modeLabel}
                             <X 
                               size={12} 
                               style={{ cursor: 'pointer' }} 
                               onClick={() => {
                                 setFormBuilder(prev => ({
                                   ...prev,
-                                  required_docs: prev.required_docs.filter(x => x !== docId)
+                                  required_docs: normalizeRequiredDocs(prev.required_docs).filter(x => x.id !== docId)
                                 }));
                               }}
                             />
@@ -1598,29 +1627,58 @@ export default function AdminPortal() {
                     </div>
                   )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '12px' }}>
                     {[
-                      { id: 'photo', label: 'Photo Upload (image < 7MB)' },
-                      { id: 'aadhar', label: 'Aadhaar Upload (img/pdf < 5MB)' },
-                      { id: 'smart_card', label: 'Smart Card Upload (img/pdf < 5MB)' },
-                      { id: 'voter_id', label: 'Voter ID Upload (img/pdf < 5MB)' },
-                      { id: 'signature', label: 'Signature Upload (img/pdf < 5MB)' }
+                      { id: 'photo', label: 'Photo Upload (image < 10MB)' },
+                      { id: 'aadhar', label: 'Aadhaar Upload (img/pdf < 10MB)' },
+                      { id: 'smart_card', label: 'Smart Card Upload (img/pdf < 10MB)' },
+                      { id: 'voter_id', label: 'Voter ID Upload (img/pdf < 10MB)' },
+                      { id: 'signature', label: 'Signature Upload (img/pdf < 10MB)' }
                     ].map(d => {
-                      const isChecked = formBuilder.required_docs.includes(d.id);
+                      const normalizedDocs = normalizeRequiredDocs(formBuilder.required_docs);
+                      const activeDoc = normalizedDocs.find(x => x.id === d.id);
+                      const isChecked = !!activeDoc;
+                      
                       return (
-                        <label key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#1e293b' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={isChecked}
-                            onChange={(e) => {
-                              const list = e.target.checked 
-                                ? [...formBuilder.required_docs, d.id]
-                                : formBuilder.required_docs.filter(x => x !== d.id);
-                              setFormBuilder({ ...formBuilder, required_docs: list });
-                            }}
-                          />
-                          <span>{d.label}</span>
-                        </label>
+                        <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#1e293b', margin: 0 }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked}
+                              onChange={(e) => {
+                                let list;
+                                if (e.target.checked) {
+                                  const defaultVal = ['aadhar', 'smart_card', 'voter_id'].includes(d.id) ? 2 : 1;
+                                  list = [...normalizedDocs, { id: d.id, val: defaultVal }];
+                                } else {
+                                  list = normalizedDocs.filter(x => x.id !== d.id);
+                                }
+                                setFormBuilder({ ...formBuilder, required_docs: list });
+                              }}
+                            />
+                            <span>{d.label}</span>
+                          </label>
+                          
+                          {isChecked && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Files:</span>
+                              <select
+                                value={activeDoc.val || 1}
+                                onChange={(e) => {
+                                  const newVal = parseInt(e.target.value) || 1;
+                                  const list = normalizedDocs.map(x => x.id === d.id ? { ...x, val: newVal } : x);
+                                  setFormBuilder({ ...formBuilder, required_docs: list });
+                                }}
+                                className="premium-input"
+                                style={{ padding: '2px 4px', fontSize: '0.75rem', width: 'auto', height: '24px' }}
+                              >
+                                <option value={1}>1 File (PDF/Image)</option>
+                                <option value={2}>2 Images (Front & Back)</option>
+                                <option value={3}>3 Images (Front, Back & Extra)</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -1631,37 +1689,53 @@ export default function AdminPortal() {
                       <button 
                         type="button" 
                         onClick={() => {
-                          setFormBuilder({ ...formBuilder, custom_docs: [...formBuilder.custom_docs, ''] });
+                          const currentCustom = normalizeCustomDocs(formBuilder.custom_docs);
+                          setFormBuilder({ ...formBuilder, custom_docs: [...currentCustom, { label: '', val: 1 }] });
                         }}
                         className="premium-btn premium-btn-success"
-                        style={{ padding: '2px 8px', fontSize: '0.7rem', width: 'auto' }}
+                        style={{ padding: '2px 8px', fontSize: '0.75rem', width: 'auto' }}
                       >
                         + Add Custom Label
                       </button>
                     </div>
-                    {formBuilder.custom_docs.map((docLabel, idx) => (
+                    {normalizeCustomDocs(formBuilder.custom_docs).map((doc, idx) => (
                       <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' }}>
                         <input 
                           type="text" 
                           placeholder="e.g. Self Declaration Form" 
-                          value={docLabel}
+                          value={doc.label}
                           onChange={(e) => {
-                            const list = [...formBuilder.custom_docs];
-                            list[idx] = e.target.value;
+                            const list = normalizeCustomDocs(formBuilder.custom_docs);
+                            list[idx].label = e.target.value;
                             setFormBuilder({ ...formBuilder, custom_docs: list });
                           }}
                           className="premium-input"
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
+                          style={{ padding: '6px', fontSize: '0.8rem', flex: 2 }}
                           required
                         />
+                        <select
+                          value={doc.val || 1}
+                          onChange={(e) => {
+                            const newVal = parseInt(e.target.value) || 1;
+                            const list = normalizeCustomDocs(formBuilder.custom_docs);
+                            list[idx].val = newVal;
+                            setFormBuilder({ ...formBuilder, custom_docs: list });
+                          }}
+                          className="premium-input"
+                          style={{ padding: '4px', fontSize: '0.8rem', flex: 1, height: '32px' }}
+                        >
+                          <option value={1}>1 File</option>
+                          <option value={2}>2 Images</option>
+                          <option value={3}>3 Images</option>
+                        </select>
                         <button 
                           type="button"
                           onClick={() => {
-                            const list = formBuilder.custom_docs.filter((_, i) => i !== idx);
+                            const list = normalizeCustomDocs(formBuilder.custom_docs).filter((_, i) => i !== idx);
                             setFormBuilder({ ...formBuilder, custom_docs: list });
                           }}
                           className="premium-btn premium-btn-danger"
-                          style={{ width: '28px', height: '28px', padding: 0 }}
+                          style={{ width: '32px', height: '32px', padding: 0 }}
                         >
                           <X size={14} />
                         </button>

@@ -998,3 +998,20 @@ select.premium-input:focus {
   }
 }
 
+/* Post flash highlight animation */
+@keyframes flash-highlight {
+  0% {
+    border-color: var(--primary);
+    box-shadow: 0 0 15px var(--primary);
+  }
+  100% {
+    border-color: rgba(0,0,0,0.06);
+    box-shadow: none;
+  }
+}
+
+.highlight-flash {
+  animation: flash-highlight 2s ease-out;
+  border: 2px solid var(--primary) !important;
+}
+

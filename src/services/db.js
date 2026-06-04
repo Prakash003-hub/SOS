@@ -116,7 +116,7 @@ export const uploadFileToDrive = async (file, folderPathArray) => {
     return response.downloadUrl;
   } catch (err) {
     console.error("File upload to Google Drive failed:", err);
-    throw new Error("Failed to store file in Google Drive. Make sure file size is under 5MB.");
+    throw new Error("Failed to store file in Google Drive. Make sure file size is under 10MB.");
   }
 };
 
