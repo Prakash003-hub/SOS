@@ -17,16 +17,16 @@ export default function Footer() {
             <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>TN sevai</span>
           </div>
           <p style={{ fontSize: '0.75rem', color: '#dcfce7', marginTop: '8px', lineHeight: '1.4' }}>
-            Official utility assistant for E-Sevai registration, PAN card, Voter ID, and other certificate registrations.
+              Assistant for E-Sevai , PAN card, Voter ID, and other certificate registrations.
           </p>
         </div>
 
         {/* Right Side: Contact Circle and description */}
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flex: '1 1 200px', justifyContent: 'flex-end', minWidth: '180px' }}>
           <div style={{ textAlign: 'right' }}>
-            <h4 style={{ fontSize: '0.85rem', color: 'white', marginBottom: '2px' }}>TN sevai Help Desk</h4>
+            <h4 style={{ fontSize: '0.85rem', color: 'white', marginBottom: '2px' }}>TN sevai WhatsApp no</h4>
             <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', marginTop: '2px', fontSize: '0.75rem', color: '#86efac', fontWeight: 700 }}>
-              <span><Phone size={10} style={{ display: 'inline', marginRight: '3px' }} /> +91 98765 43210</span>
+              <span><Phone size={10} style={{ display: 'inline', marginRight: '3px' }} /> +91 8300183615</span>
             </div>
           </div>
           <div className="circular-contact-badge" style={{ width: '64px', height: '64px', border: 'none', boxShadow: 'none', background: 'transparent', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
@@ -42,7 +42,7 @@ export default function Footer() {
       <div style={{ borderTop: '1px solid #15803d', paddingTop: '10px', marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.65rem', color: '#86efac' }}>
         <span>© 2026 TN sevai.</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-          E-Gov Assistant <ExternalLink size={8} />
+          Supporter Tec Boys <ExternalLink size={8} />
         </span>
       </div>
     </footer>

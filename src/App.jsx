@@ -56,7 +56,7 @@ function TrollPage() {
             margin: '0 0 6px 0',
             fontFamily: 'system-ui, sans-serif'
           }}>
-            வீரம் பல்பு வாங்கிய தருணம்
+            வீரன் பல்பு வாங்கிய தருணம்
           </h2>
           <p style={{
             margin: 0,
@@ -64,7 +64,7 @@ function TrollPage() {
             color: '#64748b',
             fontWeight: '600'
           }}>
-            Restricted Admin access area!
+            Restricted Admin access area!, Bye
           </p>
         </div>
 
@@ -100,7 +100,7 @@ function TrollPage() {
             marginTop: '8px'
           }}
         >
-          Return to Safety
+          Return to Safety...
         </button>
       </div>
     </div>
