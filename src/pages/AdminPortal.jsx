@@ -830,6 +830,8 @@ export default function AdminPortal() {
 
   return (
     <div className="layout-viewport-container">
+      <div className="app-mobile-container">
+        <div className="mobile-frame-content">
       
       {/* Secure Console Terminal Status Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#0f172a', color: 'white', borderRadius: '12px', margin: '16px 16px 0 16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
@@ -1831,45 +1833,114 @@ export default function AdminPortal() {
               <h3 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>
                 Platform Settings
               </h3>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  await updateSettings(settings);
-                  alert('Settings saved successfully!');
-                } catch (err) {
-                  console.error(err);
-                  alert('Failed to save settings.');
-                }
-              }}>
-                <div className="premium-input-group">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Admin Email */}
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    await updateSettings({ admin_email: settings.admin_email });
+                    alert('Admin Email saved successfully!');
+                  } catch (err) {
+                    alert('Failed to save email.');
+                  }
+                }} className="premium-input-group" style={{ margin: 0 }}>
                   <label className="premium-label">Admin Email Address</label>
-                  <input 
-                    type="email" 
-                    value={settings.admin_email} 
-                    onChange={(e) => setSettings({ ...settings, admin_email: e.target.value })} 
-                    placeholder="admin@example.com"
-                    className="premium-input" 
-                  />
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="email" 
+                      value={settings.admin_email || ''} 
+                      onChange={(e) => setSettings({ ...settings, admin_email: e.target.value })} 
+                      placeholder="admin@example.com"
+                      className="premium-input" 
+                    />
+                    <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 16px' }}>Update</button>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', marginTop: '4px', display: 'block' }}>
                     System notifications will be sent to this email.
                   </span>
-                </div>
+                </form>
 
-                <div className="premium-input-group" style={{ marginTop: '16px' }}>
-                  <label className="premium-label">Payment Number (GPay/UPI)</label>
-                  <input 
-                    type="text" 
-                    value={settings.payment_number || ''} 
-                    onChange={(e) => setSettings({ ...settings, payment_number: e.target.value })} 
-                    placeholder="e.g. 9876543210"
-                    className="premium-input" 
-                  />
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
-                    This number will be shown to users for direct UPI transfers.
+                {/* Admin Login Code */}
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    await updateSettings({ admin_login_code: settings.admin_login_code });
+                    alert('Admin Code saved successfully!');
+                  } catch (err) {
+                    alert('Failed to save Admin Code.');
+                  }
+                }} className="premium-input-group" style={{ margin: 0 }}>
+                  <label className="premium-label">Admin Login Code (PIN)</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="text" 
+                      value={settings.admin_login_code || ''} 
+                      onChange={(e) => setSettings({ ...settings, admin_login_code: e.target.value })} 
+                      placeholder="e.g. 123456"
+                      className="premium-input" 
+                    />
+                    <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 16px' }}>Update</button>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', marginTop: '4px', display: 'block' }}>
+                    Secure 6-digit PIN used to access this Admin Portal.
                   </span>
-                </div>
+                </form>
 
-                <div className="premium-input-group" style={{ marginTop: '16px' }}>
+                {/* App Installation Notification Toggle */}
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const newVal = settings.install_notification_enabled === 'true' ? 'false' : 'true';
+                    await updateSettings({ install_notification_enabled: newVal });
+                    setSettings({ ...settings, install_notification_enabled: newVal });
+                    alert(`Installation Notification turned ${newVal === 'true' ? 'ON' : 'OFF'}!`);
+                  } catch (err) {
+                    alert('Failed to toggle notification setting.');
+                  }
+                }} className="premium-input-group" style={{ margin: 0 }}>
+                  <label className="premium-label">Mobile App Installation Notification</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ flex: 1, padding: '12px 16px', background: '#f8fafc', border: '1.5px solid var(--border-light)', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                      Status: {settings.install_notification_enabled === 'true' ? <span style={{ color: 'var(--success)' }}>ON (Visible to Users)</span> : <span style={{ color: 'var(--error)' }}>OFF (Hidden)</span>}
+                    </div>
+                    <button type="submit" className="premium-btn premium-btn-secondary" style={{ width: 'auto', padding: '0 24px', height: '48px' }}>
+                      Toggle
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', marginTop: '4px', display: 'block' }}>
+                    If ON, users will see a prompt suggesting they "Add TN sevai to Home Screen".
+                  </span>
+                </form>
+
+                {/* Payment Number */}
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    await updateSettings({ payment_number: settings.payment_number });
+                    alert('Payment Number saved successfully!');
+                  } catch (err) {
+                    alert('Failed to save Payment Number.');
+                  }
+                }} className="premium-input-group" style={{ margin: 0 }}>
+                  <label className="premium-label">Payment Number (UPI/GPay)</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="text" 
+                      value={settings.payment_number || ''} 
+                      onChange={(e) => setSettings({ ...settings, payment_number: e.target.value })} 
+                      placeholder="e.g. 9876543210"
+                      className="premium-input" 
+                    />
+                    <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 16px' }}>Update</button>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', marginTop: '4px', display: 'block' }}>
+                    Used for direct UPI payments. This number will be hidden in the UI and linked dynamically via UPI.
+                  </span>
+                </form>
+
+                {/* Payment QR */}
+                <div className="premium-input-group" style={{ margin: 0 }}>
                   <label className="premium-label">Payment QR Code Upload</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {settings.qr_code_url && (
@@ -1890,6 +1961,8 @@ export default function AdminPortal() {
                               try {
                                 const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "System_Settings"]);
                                 setSettings({ ...settings, qr_code_url: url });
+                                await updateSettings({ qr_code_url: url });
+                                alert('QR Code updated successfully!');
                               } catch (err) {
                                 alert("Failed to upload QR code: " + err.message);
                               }
@@ -1901,7 +1974,11 @@ export default function AdminPortal() {
                       {settings.qr_code_url && (
                         <button 
                           type="button" 
-                          onClick={() => setSettings({ ...settings, qr_code_url: '' })}
+                          onClick={async () => {
+                            setSettings({ ...settings, qr_code_url: '' });
+                            await updateSettings({ qr_code_url: '' });
+                            alert('QR Code deleted successfully!');
+                          }}
                           className="premium-btn premium-btn-danger" 
                           style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', width: 'fit-content' }}
                         >
@@ -1915,10 +1992,7 @@ export default function AdminPortal() {
                   </span>
                 </div>
                 
-                <button type="submit" className="premium-btn premium-btn-primary" style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <Save size={16} /> Save Settings
-                </button>
-              </form>
+              </div>
             </div>
           </div>
         )}
@@ -2838,7 +2912,8 @@ export default function AdminPortal() {
           </span>
         </div>
       )}
-
+        </div>
+      </div>
     </div>
   );
 }

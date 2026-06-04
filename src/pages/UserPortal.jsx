@@ -165,6 +165,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   }, [activeTab, selectedJobDetails]);
   const [error, setError] = useState('');
   
+  // Install Prompt State
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
   // Wizard States
   const [selectedForm, setSelectedForm] = useState(null);
   const [wizardStep, setWizardStep] = useState(1); 
@@ -1020,16 +1023,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   };
 
-  const handleUpiPay = (fee, submissionId) => {
-    const pa = "9385497906@upi";
-    const pn = encodeURIComponent("TN sevai");
+  const handleUpiPay = (fee, submissionId, paymentNo) => {
+    const pa = paymentNo || "9385497906";
     const am = fee;
-    const cu = "INR";
-    const tn = encodeURIComponent(`TN_sevai_Pay_${submissionId}`);
-    const tr = `TN_sevai_Pay_${submissionId}`;
-    
-    // Direct Google Pay deep link using tez:// (native protocol for Google Pay Tez in India)
-    const payUrl = `tez://upi/pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
+    // Simplified UPI URL as requested: no extra data, just UPI ID and amount
+    const payUrl = `upi://pay?pa=${pa}&am=${am}`;
     
     // Attempt to open Google Pay directly
     window.location.href = payUrl;
@@ -2455,7 +2453,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {submissionResult.payment_status !== 'paid' && (() => {
                         const fee = selectedForm.fee || 0;
                         const paymentNo = systemSettings.payment_number || '9385497906';
-                        const upiUrl = `upi://pay?pa=${paymentNo}@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${submissionResult.id}`;
+                        // Keep UPI URL simple: just pa (payment address) and am (amount)
+                        const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
                         const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
                         const hideQr = !systemSettings.qr_code_url;
 
@@ -2486,7 +2485,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                               {/* Intent pay button */}
                               <button 
-                                onClick={() => handleUpiPay(fee, submissionResult.id)}
+                                onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo)}
                                 className="premium-btn"
                                 style={{ 
                                   display: 'flex', 
@@ -2752,7 +2751,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         const formTemplate = forms.find(f => f.id === app.form_id);
                         const fee = formTemplate?.fee || 0;
                         const paymentNo = systemSettings.payment_number || '9385497906';
-                        const upiUrl = `upi://pay?pa=${paymentNo}@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${app.id}`;
+                        const upiUrl = `upi://pay?pa=${paymentNo}&am=${fee}`;
                         const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
                         const hideQr = !systemSettings.qr_code_url;
 
@@ -2859,7 +2858,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                               {/* Pay Intent Button */}
                               <button 
-                                onClick={() => handleUpiPay(fee, app.id)}
+                                onClick={() => handleUpiPay(fee, app.id, paymentNo)}
                                 className="premium-btn"
                                 style={{ 
                                   display: 'flex', 
@@ -3285,6 +3284,61 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 Please wait a moment
               </span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* App Install Notification Popup */}
+      {showInstallPrompt && (
+        <div style={{
+          position: 'fixed',
+          bottom: showBottomNav ? '80px' : '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '90%',
+          maxWidth: '400px',
+          background: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)',
+          padding: '16px',
+          zIndex: 99999,
+          border: '1px solid #e2e8f0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          animation: 'slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f8fafc', padding: '4px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+              <img src="/whatsbro_logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b', fontWeight: '800' }}>Add TN sevai to Home Screen</h4>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Install our app for faster access and a better experience.</p>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => {
+                setShowInstallPrompt(false);
+                localStorage.setItem('hide_install_prompt', 'true');
+              }}
+              style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              Close
+            </button>
+            <button 
+              onClick={() => {
+                setShowInstallPrompt(false);
+                localStorage.setItem('hide_install_prompt', 'true');
+                alert("To install: Tap the browser menu (⋮) and select 'Add to Home screen' or 'Install App'.");
+              }}
+              className="premium-btn-primary"
+              style={{ flex: 2, padding: '10px', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              OK, Show me how
+            </button>
           </div>
         </div>
       )}
