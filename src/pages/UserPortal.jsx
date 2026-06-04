@@ -14,7 +14,8 @@ import {
   deleteUserDocument,
   loginUser,
   getJobs,
-  uploadFileToDrive
+  uploadFileToDrive,
+  getSettings
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -149,6 +150,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [jobs, setJobs] = useState([]);
   const [selectedJobDetails, setSelectedJobDetails] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'all');
+  const [systemSettings, setSystemSettings] = useState({});
   
   // Loading & error states
   const [loading, setLoading] = useState(false);
@@ -320,6 +322,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     fetchPosts();
     fetchForms();
     fetchJobs();
+    getSettings().then(data => {
+      if (data) setSystemSettings(data);
+    }).catch(err => console.error('Failed to load settings', err));
   }, []);
 
   useEffect(() => {
@@ -1285,6 +1290,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {/* --- TAB 1: HOME POSTS --- */}
         {activeTab === 'home' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
+            {currentUser && (
+              <div style={{ gridColumn: 'span 2', padding: '16px 8px 8px 8px' }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>
+                  Hi! {currentUser.name}
+                </h2>
+              </div>
+            )}
             {postsLoading ? (
               renderMintGreenLoader("LOADING...")
             ) : posts.length === 0 ? (
@@ -1339,7 +1351,64 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {/* --- TAB 1B: JOB ALERTS --- */}
         {activeTab === 'jobs' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
-            {jobsLoading ? (
+            {selectedJobDetails ? (
+              <div style={{ gridColumn: 'span 2' }}>
+                <div className="premium-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '6px solid var(--primary)', background: 'white', borderRadius: '16px' }}>
+                  
+                  {/* Nested Details Back Button */}
+                  <button 
+                    onClick={() => setSelectedJobDetails(null)} 
+                    className="premium-btn premium-btn-secondary" 
+                    style={{ width: 'fit-content', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}
+                  >
+                    <ArrowLeft size={16} /> Back to Jobs
+                  </button>
+
+                  <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0', lineHeight: '1.3' }}>
+                    {selectedJobDetails.title}
+                  </h2>
+
+                  {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
+                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', maxHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' }}>
+                      <img 
+                        src={getImageUrl(selectedJobDetails.img_url)} 
+                        style={{ width: '100%', maxHeight: '300px', objectFit: 'contain' }} 
+                        alt={selectedJobDetails.title} 
+                      />
+                    </div>
+                  )}
+
+                  <p style={{ color: '#475569', fontSize: '1rem', lineHeight: '1.6', margin: 0, paddingBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                    {selectedJobDetails.description}
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                    {parseDetailsDoc(selectedJobDetails.details_doc)}
+                  </div>
+
+                  {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' && (
+                    <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px' }}>
+                      <button 
+                        onClick={() => {
+                          const url = selectedJobDetails.apply_url;
+                          setSelectedJobDetails(null);
+                          if (url.startsWith('/user')) {
+                            const urlParams = new URLSearchParams(url.split('?')[1]);
+                            setSearchParams(urlParams);
+                          } else {
+                            window.open(url, '_blank');
+                          }
+                        }}
+                        className="premium-btn premium-btn-primary"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem' }}
+                      >
+                        {selectedJobDetails.button_name || 'Apply Now'} <ChevronRight size={20} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : jobsLoading ? (
               renderMintGreenLoader("LOADING...")
             ) : jobs.length === 0 ? (
               <div className="premium-card text-center" style={{ padding: '40px 20px', gridColumn: 'span 2' }}>
@@ -1415,36 +1484,47 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   </div>
                 ) : (
                   <div className="desktop-grid-2">
-                    {filteredForms.map((form) => (
-                      <div key={form.id} className="premium-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <span className="badge badge-info">{form.category}</span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Apply</span>
-                        </div>
-                        <h3 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>{form.title}</h3>
-                        
-                        {form.img_url && (
-                          <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
-                            <img src={getImageUrl(form.img_url)} alt={form.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {filteredForms.map((form) => {
+                      const fieldsCount = safeJsonParse(form.required_fields, []).length;
+                      const docsCount = safeJsonParse(form.required_docs, []).length;
+                      const isUpcoming = fieldsCount === 0 && docsCount === 0;
+
+                      return (
+                        <div key={form.id} className="premium-card">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                            <span className="badge badge-info">{form.category}</span>
+                            {isUpcoming ? (
+                              <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>Upcoming</span>
+                            ) : (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Apply</span>
+                            )}
                           </div>
-                        )}
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px' }}>
-                            Rs ₹{form.fee || 0}
-                          </span>
+                          <h3 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>{form.title}</h3>
+                          
+                          {form.img_url && (
+                            <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                              <img src={getImageUrl(form.img_url)} alt={form.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                          )}
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px' }}>
+                              Rs ₹{form.fee || 0}
+                            </span>
+                          </div>
+                          
+                          <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '16px' }}>{form.description}</p>
+                          <button 
+                            onClick={() => !isUpcoming && selectFormToFill(form)}
+                            className={`premium-btn ${isUpcoming ? 'premium-btn-secondary' : 'premium-btn-primary'}`}
+                            style={{ padding: '10px', opacity: isUpcoming ? 0.7 : 1, cursor: isUpcoming ? 'not-allowed' : 'pointer' }}
+                            disabled={isUpcoming}
+                          >
+                            {isUpcoming ? 'Upcoming soon' : 'Click to Apply'}
+                          </button>
                         </div>
-                        
-                        <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '16px' }}>{form.description}</p>
-                        <button 
-                          onClick={() => selectFormToFill(form)}
-                          className="premium-btn premium-btn-primary"
-                          style={{ padding: '10px' }}
-                        >
-                          Click toApply 
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -2369,8 +2449,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {/* Instant screenshot upload direct link in Receipt */}
                       {submissionResult.payment_status !== 'paid' && (() => {
                         const fee = selectedForm.fee || 0;
-                        const upiUrl = `upi://pay?pa=9385497906@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${submissionResult.id}`;
-                        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+                        const paymentNo = systemSettings.payment_number || '9385497906';
+                        const upiUrl = `upi://pay?pa=${paymentNo}@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${submissionResult.id}`;
+                        const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+                        const hideQr = !systemSettings.qr_code_url;
 
                         return (
                           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginTop: '16px' }}>
@@ -2386,14 +2468,16 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               </div>
 
                               {/* QR Code */}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '6px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                                <img 
-                                  src={qrCodeUrl} 
-                                  alt="UPI Payment QR Code" 
-                                  style={{ width: '120px', height: '120px' }} 
-                                />
-                                <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 'bold' }}>Scan to Pay using GPAY / any UPI</span>
-                              </div>
+                              {!hideQr && (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '6px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                                  <img 
+                                    src={qrCodeUrl} 
+                                    alt="UPI Payment QR Code" 
+                                    style={{ width: '120px', height: '120px', objectFit: 'contain' }} 
+                                  />
+                                  <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 'bold' }}>Scan to Pay using GPAY / any UPI</span>
+                                </div>
+                              )}
 
                               {/* Intent pay button */}
                               <button 
@@ -2441,7 +2525,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   Or send direct via GPay / UPI to number:
                                 </p>
                                 <span style={{ fontSize: '0.8rem', fontWeight: '900', color: '#1e293b', background: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                                  9385497906
+                                  {paymentNo}
                                 </span>
                               </div>
                             </div>
@@ -2662,8 +2746,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {app.payment_status === 'unpaid' && (() => {
                         const formTemplate = forms.find(f => f.id === app.form_id);
                         const fee = formTemplate?.fee || 0;
-                        const upiUrl = `upi://pay?pa=9385497906@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${app.id}`;
-                        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+                        const paymentNo = systemSettings.payment_number || '9385497906';
+                        const upiUrl = `upi://pay?pa=${paymentNo}@upi&pn=TN%20sevai&am=${fee}&cu=INR&tn=TN_sevai_Pay_${app.id}`;
+                        const qrCodeUrl = systemSettings.qr_code_url || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+                        const hideQr = !systemSettings.qr_code_url;
 
                         if (app.payment_screenshot) {
                           const isProofPdf = checkIfPdf(app.payment_screenshot);
@@ -2755,14 +2841,16 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               </div>
                               
                               {/* QR Code Container */}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '8px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                                <img 
-                                  src={qrCodeUrl} 
-                                  alt="UPI Payment QR Code" 
-                                  style={{ width: '130px', height: '130px' }} 
-                                />
-                                <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 'bold' }}>Scan QR Code with any UPI App</span>
-                              </div>
+                              {!hideQr && (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '8px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                                  <img 
+                                    src={qrCodeUrl} 
+                                    alt="UPI Payment QR Code" 
+                                    style={{ width: '130px', height: '130px', objectFit: 'contain' }} 
+                                  />
+                                  <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 'bold' }}>Scan QR Code with any UPI App</span>
+                                </div>
+                              )}
 
                               {/* Pay Intent Button */}
                               <button 
@@ -2804,13 +2892,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px' }}>GPay</span>
                               </button>
 
-                              {/* Direct Details */}
+                              {/* Direct number */}
                               <div style={{ textAlign: 'center', borderTop: '1px solid #cbd5e1', paddingTop: '10px', width: '100%' }}>
-                                <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0 0 4px 0', lineHeight: '1.4' }}>
-                                  Alternatively, pay direct via GPay / PhonePe / Paytm to:
+                                <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0 0 4px 0', fontWeight: '600' }}>
+                                  Or send direct via GPay / UPI to number:
                                 </p>
-                                <span style={{ fontSize: '0.85rem', fontWeight: '900', color: '#1e293b', background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px', display: 'inline-block' }}>
-                                  9385497906
+                                <span style={{ fontSize: '0.9rem', fontWeight: '900', color: '#1e293b', background: '#f1f5f9', padding: '4px 12px', borderRadius: '4px', display: 'inline-block' }}>
+                                  {paymentNo}
                                 </span>
                               </div>
                             </div>
@@ -3098,105 +3186,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         )}
       </div>
 
-      {/* Modal / Dialog for Job details */}
-      {selectedJobDetails && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.45)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          padding: '16px'
-        }}>
-          <div className="premium-card scroll-y" style={{ 
-            maxWidth: '650px', 
-            width: '100%', 
-            maxHeight: '90vh', 
-            padding: '24px', 
-            position: 'relative', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '16px', 
-            borderTop: '6px solid var(--primary)',
-            background: 'white',
-            borderRadius: '16px',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-            overflowY: 'auto'
-          }}>
-            
-            {/* Modal Close Button */}
-            <button 
-              onClick={() => setSelectedJobDetails(null)} 
-              className="premium-btn premium-btn-secondary" 
-              style={{ position: 'absolute', right: '16px', top: '16px', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, minWidth: 'auto' }}
-            >
-              ✕
-            </button>
 
-            {/* Modal Title */}
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0 24px 0 0', lineHeight: '1.3' }}>
-              {selectedJobDetails.title}
-            </h2>
-
-            {/* Modal Image */}
-            {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
-              <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', maxHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px 0' }}>
-                <img 
-                  src={getImageUrl(selectedJobDetails.img_url)} 
-                  style={{ width: '100%', maxHeight: '200px', objectFit: 'contain' }} 
-                  alt={selectedJobDetails.title} 
-                />
-              </div>
-            )}
-
-            {/* Modal Brief Description */}
-            <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: '1.6', margin: 0, paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-              {selectedJobDetails.description}
-            </p>
-
-            {/* Modal Rich Document parsed layout */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {parseDetailsDoc(selectedJobDetails.details_doc)}
-            </div>
-
-            {/* Modal Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '16px' }}>
-              <button 
-                onClick={() => setSelectedJobDetails(null)} 
-                className="premium-btn premium-btn-secondary" 
-                style={{ flex: 1 }}
-              >
-                Close
-              </button>
-
-              {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' && (
-                <button 
-                  onClick={() => {
-                    const url = selectedJobDetails.apply_url;
-                    setSelectedJobDetails(null);
-                    if (url.startsWith('/user')) {
-                      const urlParams = new URLSearchParams(url.split('?')[1]);
-                      setSearchParams(urlParams);
-                    } else {
-                      window.open(url, '_blank');
-                    }
-                  }}
-                  className="premium-btn premium-btn-primary"
-                  style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                >
-                  {selectedJobDetails.button_name || 'Apply Now'} <ChevronRight size={18} />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
       )}
 
       {loading && (

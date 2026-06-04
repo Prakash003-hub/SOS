@@ -82,7 +82,15 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
         <img 
           src="/whatsbro_logo.png" 
           alt="WhatsBro Logo" 
-          style={{ width: '48px', height: '48px', objectFit: 'contain' }} 
+          style={{ 
+            width: '48px', 
+            height: '48px', 
+            objectFit: 'contain',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none'
+          }} 
         />
         <div>
           <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>TN sevai</div>

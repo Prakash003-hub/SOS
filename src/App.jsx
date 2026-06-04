@@ -693,6 +693,78 @@ function PortalLayout() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showSplash) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#ffffff',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 999999,
+        animation: 'fadeOut 0.5s ease-in-out 1.5s forwards'
+      }}>
+        <style>{`
+          @keyframes slideUpFade {
+            0% { transform: translateY(30px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes pulseScale {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+          @keyframes fadeOut {
+            to { opacity: 0; visibility: hidden; }
+          }
+        `}</style>
+        <div style={{
+          animation: 'slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <img 
+            src="/whatsbro_logo.png" 
+            alt="Logo" 
+            style={{ 
+              width: '120px', 
+              height: '120px', 
+              objectFit: 'contain',
+              animation: 'pulseScale 2s ease-in-out infinite'
+            }} 
+          />
+          <h1 style={{
+            fontSize: '2.5rem',
+            fontWeight: '900',
+            color: '#1e293b',
+            margin: 0,
+            letterSpacing: '-1px'
+          }}>
+            TN sevai
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '1rem', fontWeight: '600', margin: 0 }}>
+            Online Service Portal
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <PortalLayout />

@@ -42,7 +42,7 @@ export default function Footer() {
       <div style={{ borderTop: '1px solid #15803d', paddingTop: '10px', marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.65rem', color: '#86efac' }}>
         <span>© 2026 TN sevai.</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-          Supporter Tec Boys <ExternalLink size={8} />
+          Powered by TEC Boys <ExternalLink size={8} />
         </span>
       </div>
     </footer>

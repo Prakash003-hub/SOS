@@ -28,7 +28,8 @@ import {
   deleteFeedback,
   getSettings,
   updateSettings,
-  uploadFormImage
+  uploadFormImage,
+  uploadFileToDrive
 } from '../services/db';
 import { 
   Plus, 
@@ -185,7 +186,7 @@ export default function AdminPortal() {
   const [feedbackSearchTerm, setFeedbackSearchTerm] = useState('');
   
   // Settings
-  const [settings, setSettings] = useState({ admin_email: '' });
+  const [settings, setSettings] = useState({ admin_email: '', payment_number: '', qr_code_url: '' });
   
   // Selected user details (Aadhaar click)
   const [selectedUser, setSelectedUser] = useState(null);
@@ -1896,8 +1897,56 @@ export default function AdminPortal() {
                     System notifications will be sent to this email.
                   </span>
                 </div>
+
+                <div className="premium-input-group" style={{ marginTop: '16px' }}>
+                  <label className="premium-label">Payment Number (GPay/UPI)</label>
+                  <input 
+                    type="text" 
+                    value={settings.payment_number || ''} 
+                    onChange={(e) => setSettings({ ...settings, payment_number: e.target.value })} 
+                    placeholder="e.g. 9876543210"
+                    className="premium-input" 
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
+                    This number will be shown to users for direct UPI transfers.
+                  </span>
+                </div>
+
+                <div className="premium-input-group" style={{ marginTop: '16px' }}>
+                  <label className="premium-label">Payment QR Code Upload</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {settings.qr_code_url && (
+                      <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+                        <img src={settings.qr_code_url} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)', width: 'fit-content' }}>
+                      <Upload size={16} style={{ color: 'var(--primary)' }} />
+                      <span>{settings.qr_code_url ? 'Replace QR Code' : 'Upload QR Code'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            try {
+                              const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "System_Settings"]);
+                              setSettings({ ...settings, qr_code_url: url });
+                            } catch (err) {
+                              alert("Failed to upload QR code: " + err.message);
+                            }
+                          }
+                        }}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
+                    Upload your GPay/UPI QR Code image. If uploaded, it will be shown to users instead of a dynamically generated one. If hidden, the QR section will be removed.
+                  </span>
+                </div>
                 
-                <button type="submit" className="premium-btn premium-btn-primary" style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button type="submit" className="premium-btn premium-btn-primary" style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <Save size={16} /> Save Settings
                 </button>
               </form>
