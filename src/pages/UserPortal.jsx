@@ -145,11 +145,11 @@ const STANDARD_FIELDS = {
   pincode: { label: 'Pin Code', type: 'number', required: false },
   address: { label: 'Address', type: 'textarea', required: false },
   
-  photo: { label: 'Photo Upload (image < 7MB)' },
-  aadhar_doc: { label: 'Aadhaar Upload (img/pdf < 5MB)' },
-  smart_card: { label: 'Smart Card Upload (img/pdf < 5MB)' },
-  voter_id: { label: 'Voter ID Upload (img/pdf < 5MB)' },
-  signature: { label: 'Signature Upload (img/pdf < 5MB)' }
+  photo: { label: 'Photo Upload (image < 10MB)' },
+  aadhar_doc: { label: 'Aadhaar Upload (img/pdf < 10MB)' },
+  smart_card: { label: 'Smart Card Upload (img/pdf < 10MB)' },
+  voter_id: { label: 'Voter ID Upload (img/pdf < 10MB)' },
+  signature: { label: 'Signature Upload (img/pdf < 10MB)' }
 };
 
 export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigger }) {
@@ -704,14 +704,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     return () => clearInterval(interval);
   }, [uploadStatuses]);
 
-  // Handle immediate upload for independent documents
   const handleImmediateUpload = async (docKey, uploadType, fileInputIdx, file) => {
     if (!file) return;
 
-    // Check size limit
-    const limit = docKey === 'photo' ? 7 * 1024 * 1024 : 5 * 1024 * 1024;
+    // Check size limit (10MB limit for each upload)
+    const limit = 10 * 1024 * 1024;
     if (file.size > limit) {
-      alert(`File size exceeds limit. ${docKey === 'photo' ? 'Photo' : 'Documents'} must be less than ${limit / (1024 * 1024)}MB.`);
+      alert(`File size exceeds limit. Files must be less than 10MB.`);
       return;
     }
 
@@ -728,14 +727,19 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       
       setUploadedUrls(prev => {
         const current = prev[docKey] || { type: uploadType };
+        let nextUrls;
         if (uploadType === 'pdf') {
-          return { ...prev, [docKey]: { type: 'pdf', url1: fileUrl, name1: file.name } };
+          nextUrls = { type: 'pdf', url1: fileUrl, name1: file.name };
         } else {
-          return { ...prev, [docKey]: { ...current, type: 'images', [`url${fileInputIdx}`]: fileUrl, [`name${fileInputIdx}`]: file.name } };
+          nextUrls = { ...current, type: 'images', [`url${fileInputIdx}`]: fileUrl, [`name${fileInputIdx}`]: file.name };
         }
+        
+        // Determine if upload is fully complete
+        const isComplete = nextUrls.type === 'pdf' || (nextUrls.url1 && nextUrls.url2);
+        setUploadStatuses(statusPrev => ({ ...statusPrev, [docKey]: isComplete ? 'uploaded' : 'partial' }));
+        
+        return { ...prev, [docKey]: nextUrls };
       });
-      
-      setUploadStatuses(prev => ({ ...prev, [docKey]: 'uploaded' }));
     } catch (err) {
       console.error(err);
       alert("Failed to upload " + docKey);
@@ -2277,10 +2281,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               </div>
                             ) : isUploaded && freshlyUploaded ? (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#f0fdf4', border: '1px solid #10b981', borderRadius: '6px' }}>
-                                <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', flex: 1, marginRight: '8px', wordBreak: 'break-all' }}>
                                   {freshlyUploaded.type === 'pdf' ? freshlyUploaded.name1 : `${freshlyUploaded.name1} & ${freshlyUploaded.name2}`}
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                                   <a 
                                     href={getImageUrl(freshlyUploaded.url1)} 
                                     target="_blank" 
@@ -2288,17 +2292,38 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                     className="premium-btn premium-btn-secondary"
                                     style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
                                   >
-                                    View
+                                    {freshlyUploaded.type === 'pdf' ? 'View' : 'View Front'}
                                   </a>
-                                  <label className="premium-btn premium-btn-primary" style={{ padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', margin: 0 }}>
-                                    Replace
-                                    <input 
-                                      type="file" 
-                                      accept={['photo', 'signature'].includes(docKey) ? 'image/*' : 'application/pdf,image/*'}
-                                      onChange={(e) => handleImmediateUpload(docKey, 'pdf', 1, e.target.files[0])}
-                                      style={{ display: 'none' }}
-                                    />
-                                  </label>
+                                  {freshlyUploaded.url2 && (
+                                    <a 
+                                      href={getImageUrl(freshlyUploaded.url2)} 
+                                      target="_blank" 
+                                      rel="noreferrer"
+                                      className="premium-btn premium-btn-secondary"
+                                      style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
+                                    >
+                                      View Back
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setUploadedUrls(prev => {
+                                        const copy = { ...prev };
+                                        delete copy[docKey];
+                                        return copy;
+                                      });
+                                      setUploadStatuses(prev => {
+                                        const copy = { ...prev };
+                                        delete copy[docKey];
+                                        return copy;
+                                      });
+                                    }}
+                                    className="premium-btn premium-btn-danger"
+                                    style={{ padding: '4px 10px', fontSize: '0.75rem', border: 'none', cursor: 'pointer' }}
+                                  >
+                                    Delete
+                                  </button>
                                 </div>
                               </div>
                             ) : (
@@ -2308,7 +2333,19 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   <div style={{ display: 'flex', backgroundColor: '#e2e8f0', borderRadius: '6px', padding: '2px', border: '1px solid #cbd5e1', marginBottom: '10px', maxWidth: '240px' }}>
                                     <button
                                       type="button"
-                                      onClick={() => setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'pdf' } }))}
+                                      onClick={() => {
+                                        setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'pdf' } }));
+                                        setUploadedUrls(prev => {
+                                          const copy = { ...prev };
+                                          delete copy[docKey];
+                                          return copy;
+                                        });
+                                        setUploadStatuses(prev => {
+                                          const copy = { ...prev };
+                                          delete copy[docKey];
+                                          return copy;
+                                        });
+                                      }}
                                       style={{
                                         flex: 1, padding: '4px 8px', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '600',
                                         backgroundColor: selectedType === 'pdf' ? '#10b981' : 'transparent',
@@ -2319,7 +2356,19 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'images' } }))}
+                                      onClick={() => {
+                                        setUploadedFiles(prev => ({ ...prev, [docKey]: { ...prev[docKey], type: 'images' } }));
+                                        setUploadedUrls(prev => {
+                                          const copy = { ...prev };
+                                          delete copy[docKey];
+                                          return copy;
+                                        });
+                                        setUploadStatuses(prev => {
+                                          const copy = { ...prev };
+                                          delete copy[docKey];
+                                          return copy;
+                                        });
+                                      }}
                                       style={{
                                         flex: 1, padding: '4px 8px', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '600',
                                         backgroundColor: selectedType === 'images' ? '#10b981' : 'transparent',
@@ -2348,10 +2397,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 ) : (
                                   <div style={{ display: 'flex', gap: '10px' }}>
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Front Side:</span>
-                                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', gap: '4px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                                        <Upload size={14} style={{ color: 'var(--primary)' }} />
-                                        <span>Upload Front</span>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Front Side:</span>
+                                        {uploadedUrls[docKey]?.url1 && (
+                                          <span style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 'bold' }}>✓ Uploaded</span>
+                                        )}
+                                      </div>
+                                      <label className="premium-btn premium-btn-secondary" style={{ 
+                                        padding: '8px', 
+                                        fontSize: '0.75rem', 
+                                        display: 'flex', 
+                                        gap: '4px', 
+                                        cursor: 'pointer', 
+                                        background: uploadedUrls[docKey]?.url1 ? '#f0fdf4' : 'white', 
+                                        border: uploadedUrls[docKey]?.url1 ? '1px solid #10b981' : '1px dashed var(--primary)',
+                                        color: uploadedUrls[docKey]?.url1 ? '#166534' : 'inherit'
+                                      }}>
+                                        <Upload size={14} style={{ color: uploadedUrls[docKey]?.url1 ? '#10b981' : 'var(--primary)' }} />
+                                        <span>{uploadedUrls[docKey]?.url1 ? 'Replace Front' : 'Upload Front'}</span>
                                         <input 
                                           type="file" 
                                           accept="image/*"
@@ -2361,10 +2424,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                       </label>
                                     </div>
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Back Side:</span>
-                                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', gap: '4px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)' }}>
-                                        <Upload size={14} style={{ color: 'var(--primary)' }} />
-                                        <span>Upload Back</span>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Back Side:</span>
+                                        {uploadedUrls[docKey]?.url2 && (
+                                          <span style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 'bold' }}>✓ Uploaded</span>
+                                        )}
+                                      </div>
+                                      <label className="premium-btn premium-btn-secondary" style={{ 
+                                        padding: '8px', 
+                                        fontSize: '0.75rem', 
+                                        display: 'flex', 
+                                        gap: '4px', 
+                                        cursor: 'pointer', 
+                                        background: uploadedUrls[docKey]?.url2 ? '#f0fdf4' : 'white', 
+                                        border: uploadedUrls[docKey]?.url2 ? '1px solid #10b981' : '1px dashed var(--primary)',
+                                        color: uploadedUrls[docKey]?.url2 ? '#166534' : 'inherit'
+                                      }}>
+                                        <Upload size={14} style={{ color: uploadedUrls[docKey]?.url2 ? '#10b981' : 'var(--primary)' }} />
+                                        <span>{uploadedUrls[docKey]?.url2 ? 'Replace Back' : 'Upload Back'}</span>
                                         <input 
                                           type="file" 
                                           accept="image/*"

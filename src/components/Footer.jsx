@@ -24,7 +24,7 @@ export default function Footer({ systemSettings }) {
             </div>
           </div>
           <div style={{ fontSize: '0.65rem', color: '#dcfce7', marginTop: '3px', opacity: 0.9 }}>
-            Govt Registration Assistant
+            Online Application Assistant
           </div>
         </div>
 
