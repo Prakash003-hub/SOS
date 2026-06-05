@@ -25,6 +25,9 @@ function formatDateString(val) {
     }
   }
   var str = val.toString().trim();
+  if (str.indexOf("'") === 0) {
+    str = str.substring(1);
+  }
   
   // If already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
@@ -50,9 +53,14 @@ function formatNumberString(val) {
   if (val === undefined || val === null || val === "") return "";
   var str = val.toString().trim();
   
+  // Strip leading single quote if it was added for text-forcing in sheets
+  if (str.indexOf("'") === 0) {
+    str = str.substring(1);
+  }
+  
   // Handle scientific notation (like 1.23456789012e11)
   if (str.indexOf("e") !== -1 || str.indexOf("E") !== -1) {
-    var num = Number(val);
+    var num = Number(str);
     if (!isNaN(num)) {
       return num.toFixed(0);
     }
