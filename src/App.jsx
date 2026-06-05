@@ -356,21 +356,21 @@ function PortalLayout() {
               className={`bottom-nav-item ${activeTab === 'apply' ? 'active' : ''}`}
             >
               <FileText className="bottom-nav-icon" size={20} />
-              <span>Apply</span>
+              <span>Application</span>
             </button>
             <button 
               onClick={() => handleTabChange('status')}
               className={`bottom-nav-item ${activeTab === 'status' ? 'active' : ''}`}
             >
               <CheckCircle className="bottom-nav-icon" size={20} />
-              <span>Status</span>
+              <span>Check Status</span>
             </button>
             <button 
               onClick={() => handleTabChange('jobs')}
               className={`bottom-nav-item ${activeTab === 'jobs' ? 'active' : ''}`}
             >
               <Briefcase className="bottom-nav-icon" size={20} />
-              <span>Jobs</span>
+              <span>Job alerts</span>
             </button>
           </div>
         )}

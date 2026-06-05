@@ -2669,7 +2669,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <div className="receipt-header" style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '12px', marginBottom: '16px' }}>
                         <h4 style={{ fontSize: '1.25rem', color: '#047857', margin: '0 0 6px 0', fontWeight: '900', textTransform: 'uppercase' }}>{selectedForm.title}</h4>
                         <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: '700', display: 'block', marginBottom: '4px' }}>TN SEVAI E-SERVICE</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Official E-Governance Receipt</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Official TN sevai E-Receipt</span>
                       </div>
                       
                       <div className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '8px' }}>
