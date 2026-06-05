@@ -91,13 +91,20 @@ export default async function handler(req, res) {
         if (type === 'job') actionName = 'getJobs';
         if (type === 'form') actionName = 'getForms';
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
         const response = await fetch(scriptUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8',
           },
-          body: JSON.stringify({ action: actionName })
+          body: JSON.stringify({ action: actionName }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+
         if (response.ok) {
           const json = await response.json();
           if (json.success && Array.isArray(json.data)) {
@@ -105,7 +112,7 @@ export default async function handler(req, res) {
           }
         }
       } catch (err) {
-        console.warn(`Failed to fetch ${type} from GAS, using local fallback:`, err);
+        console.warn(`Failed to fetch ${type} from GAS (timeout or network error), using local fallback:`, err);
       }
     }
 
@@ -127,6 +134,10 @@ export default async function handler(req, res) {
     if (fetchedData) {
       item = fetchedData.find(x => String(x.id) === String(id));
     }
+
+    // Add debug logging
+    console.log("Item:", item);
+    console.log("Image URL:", item?.img_url);
 
     // 4. Map tags and redirect paths
     if (item) {
