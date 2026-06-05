@@ -2113,7 +2113,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4', padding: '12px 16px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#065f46' }}>E-Gov Processing & Service Fee:</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#065f46' }}>Service Fee:</span>
                         <span style={{ fontSize: '1rem', fontWeight: 800, color: '#047857' }}>Rs. {selectedForm.fee || 0}</span>
                       </div>
                     </div>
