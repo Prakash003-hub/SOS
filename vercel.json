@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/post/:id",
+      "destination": "/api/share?type=post&id=:id"
+    },
+    {
+      "source": "/job/:id",
+      "destination": "/api/share?type=job&id=:id"
+    },
+    {
+      "source": "/form/:id",
+      "destination": "/api/share?type=form&id=:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
