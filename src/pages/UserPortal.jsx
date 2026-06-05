@@ -2708,7 +2708,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
  
                       {/* Instant screenshot upload direct link in Receipt */}
                       {submissionResult.payment_status !== 'paid' && (() => {
-                        const fee = selectedForm.fee || 0;
+                        const fee = Number(selectedForm.fee) || 0;
+                        if (!fee || fee <= 0) return null;
+                        
                         const paymentNo = systemSettings.payment_number || '';
                         const formattedVpa = formatUpiVpa(paymentNo);
                         // Keep UPI URL simple: just pa (payment address) and am (amount)
@@ -3034,7 +3036,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {/* Payment Action for Unpaid Status */}
                       {app.payment_status === 'unpaid' && (() => {
                         const formTemplate = forms.find(f => f.id === app.form_id);
-                        const fee = formTemplate?.fee || 0;
+                        const fee = formTemplate ? Number(formTemplate.fee) : 0;
+                        if (!fee || fee <= 0) return null;
+                        
                         const paymentNo = systemSettings.payment_number || '';
                         const formattedVpa = formatUpiVpa(paymentNo);
                         const upiUrl = `upi://pay?pa=${formattedVpa}&am=${fee}`;
@@ -3104,6 +3108,29 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   />
                                 </label>
                               </div>
+                            </div>
+                          );
+                        }
+
+                        if (String(app.pay_allowed).toLowerCase() !== 'true') {
+                          return (
+                            <div style={{ 
+                              background: '#fffbeb', 
+                              border: '1.5px solid #fef3c7', 
+                              borderRadius: '12px', 
+                              padding: '16px', 
+                              margin: '12px 0 16px 0',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <h4 style={{ fontSize: '0.9rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', margin: 0 }}>
+                                <Clock size={16} style={{ color: '#d97706' }} /> Verification In Progress
+                              </h4>
+                              <p style={{ fontSize: '0.82rem', color: '#78350f', fontWeight: '600', margin: 0 }}>
+                                Application is under verification, so please wait.
+                              </p>
                             </div>
                           );
                         }

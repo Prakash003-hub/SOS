@@ -364,7 +364,8 @@ export default function AdminPortal() {
     progress_desc: '',
     info_request_label: '',
     info_request_type: 'text',
-    other_doc_name: ''
+    other_doc_name: '',
+    pay_allowed: 'false'
   });
 
   // 1. Initial Load of DB Data - ONLY IF AUTHENTICATED
@@ -461,21 +462,46 @@ export default function AdminPortal() {
     }
   };
 
+  const sortItems = (list) => {
+    return [...list].sort((a, b) => {
+      const orderA = a.order_index === undefined || a.order_index === null ? 0 : Number(a.order_index);
+      const orderB = b.order_index === undefined || b.order_index === null ? 0 : Number(b.order_index);
+      if (orderA !== orderB) return orderA - orderB;
+      return Number(a.id || 0) - Number(b.id || 0);
+    });
+  };
+
   const moveItem = async (type, list, index, direction) => {
-    const sorted = [...list].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i].order_index === undefined) {
+    // 1. Sort the list by order_index ascending, fallback to id ascending
+    const sorted = sortItems(list);
+
+    // 2. Self-healing: if items have duplicates or undefined/0 order_index, sequentially re-index all of them
+    const needsInitialization = sorted.some((x, i) => {
+      if (x.order_index === undefined || x.order_index === null || Number(x.order_index) === 0) return true;
+      return sorted.findIndex(y => Number(y.order_index) === Number(x.order_index)) !== i;
+    });
+
+    if (needsInitialization) {
+      for (let i = 0; i < sorted.length; i++) {
         sorted[i].order_index = i;
+        try {
+          if (type === 'post') await updatePost(sorted[i].id, { order_index: i });
+          else if (type === 'job') await updateJob(sorted[i].id, { order_index: i });
+          else if (type === 'form') await updateForm(sorted[i].id, { order_index: i });
+        } catch (err) {
+          console.error(`Failed to initialize order_index for ${type} ${sorted[i].id}`, err);
+        }
       }
     }
-    
+
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= sorted.length) return;
-    
+
+    // 3. Swap the order_index
     const temp = sorted[index].order_index;
     sorted[index].order_index = sorted[targetIndex].order_index;
     sorted[targetIndex].order_index = temp;
-    
+
     try {
       if (type === 'post') {
         await updatePost(sorted[index].id, { order_index: sorted[index].order_index });
@@ -773,7 +799,8 @@ export default function AdminPortal() {
       progress_desc: sub.progress_desc || '',
       info_request_label: sub.info_request_label || '',
       info_request_type: sub.info_request_type || 'text',
-      other_doc_name: sub.other_doc_name || ''
+      other_doc_name: sub.other_doc_name || '',
+      pay_allowed: String(sub.pay_allowed || '').toLowerCase() === 'true' ? 'true' : 'false'
     });
     setTimeout(() => {
       document.getElementById('active-submission-dashboard')?.scrollIntoView({ behavior: 'smooth' });
@@ -928,7 +955,7 @@ export default function AdminPortal() {
   }
 
   return (
-    <div className="layout-viewport-container">
+    <div className="layout-viewport-container admin-portal-wrapper">
       <div className="app-mobile-container">
         <div className="mobile-frame-content">
       
@@ -1063,7 +1090,7 @@ export default function AdminPortal() {
               fontWeight: activeTab === 'users' ? 800 : 600
             }}
           >
-            Users
+            Users ({users.length})
           </button>
 
           <button
@@ -1202,7 +1229,7 @@ export default function AdminPortal() {
               <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
                 Active Posts Feed ({posts.length} Posts)
               </h4>
-              {[...posts].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).map((post, idx) => (
+              {sortItems(posts).map((post, idx) => (
                 <div key={post.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <h4 style={{ fontSize: '0.95rem', marginBottom: '4px' }}>{post.title}</h4>
@@ -1364,7 +1391,7 @@ export default function AdminPortal() {
               <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
                 Active Job Alerts ({jobs.length} Listings)
               </h4>
-              {[...jobs].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).map((job, idx) => (
+              {sortItems(jobs).map((job, idx) => (
                 <div key={job.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <h4 style={{ fontSize: '0.95rem', marginBottom: '4px' }}>{job.title}</h4>
@@ -1941,7 +1968,7 @@ export default function AdminPortal() {
               <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
                 Configured Templates ({forms.length} Templates)
               </h4>
-              {[...forms].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).map((form, idx) => (
+              {sortItems(forms).map((form, idx) => (
                 <div key={form.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
                   {form.img_url && (
                     <div style={{ width: '50px', height: '50px', marginRight: '12px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)', flexShrink: 0 }}>
@@ -2389,7 +2416,7 @@ export default function AdminPortal() {
               <div className="premium-card" style={{ borderTop: '6px solid var(--primary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <h3 style={{ fontSize: '1.1rem', margin: 0 }}>User Registrations Manager</h3>
+                    <h3 style={{ fontSize: '1.1rem', margin: 0 }}>User Registrations Manager ({filteredUsers.length})</h3>
                     <button 
                       onClick={() => handleExportToCsv(users, "citizen_profiles")}
                       className="premium-btn premium-btn-success"
@@ -2413,6 +2440,7 @@ export default function AdminPortal() {
 
                 <div style={{ border: '1px solid var(--border-light)', borderRadius: '10px', overflow: 'hidden' }}>
                   <div className="admin-table-header" style={{ display: 'flex', background: '#f1f5f9', padding: '10px 16px', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-light-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                    <span style={{ width: '40px' }}>#</span>
                     <span style={{ flex: 1.5 }}>USER NAME</span>
                     <span style={{ flex: 2 }}>AADHAAR CARD NO</span>
                     <span style={{ flex: 1.5 }}>PHONE NUMBER</span>
@@ -2426,8 +2454,11 @@ export default function AdminPortal() {
                       No user submissions matched your search query.
                     </div>
                   ) : (
-                    filteredUsers.map((user) => (
-                      <div key={user.aadhar} className="admin-user-row" style={{ fontSize: '0.85rem' }}>
+                    filteredUsers.map((user, idx) => (
+                      <div key={user.aadhar} className="admin-user-row" style={{ display: 'flex', alignItems: 'center', fontSize: '0.85rem' }}>
+                        <span style={{ width: '40px', fontWeight: 'bold', color: '#64748b' }}>
+                          {idx + 1}
+                        </span>
                         <span style={{ flex: 1.5, fontWeight: 700, color: 'var(--primary)' }}>
                           {user.name || 'Citizen User'}
                         </span>
@@ -2554,7 +2585,9 @@ export default function AdminPortal() {
                               ) : sub.payment_screenshot ? (
                                 <span className="badge badge-warning">Verify Screenshot</span>
                               ) : (
-                                <span className="badge badge-danger">Unpaid</span>
+                                <span className="badge" style={{ backgroundColor: String(sub.pay_allowed).toLowerCase() === 'true' ? '#14b8a6' : '#ef4444' }}>
+                                  {String(sub.pay_allowed).toLowerCase() === 'true' ? 'Pay Allowed' : 'Unpaid'}
+                                </span>
                               )}
                               <button
                                 type="button"
@@ -2859,6 +2892,19 @@ export default function AdminPortal() {
                             <option value="paid">Paid</option>
                             <option value="rejected">Rejected</option>
                           </select>
+                        </div>
+
+                        <div className="premium-input-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', marginBottom: '14px' }}>
+                          <input 
+                            type="checkbox"
+                            id="pay_allowed_checkbox"
+                            checked={statusForm.pay_allowed === 'true'}
+                            onChange={(e) => setStatusForm({ ...statusForm, pay_allowed: e.target.checked ? 'true' : 'false' })}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                          />
+                          <label htmlFor="pay_allowed_checkbox" style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', cursor: 'pointer', margin: 0 }}>
+                            Allow User to Pay (Verify & Enable UPI)
+                          </label>
                         </div>
 
                         <div className="premium-input-group">

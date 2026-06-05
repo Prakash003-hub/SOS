@@ -259,11 +259,11 @@ function doPost(e) {
 
 function getPostsAction() {
   var rows = getRowsFromSheet("Posts");
-  // Sort posts descending by order_index, then by id
+  // Sort posts ascending by order_index, then by id descending (newest first for same index)
   rows.sort(function(a, b) {
     var orderA = parseInt(a.order_index) || 0;
     var orderB = parseInt(b.order_index) || 0;
-    if (orderB !== orderA) return orderB - orderA;
+    if (orderA !== orderB) return orderA - orderB;
     return b.id - a.id; 
   });
   return rows;
@@ -314,11 +314,11 @@ function deletePostAction(id) {
 
 function getJobsAction() {
   var rows = getRowsFromSheet("Jobs");
-  // Sort jobs descending by order_index, then by id
+  // Sort jobs ascending by order_index, then by id descending (newest first for same index)
   rows.sort(function(a, b) { 
     var orderA = parseInt(a.order_index) || 0;
     var orderB = parseInt(b.order_index) || 0;
-    if (orderB !== orderA) return orderB - orderA;
+    if (orderA !== orderB) return orderA - orderB;
     return b.id - a.id; 
   });
   return rows;
@@ -373,6 +373,13 @@ function deleteJobAction(id) {
 
 function getFormsAction() {
   var rows = getRowsFromSheet("Forms");
+  // Sort forms ascending by order_index, then by id descending (newest first for same index)
+  rows.sort(function(a, b) { 
+    var orderA = parseInt(a.order_index) || 0;
+    var orderB = parseInt(b.order_index) || 0;
+    if (orderA !== orderB) return orderA - orderB;
+    return b.id - a.id; 
+  });
   return rows.map(function(row) {
     return {
       id: row.id,
@@ -1381,6 +1388,7 @@ function initSpreadsheet() {
   ensureColumnExists(subSheet, "certificate_url");
   ensureColumnExists(subSheet, "other_doc_url");
   ensureColumnExists(subSheet, "other_doc_name");
+  ensureColumnExists(subSheet, "pay_allowed");
   
   // 4. POSTS FEED SHEET
   var postsSheet = ensureSheetExists("Posts", [
