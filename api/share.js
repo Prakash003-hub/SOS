@@ -34,7 +34,7 @@ const getGoogleDriveId = (url) => {
 };
 
 const getImageUrl = (url, baseUrl) => {
-  if (!url) return `${baseUrl}/income_og_preview.png`; // Default fallback logo
+  if (!url) return `${baseUrl}/income_og_preview.jpg`; // Default fallback logo
   if (url.startsWith('http://') || url.startsWith('https://')) {
     if (url.includes('drive.google.com')) {
       const driveId = getGoogleDriveId(url);
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
   let redirectPath = '/user';
   let title = 'TN Sevai Portal';
   let description = 'Apply for E-Sevai services, view job alerts, and stay updated.';
-  let imageUrl = `${baseUrl}/income_og_preview.png`;
+  let imageUrl = `${baseUrl}/income_og_preview.jpg`;
   let item = null;
 
   try {
