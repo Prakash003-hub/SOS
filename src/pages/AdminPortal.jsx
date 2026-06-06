@@ -2242,9 +2242,20 @@ export default function AdminPortal() {
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)', width: 'fit-content' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-light-muted)' }}>Target Aspect Ratio:</span>
+                        <select 
+                          id="og-aspect-ratio-select" 
+                          className="premium-input" 
+                          style={{ padding: '6px 10px', fontSize: '0.8rem', height: '34px', width: 'fit-content' }}
+                        >
+                          <option value="landscape">1.91:1 Landscape (1200x630)</option>
+                          <option value="square">1:1 Square (1024x1024)</option>
+                        </select>
+                      </div>
+                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)', width: 'fit-content', margin: 0 }}>
                         <Upload size={16} style={{ color: 'var(--primary)' }} />
-                        <span>Upload & Auto-Crop OG Image</span>
+                        <span>Upload & Process OG Image</span>
                         <input 
                           type="file" 
                           accept="image/*"
@@ -2255,6 +2266,8 @@ export default function AdminPortal() {
                                 alert("This feature is only available during local development (localhost) because it writes directly to your local 'public/' directory.");
                                 return;
                               }
+                              
+                              const aspect = document.getElementById('og-aspect-ratio-select').value;
                               
                               try {
                                 const reader = new FileReader();
@@ -2267,11 +2280,14 @@ export default function AdminPortal() {
                                       headers: {
                                         'Content-Type': 'application/json'
                                       },
-                                      body: JSON.stringify({ image: base64Str })
+                                      body: JSON.stringify({ image: base64Str, aspect: aspect })
                                     });
                                     const resData = await response.json();
                                     if (resData.success) {
-                                      alert("OG Image successfully cropped to 1200x630, compressed, and saved to public/income_og_preview.jpg! Please push your code to GitHub to deploy.");
+                                      alert(aspect === 'landscape' 
+                                        ? "OG Image successfully cropped to 1200x630, compressed, and saved to public/income_og_preview.jpg! Please push your code to GitHub to deploy."
+                                        : "OG Image successfully resized to 1024x1024, compressed, and saved to public/income_og_preview.jpg! Please push your code to GitHub to deploy."
+                                      );
                                       window.location.reload();
                                     } else {
                                       alert("Failed to process image: " + resData.error);
