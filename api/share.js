@@ -82,17 +82,37 @@ export default async function handler(req, res) {
 
   try {
     const scriptUrl = process.env.VITE_GOOGLE_SCRIPT_URL || process.env.GOOGLE_SCRIPT_URL;
-    let fetchedData = null;
 
-    // 1. Try to fetch live data from GAS if configured
-    if (scriptUrl) {
+    // 1. Read local database first to minimize time delay for static items
+    const dataPath = path.join(process.cwd(), 'src/data.json');
+    let mockData = { forms: [], posts: [] };
+    try {
+      mockData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+    } catch (e) {
+      console.error('Failed to read local data.json:', e);
+    }
+
+    let localItems = [];
+    if (type === 'post') {
+      localItems = mockData.posts || [];
+    } else if (type === 'form') {
+      localItems = mockData.forms || [];
+    } else if (type === 'job') {
+      localItems = defaultMockJobs;
+    }
+
+    // Try to find the item locally first (extremely fast, no network delay)
+    item = localItems.find(x => String(x.id) === String(id));
+
+    // 2. If not found locally, fetch live data from GAS (with reduced timeout of 1.2s to prevent bot timeouts)
+    if (!item && scriptUrl) {
       try {
         let actionName = 'getPosts';
         if (type === 'job') actionName = 'getJobs';
         if (type === 'form') actionName = 'getForms';
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), 1200); // 1.2s timeout
 
         const response = await fetch(scriptUrl, {
           method: 'POST',
@@ -108,31 +128,12 @@ export default async function handler(req, res) {
         if (response.ok) {
           const json = await response.json();
           if (json.success && Array.isArray(json.data)) {
-            fetchedData = json.data;
+            item = json.data.find(x => String(x.id) === String(id));
           }
         }
       } catch (err) {
-        console.warn(`Failed to fetch ${type} from GAS (timeout or network error), using local fallback:`, err);
+        console.warn(`Failed to fetch ${type} from GAS (timeout or network error):`, err);
       }
-    }
-
-    // 2. Local Fallback Database
-    if (!fetchedData) {
-      const dataPath = path.join(process.cwd(), 'src/data.json');
-      const mockData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-
-      if (type === 'post') {
-        fetchedData = mockData.posts || [];
-      } else if (type === 'form') {
-        fetchedData = mockData.forms || [];
-      } else if (type === 'job') {
-        fetchedData = defaultMockJobs;
-      }
-    }
-
-    // 3. Find the item
-    if (fetchedData) {
-      item = fetchedData.find(x => String(x.id) === String(id));
     }
 
     // Add debug logging
