@@ -2228,6 +2228,72 @@ export default function AdminPortal() {
                     Upload your GPay/UPI QR Code image. If uploaded, it will be shown to users instead of a dynamically generated one. If hidden, the QR section will be removed.
                   </span>
                 </div>
+
+                {/* OG Image Upload */}
+                <div className="premium-input-group" style={{ margin: 0, borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
+                  <label className="premium-label">Open Graph (OG) Image Upload (Local Dev Only)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '152px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#f1f5f9' }}>
+                      <img 
+                        src={`/income_og_preview.jpg?t=${Date.now()}`} 
+                        alt="Current OG Image" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        onError={(e) => { e.target.src = '/whatsbro_logo.png' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)', width: 'fit-content' }}>
+                        <Upload size={16} style={{ color: 'var(--primary)' }} />
+                        <span>Upload & Auto-Crop OG Image</span>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                                alert("This feature is only available during local development (localhost) because it writes directly to your local 'public/' directory.");
+                                return;
+                              }
+                              
+                              try {
+                                const reader = new FileReader();
+                                reader.readAsDataURL(file);
+                                reader.onload = async () => {
+                                  try {
+                                    const base64Str = reader.result;
+                                    const response = await fetch('/api/upload-og-image', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json'
+                                      },
+                                      body: JSON.stringify({ image: base64Str })
+                                    });
+                                    const resData = await response.json();
+                                    if (resData.success) {
+                                      alert("OG Image successfully cropped to 1200x630, compressed, and saved to public/income_og_preview.jpg! Please push your code to GitHub to deploy.");
+                                      window.location.reload();
+                                    } else {
+                                      alert("Failed to process image: " + resData.error);
+                                    }
+                                  } catch (err) {
+                                    alert("Error uploading image: " + err.message);
+                                  }
+                                };
+                              } catch (err) {
+                                alert("Failed to read file: " + err.message);
+                              }
+                            }
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
+                    Upload any image (square, landscape, or letterboxed). The local development server will automatically crop the boundaries, resize it to exactly **1200 × 630**, compress it, and overwrite `public/income_og_preview.jpg`! Then, simply push the file to GitHub.
+                  </span>
+                </div>
                 
                 {/* Public Announcement / Alert Notification Manager */}
                 <div style={{ borderTop: '1.5px dashed var(--border-light)', paddingTop: '20px', marginTop: '20px' }}>
