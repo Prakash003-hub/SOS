@@ -32,7 +32,6 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
   const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   // Review form states
-  const [reviewName, setReviewName] = useState(currentUser ? currentUser.name : '');
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
@@ -60,11 +59,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
     }
   }, [isFeedbackOpen]);
 
-  useEffect(() => {
-    if (currentUser) {
-      setReviewName(currentUser.name);
-    }
-  }, [currentUser]);
+
 
   const getAvatarUrl = () => {
     if (currentUser && currentUser.photo_url) {
@@ -88,7 +83,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
     setReviewSubmitting(true);
     try {
       await submitFeedback(
-        reviewName || 'Anonymous',
+        currentUser ? currentUser.name : 'Anonymous',
         currentUser ? currentUser.phone : '',
         currentUser ? currentUser.aadhar : '',
         reviewText,
@@ -486,57 +481,55 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                 </div>
 
                 {/* Review form */}
-                <form onSubmit={handleReviewSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: '700', color: '#475569' }}>Name</label>
-                      <input 
-                        type="text" 
-                        value={reviewName} 
-                        onChange={(e) => setReviewName(e.target.value)} 
-                        required 
-                        placeholder="Your name" 
-                        style={{ padding: '6px 10px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: '700', color: '#475569' }}>Rating</label>
-                      <div style={{ display: 'flex', gap: '2px', height: '28px', alignItems: 'center' }}>
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setReviewRating(star)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: star <= reviewRating ? '#f59e0b' : '#cbd5e1', padding: 0 }}
-                          >
-                            ★
-                          </button>
-                        ))}
+                {currentUser ? (
+                  <form onSubmit={handleReviewSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1e293b' }}>
+                        Review as: <span style={{ color: 'var(--primary)', fontWeight: '800' }}>{currentUser.name}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Rating:</span>
+                        <div style={{ display: 'flex', gap: '2px', height: '28px', alignItems: 'center' }}>
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setReviewRating(star)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: star <= reviewRating ? '#f59e0b' : '#cbd5e1', padding: 0 }}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: '700', color: '#475569' }}>Message</label>
-                    <textarea
-                      rows={2}
-                      value={reviewText}
-                      onChange={(e) => setReviewText(e.target.value)}
-                      required
-                      placeholder="Share your experience..."
-                      style={{ padding: '6px 10px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', resize: 'none', outline: 'none', fontFamily: 'inherit' }}
-                    />
-                  </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <textarea
+                        rows={2}
+                        value={reviewText}
+                        onChange={(e) => setReviewText(e.target.value)}
+                        required
+                        placeholder="Share your experience..."
+                        style={{ padding: '6px 10px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', resize: 'none', outline: 'none', fontFamily: 'inherit' }}
+                      />
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={reviewSubmitting}
-                    className="premium-btn premium-btn-success"
-                    style={{ padding: '6px 12px', fontSize: '0.72rem', alignSelf: 'flex-end', width: 'auto', fontWeight: '700' }}
-                  >
-                    {reviewSubmitting ? 'Submitting...' : 'Submit'}
-                  </button>
-                </form>
+                    <button
+                      type="submit"
+                      disabled={reviewSubmitting}
+                      className="premium-btn premium-btn-success"
+                      style={{ padding: '6px 12px', fontSize: '0.72rem', alignSelf: 'flex-end', width: 'auto', fontWeight: '700' }}
+                    >
+                      {reviewSubmitting ? 'Submitting...' : 'Submit'}
+                    </button>
+                  </form>
+                ) : (
+                  <div style={{ padding: '12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '0.72rem', color: '#991b1b', fontWeight: '600', textAlign: 'center' }}>
+                    🔒 Please log in to write a review.
+                  </div>
+                )}
 
                 {/* Reviews List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
