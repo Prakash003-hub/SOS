@@ -63,6 +63,18 @@ const defaultMockJobs = [
     title: "TNPSC Group 4 Openings",
     description: "TNPSC has released the recruitment notification for Group 4 services including VAO, Junior Assistant, and Typist. Minimum qualification: 10th standard pass. Apply today through the official channel.",
     img_url: ""
+  },
+  {
+    id: "csir-csmcri",
+    title: "CSIR-CSMCRI JRF & Project Assistant Recruitment",
+    description: "CSIR - Central Salt and Marine Chemicals Research Institute invites applications for research fellows and project assistants. Apply online.",
+    img_url: "https://upload.wikimedia.org/wikipedia/commons/e/e4/CSIR_India_logo.png"
+  },
+  {
+    id: "tnpsc-group-4",
+    title: "TNPSC Group 4 Exam Recruitment 2026",
+    description: "Official recruitment for TNPSC Group 4 services (VAO, Typist, Junior Assistant). Check eligibility, syllabus and apply now.",
+    img_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Tamil_Nadu_State_Emblem.svg/512px-Tamil_Nadu_State_Emblem.svg.png"
   }
 ];
 
