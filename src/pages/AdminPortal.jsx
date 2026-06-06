@@ -206,6 +206,48 @@ const resizeQRImage = (file) => {
   });
 };
 
+const cropToSquareImage = (file, size = 600) => {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        
+        // Find the smaller side for centered crop
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+        
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const croppedFile = new File([blob], file.name, {
+            type: file.type || 'image/png',
+            lastModified: Date.now(),
+          });
+          resolve(croppedFile);
+        }, file.type || 'image/png', 0.85);
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
 const handleExportToCsv = (submissionsList, customTitle = "submissions_export") => {
   if (!submissionsList || submissionsList.length === 0) {
     alert("No submissions available to export.");
@@ -490,7 +532,8 @@ export default function AdminPortal() {
     if (!file) return;
     setUploadingPostImg(true);
     try {
-      const res = await uploadPostImage(file);
+      const croppedFile = await cropToSquareImage(file, 600);
+      const res = await uploadPostImage(croppedFile);
       setPostForm(prev => ({ ...prev, img_url: res.img_url }));
       alert('Post image uploaded successfully!');
     } catch (err) {
@@ -611,7 +654,8 @@ export default function AdminPortal() {
     if (!file) return;
     setUploadingJobImg(true);
     try {
-      const res = await uploadJobImage(file);
+      const croppedFile = await cropToSquareImage(file, 600);
+      const res = await uploadJobImage(croppedFile);
       setJobForm(prev => ({ ...prev, img_url: res.img_url }));
       alert('Job banner image uploaded successfully!');
     } catch (err) {
@@ -1198,11 +1242,11 @@ export default function AdminPortal() {
                   <label className="premium-label">Post Banner Image (Optional)</label>
                   
                   {postForm.img_url && (
-                    <div style={{ marginBottom: '10px', position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                    <div style={{ marginBottom: '10px', position: 'relative', width: '140px', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
                       <img 
                         src={getImageUrl(postForm.img_url)} 
                         alt="Uploaded preview" 
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f8fafc' }} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#f8fafc' }} 
                       />
                       <button 
                         type="button" 
@@ -1331,11 +1375,11 @@ export default function AdminPortal() {
                   <label className="premium-label">Job Banner Image (Optional)</label>
                   
                   {jobForm.img_url && (
-                    <div style={{ marginBottom: '10px', position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                    <div style={{ marginBottom: '10px', position: 'relative', width: '140px', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
                       <img 
                         src={getImageUrl(jobForm.img_url)} 
                         alt="Uploaded preview" 
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f8fafc' }} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#f8fafc' }} 
                       />
                       <button 
                         type="button" 

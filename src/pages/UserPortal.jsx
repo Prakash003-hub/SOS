@@ -1861,10 +1861,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     </h3>
 
                     {post.img_url && post.img_url.trim() !== '' && (
-                      <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', maxHeight: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <img 
                           src={getImageUrl(post.img_url)} 
-                          style={{ width: '100%', maxHeight: '280px', objectFit: 'contain' }} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                           alt={post.title} 
                         />
                       </div>
@@ -1938,10 +1938,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   </h2>
 
                   {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
-                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', maxHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' }}>
+                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' }}>
                       <img 
                         src={getImageUrl(selectedJobDetails.img_url)} 
-                        style={{ width: '100%', maxHeight: '300px', objectFit: 'contain' }} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                         alt={selectedJobDetails.title} 
                       />
                     </div>
@@ -2013,10 +2013,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     </h3>
 
                     {job.img_url && job.img_url.trim() !== '' && (
-                      <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', maxHeight: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <img 
                           src={getImageUrl(job.img_url)} 
-                          style={{ width: '100%', maxHeight: '280px', objectFit: 'contain' }} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                           alt={job.title} 
                         />
                       </div>
