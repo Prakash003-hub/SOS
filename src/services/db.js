@@ -262,6 +262,10 @@ export const verifyOtp = async (email, otp) => {
   return await callApi("verifyOtp", { payload: { email, otp } });
 };
 
+export const checkAadhar = async (aadhar) => {
+  return await callApi("checkAadhar", { payload: { aadhar } });
+};
+
 export const verifyAdminLogin = async (code) => {
   return await callApi("verifyAdminLogin", { payload: { code } });
 };
@@ -546,6 +550,10 @@ export const getFeedback = async () => {
 
 export const deleteFeedback = async (id) => {
   return await callApi("deleteFeedback", { id });
+};
+
+export const replyFeedback = async (id, responseText) => {
+  return await callApi("replyFeedback", { id, responseText });
 };
 
 // --- SETTINGS SERVICE ---
@@ -853,6 +861,18 @@ const callMockFallback = (action, payload) => {
       return { success: true };
     }
     
+    case "replyFeedback": {
+      let feedList = JSON.parse(localStorage.getItem('mock_feedback') || '[]');
+      const index = feedList.findIndex(f => f.id === payload.id);
+      if (index !== -1) {
+        feedList[index].admin_response = payload.responseText;
+        feedList[index].response_at = new Date().toISOString();
+        localStorage.setItem('mock_feedback', JSON.stringify(feedList));
+        return feedList[index];
+      }
+      throw new Error("Feedback entry not found.");
+    }
+    
     case "getSettings":
       return JSON.parse(localStorage.getItem('mock_settings') || '{"admin_email":""}');
       
@@ -917,6 +937,24 @@ const callMockFallback = (action, payload) => {
         return { success: true, verified: true };
       }
       return { success: false, verified: false };
+      
+    case "checkAadhar": {
+      console.log(`[Mock] Simulating Aadhar check for ${payload.payload.aadhar}`);
+      const list = getMockList('mock_users') || [];
+      const cleaned = payload.payload.aadhar.replace(/\s/g, '');
+      const matched = list.find(u => u.aadhar.replace(/\s/g, '') === cleaned);
+      if (matched) {
+        return {
+          exists: true,
+          user: {
+            name: matched.name || "Mock User",
+            phone: matched.phone || "",
+            aadhar_prefix: matched.aadhar.substring(0, 4)
+          }
+        };
+      }
+      return { exists: false };
+    }
       
     case "verifyAdminLogin":
       console.log(`[Mock] Simulating Admin Login with code ${payload.payload.code}`);

@@ -16,7 +16,12 @@ import {
   getJobs,
   uploadFileToDrive,
   getSettings,
-  getAnnouncements
+  getAnnouncements,
+  sendOtp,
+  verifyOtp,
+  checkAadhar,
+  getFeedback,
+  submitFeedback
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -234,6 +239,29 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [userApplications, setUserApplications] = useState([]);
   const [hasSearchedStatus, setHasSearchedStatus] = useState(false);
   const [uploadingScreenshotId, setUploadingScreenshotId] = useState(null);
+
+  // Feedback, reviews, and support chat states
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [newReviewName, setNewReviewName] = useState(currentUser ? currentUser.name : '');
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewText, setNewReviewText] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [newChatText, setNewChatText] = useState('');
+  const [chatSubmitting, setChatSubmitting] = useState(false);
+
+  // Guest Verification States
+  const [showGuestVerification, setShowGuestVerification] = useState(false);
+  const [guestAadhar, setGuestAadhar] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [guestOtp, setGuestOtp] = useState('');
+  const [lookupAadharStatus, setLookupAadharStatus] = useState(null); // 'checking', 'new_user', 'existing_user'
+  const [matchedUserPrefills, setMatchedUserPrefills] = useState(null);
+  const [guestVerifyError, setGuestVerifyError] = useState('');
+  const [verifyingAadhar, setVerifyingAadhar] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const [infoRequestTexts, setInfoRequestTexts] = useState({});
   const [infoRequestFiles, setInfoRequestFiles] = useState({});
@@ -638,7 +666,91 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   // Proceed from Step 1 (Instructions) to Step 2 (Form details)
   const handleProceedToForm = () => {
-    setWizardStep(2);
+    if (!currentUser) {
+      setShowGuestVerification(true);
+      setGuestAadhar('');
+      setGuestEmail('');
+      setShowOtpInput(false);
+      setGuestOtp('');
+      setLookupAadharStatus(null);
+      setMatchedUserPrefills(null);
+      setGuestVerifyError('');
+    } else {
+      setWizardStep(2);
+    }
+  };
+
+  const handleVerifyGuestAadhar = async (e) => {
+    e.preventDefault();
+    if (!guestAadhar || !guestAadhar.match(/^\d{12}$/)) {
+      setGuestVerifyError("Please enter a valid 12-digit Aadhaar number.");
+      return;
+    }
+    setGuestVerifyError("");
+    setVerifyingAadhar(true);
+    try {
+      const res = await checkAadhar(guestAadhar);
+      if (res && res.exists) {
+        setLookupAadharStatus('existing_user');
+        setMatchedUserPrefills(res.user);
+      } else {
+        setLookupAadharStatus('new_user');
+      }
+    } catch (err) {
+      console.error(err);
+      setGuestVerifyError(err.message || "Failed to verify Aadhaar.");
+    } finally {
+      setVerifyingAadhar(false);
+    }
+  };
+
+  const handleSendGuestOtp = async () => {
+    if (!guestEmail || !guestEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      setGuestVerifyError("Please enter a valid Email address.");
+      return;
+    }
+    setGuestVerifyError("");
+    setSendingOtp(true);
+    try {
+      await sendOtp(guestEmail);
+      setShowOtpInput(true);
+      alert("OTP sent to your email address!");
+    } catch (err) {
+      console.error(err);
+      setGuestVerifyError(err.message || "Failed to send OTP.");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyGuestOtp = async (e) => {
+    e.preventDefault();
+    if (!guestOtp || guestOtp.length !== 6) {
+      setGuestVerifyError("Please enter the 6-digit OTP code.");
+      return;
+    }
+    setGuestVerifyError("");
+    setVerifyingOtp(true);
+    try {
+      const res = await verifyOtp(guestEmail, guestOtp);
+      if (res && res.verified) {
+        alert("Verification successful!");
+        setFormData(prev => ({ 
+          ...prev, 
+          aadhar: guestAadhar,
+          email: guestEmail
+        }));
+        setShowGuestVerification(false);
+        setWizardStep(2);
+      } else {
+        setGuestVerifyError("Invalid OTP. Please check and try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      setGuestVerifyError(err.message || "Verification failed.");
+    } finally {
+      setVerifyingOtp(false);
+    }
   };
 
   // Proceed from Step 2 (Form details) to Step 3 (Preview)
@@ -703,6 +815,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         const regPayload = {
           name: formData.name || 'User Profile',
           name_tamil: formData.name_tamil || undefined,
+          email: guestEmail || formData.email || undefined,
           dob: formData.dob || '',
           phone: formData.phone || '',
           aadhar: formData.aadhar || undefined,
@@ -1372,6 +1485,82 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       setUploadProgress('');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeedbackList = async () => {
+    setFeedbackLoading(true);
+    try {
+      const data = await getFeedback();
+      setFeedbackList(data);
+    } catch (err) {
+      console.error("Error fetching feedback:", err);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reviews') {
+      fetchFeedbackList();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (currentUser) {
+      setNewReviewName(currentUser.name);
+    }
+  }, [currentUser]);
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!newReviewText.trim()) {
+      showToast('Please enter your review message.', 'warning');
+      return;
+    }
+    setReviewSubmitting(true);
+    try {
+      await submitFeedback(
+        newReviewName || 'Anonymous',
+        currentUser.phone || '',
+        currentUser.aadhar || '',
+        newReviewText,
+        newReviewRating
+      );
+      showToast('Review submitted successfully!', 'success');
+      setNewReviewText('');
+      fetchFeedbackList();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to submit review. Please try again.', 'error');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleChatSubmit = async (e) => {
+    e.preventDefault();
+    if (!newChatText.trim()) {
+      showToast('Please type a message.', 'warning');
+      return;
+    }
+    setChatSubmitting(true);
+    try {
+      await submitFeedback(
+        currentUser.name || 'Citizen',
+        currentUser.phone || '',
+        currentUser.aadhar || '',
+        newChatText,
+        0
+      );
+      showToast('Message sent to admin!', 'success');
+      setNewChatText('');
+      fetchFeedbackList();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to send message. Please try again.', 'error');
+    } finally {
+      setChatSubmitting(false);
     }
   };
 
@@ -2088,43 +2277,206 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 {/* STEP 1: INSTRUCTIONS & TERMS */}
                 {wizardStep === 1 && (
                   <div style={{ padding: '0 16px' }}>
-                    <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '0 0 20px 0' }}>
-                      <h4 style={{ fontSize: '1rem', marginBottom: '8px', color: '#1e293b' }}>Application Guide & Terms</h4>
-                      {selectedForm.description && (
-                        <p style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '500', marginBottom: '12px', background: '#f1f5f9', padding: '10px', borderRadius: '8px', borderLeft: '3px solid var(--primary)' }}>
-                          <strong>Service Description:</strong> {selectedForm.description}
-                        </p>
-                      )}
-                      <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '16px' }}>
-                        Please read the following instructions carefully before starting the application.
-                      </p>
+                    {showGuestVerification ? (
+                      <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '0 0 20px 0' }}>
+                        <h4 style={{ fontSize: '1.1rem', marginBottom: '12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          🔑 Identity Verification
+                        </h4>
+                        
+                        {guestVerifyError && (
+                          <div style={{ color: 'var(--error)', fontSize: '0.8rem', fontWeight: 'bold', background: '#fee2e2', padding: '10px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #fca5a5' }}>
+                            ⚠️ {guestVerifyError}
+                          </div>
+                        )}
 
-                      <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-                        <h5 style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>Instructions List:</h5>
-                        {selectedForm.instructions ? (
-                          <ul style={{ paddingLeft: '20px', fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px', margin: 0 }}>
-                            {selectedForm.instructions.split('\n').filter(Boolean).map((item, idx) => (
-                              <li key={idx}>{item}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>No instructions configured by admin. Please fill the details in the next steps.</p>
+                        {lookupAadharStatus === null && (
+                          <form onSubmit={handleVerifyGuestAadhar}>
+                            <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '14px' }}>
+                              Enter your 12-digit Aadhaar number to verify if you have an existing account profile.
+                            </p>
+                            <div className="premium-input-group">
+                              <label className="premium-label">Aadhaar Card Number</label>
+                              <input 
+                                type="text"
+                                maxLength={12}
+                                value={guestAadhar}
+                                onChange={(e) => setGuestAadhar(e.target.value.replace(/\D/g, ''))}
+                                placeholder="e.g. 512345678901"
+                                className="premium-input"
+                                style={{ padding: '10px', fontSize: '0.9rem' }}
+                                required
+                              />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                              <button 
+                                type="button" 
+                                onClick={() => setShowGuestVerification(false)} 
+                                className="premium-btn premium-btn-secondary"
+                                style={{ flex: 1 }}
+                              >
+                                Back
+                              </button>
+                              <button 
+                                type="submit" 
+                                className="premium-btn premium-btn-primary" 
+                                style={{ flex: 1.5 }}
+                                disabled={verifyingAadhar}
+                              >
+                                {verifyingAadhar ? 'Verifying...' : 'Verify Aadhaar'}
+                              </button>
+                            </div>
+                          </form>
+                        )}
+
+                        {lookupAadharStatus === 'existing_user' && (
+                          <div>
+                            <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '14px' }}>
+                              A citizen profile already exists with this Aadhaar number for <strong>{matchedUserPrefills?.name || 'Citizen User'}</strong>. 
+                              <br /><br />
+                              Please log in using your Phone number and first 4 digits of Aadhaar to view your pre-filled data.
+                            </p>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                              <button 
+                                type="button" 
+                                onClick={() => setLookupAadharStatus(null)} 
+                                className="premium-btn premium-btn-secondary"
+                                style={{ flex: 1 }}
+                              >
+                                Back
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  setShowGuestVerification(false);
+                                  onLoginTrigger(matchedUserPrefills?.phone, matchedUserPrefills?.aadhar_prefix);
+                                }} 
+                                className="premium-btn premium-btn-primary" 
+                                style={{ flex: 1.5 }}
+                              >
+                                Login to Proceed
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {lookupAadharStatus === 'new_user' && (
+                          <div>
+                            <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '14px' }}>
+                              No registered profile found. Enter your Email ID to receive a verification OTP. Once verified, you can fill and submit the form, and your account will be registered automatically.
+                            </p>
+                            
+                            <div className="premium-input-group" style={{ marginBottom: '14px' }}>
+                              <label className="premium-label">Email ID</label>
+                              <input 
+                                type="email"
+                                value={guestEmail}
+                                onChange={(e) => setGuestEmail(e.target.value)}
+                                placeholder="name@example.com"
+                                className="premium-input"
+                                disabled={showOtpInput}
+                                required
+                              />
+                            </div>
+
+                            {!showOtpInput ? (
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setLookupAadharStatus(null)} 
+                                  className="premium-btn premium-btn-secondary"
+                                  style={{ flex: 1 }}
+                                >
+                                  Back
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={handleSendGuestOtp} 
+                                  className="premium-btn premium-btn-primary" 
+                                  style={{ flex: 1.5 }}
+                                  disabled={sendingOtp}
+                                >
+                                  {sendingOtp ? 'Sending OTP...' : 'Send OTP'}
+                                </button>
+                              </div>
+                            ) : (
+                              <form onSubmit={handleVerifyGuestOtp}>
+                                <div className="premium-input-group">
+                                  <label className="premium-label">Enter 6-digit OTP Code</label>
+                                  <input 
+                                    type="text"
+                                    maxLength={6}
+                                    value={guestOtp}
+                                    onChange={(e) => setGuestOtp(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="e.g. 123456"
+                                    className="premium-input"
+                                    style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '4px', padding: '10px' }}
+                                    required
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setShowOtpInput(false)} 
+                                    className="premium-btn premium-btn-secondary"
+                                    style={{ flex: 1 }}
+                                  >
+                                    Change Email
+                                  </button>
+                                  <button 
+                                    type="submit" 
+                                    className="premium-btn premium-btn-primary" 
+                                    style={{ flex: 1.5 }}
+                                    disabled={verifyingOtp}
+                                  >
+                                    {verifyingOtp ? 'Verifying...' : 'Verify & Proceed'}
+                                  </button>
+                                </div>
+                              </form>
+                            )}
+                          </div>
                         )}
                       </div>
+                    ) : (
+                      <>
+                        <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '0 0 20px 0' }}>
+                          <h4 style={{ fontSize: '1rem', marginBottom: '8px', color: '#1e293b' }}>Application Guide & Terms</h4>
+                          {selectedForm.description && (
+                            <p style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '500', marginBottom: '12px', background: '#f1f5f9', padding: '10px', borderRadius: '8px', borderLeft: '3px solid var(--primary)' }}>
+                              <strong>Service Description:</strong> {selectedForm.description}
+                            </p>
+                          )}
+                          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '16px' }}>
+                            Please read the following instructions carefully before starting the application.
+                          </p>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4', padding: '12px 16px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#065f46' }}>Service Fee:</span>
-                        <span style={{ fontSize: '1rem', fontWeight: 800, color: '#047857' }}>Rs. {selectedForm.fee || 0}</span>
-                      </div>
-                    </div>
+                          <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                            <h5 style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>Instructions List:</h5>
+                            {selectedForm.instructions ? (
+                              <ul style={{ paddingLeft: '20px', fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px', margin: 0 }}>
+                                {selectedForm.instructions.split('\n').filter(Boolean).map((item, idx) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>No instructions configured by admin. Please fill the details in the next steps.</p>
+                            )}
+                          </div>
 
-                    <button 
-                      onClick={handleProceedToForm}
-                      className="premium-btn premium-btn-primary"
-                      style={{ marginBottom: '20px' }}
-                    >
-                      I Agree, Proceed <ChevronRight size={18} />
-                    </button>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4', padding: '12px 16px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#065f46' }}>Service Fee:</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#047857' }}>Rs. {selectedForm.fee || 0}</span>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={handleProceedToForm}
+                          className="premium-btn premium-btn-primary"
+                          style={{ marginBottom: '20px' }}
+                        >
+                          I Agree, Proceed <ChevronRight size={18} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -3527,6 +3879,208 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* --- TAB 4: REVIEWS & SUPPORT CHAT --- */}
+        {activeTab === 'reviews' && currentUser && (
+          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Citizen Reviews Panel */}
+            <div className="premium-card" style={{ borderTop: '6px solid var(--primary)' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                ⭐ Citizen Reviews & Ratings
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 16px 0' }}>
+                See what other citizens say about TN sevai, and write your own review.
+              </p>
+
+              {/* Write Review Form */}
+              <form onSubmit={handleReviewSubmit} style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: '700', color: '#1e293b' }}>Write a Review</h4>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Your Name</label>
+                    <input 
+                      type="text" 
+                      value={newReviewName} 
+                      onChange={(e) => setNewReviewName(e.target.value)} 
+                      required 
+                      placeholder="Enter name"
+                      style={{ padding: '8px 12px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                    />
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Rating</label>
+                    <div style={{ display: 'flex', gap: '4px', height: '32px', alignItems: 'center' }}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setNewReviewRating(star)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', color: star <= newReviewRating ? '#f59e0b' : '#cbd5e1', padding: 0 }}
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Review Message</label>
+                  <textarea 
+                    rows={3} 
+                    value={newReviewText} 
+                    onChange={(e) => setNewReviewText(e.target.value)} 
+                    required 
+                    placeholder="Describe your experience with the portal..."
+                    style={{ padding: '8px 12px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', resize: 'none', outline: 'none', fontFamily: 'inherit' }}
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={reviewSubmitting}
+                  className="premium-btn premium-btn-success"
+                  style={{ padding: '8px 16px', fontSize: '0.8rem', width: 'fit-content', alignSelf: 'flex-end', fontWeight: '700' }}
+                >
+                  {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </form>
+
+              {/* Reviews List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
+                {feedbackLoading ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b', fontSize: '0.8rem' }}>Loading reviews...</div>
+                ) : feedbackList.filter(f => parseInt(f.rating) > 0).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#94a3b8', fontSize: '0.8rem' }}>No reviews yet. Be the first to write one!</div>
+                ) : (
+                  feedbackList.filter(f => parseInt(f.rating) > 0).map(review => (
+                    <div key={review.id} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>{review.user_name}</span>
+                        <div style={{ display: 'flex', gap: '1px' }}>
+                          {[1,2,3,4,5].map(s => (
+                            <span key={s} style={{ fontSize: '0.8rem', color: s <= parseInt(review.rating) ? '#f59e0b' : '#e2e8f0' }}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#475569', lineHeight: '1.4' }}>{review.message}</p>
+                      <p style={{ margin: '6px 0 0 0', fontSize: '0.6rem', color: '#94a3b8', textAlign: 'right' }}>
+                        {review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Direct Support Chat Inquiry Panel */}
+            <div className="premium-card" style={{ borderTop: '6px solid var(--secondary)', marginBottom: '30px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                💬 Message / Support Inquiry
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 16px 0' }}>
+                Send a direct message to the admin. You will receive replies from the admin directly here.
+              </p>
+
+              {/* Chat Messages History */}
+              <div style={{ 
+                background: '#f8fafc', 
+                borderRadius: '12px', 
+                border: '1.5px solid #e2e8f0', 
+                padding: '16px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px', 
+                minHeight: '200px', 
+                maxHeight: '350px', 
+                overflowY: 'auto', 
+                marginBottom: '16px' 
+              }}>
+                {feedbackLoading ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b', fontSize: '0.8rem' }}>Loading messages...</div>
+                ) : feedbackList.filter(f => (!f.rating || parseInt(f.rating) === 0) && (f.user_aadhar === currentUser.aadhar || f.user_phone === currentUser.phone)).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                    <MessageSquare size={32} style={{ opacity: 0.3 }} />
+                    No support queries or messages yet. Need help? Send a message to the admin below.
+                  </div>
+                ) : (
+                  feedbackList.filter(f => (!f.rating || parseInt(f.rating) === 0) && (f.user_aadhar === currentUser.aadhar || f.user_phone === currentUser.phone))
+                    .slice().reverse() // Show chronological order in chat
+                    .map(msg => (
+                      <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {/* User Message (Right Side) */}
+                        <div style={{ alignSelf: 'flex-end', maxWidth: '85%', background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)', color: 'white', padding: '10px 14px', borderRadius: '14px 14px 2px 14px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                          <p style={{ margin: 0, fontSize: '0.78rem', lineHeight: '1.4' }}>{msg.message}</p>
+                          <span style={{ fontSize: '0.55rem', opacity: 0.8, display: 'block', textAlign: 'right', marginTop: '4px' }}>
+                            {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                        </div>
+                        
+                        {/* Admin Response (Left Side) */}
+                        {msg.admin_response ? (
+                          <div style={{ alignSelf: 'flex-start', maxWidth: '85%', background: '#ffffff', border: '1px solid #e2e8f0', padding: '10px 14px', borderRadius: '14px 14px 14px 2px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                            <span style={{ fontSize: '0.62rem', fontWeight: '800', color: 'var(--secondary)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              🛡️ Support Agent Reply
+                            </span>
+                            <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: '1.4' }}>{msg.admin_response}</p>
+                            <span style={{ fontSize: '0.55rem', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
+                              {msg.response_at ? new Date(msg.response_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
+                        ) : (
+                          <div style={{ alignSelf: 'flex-start', fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic', paddingLeft: '8px' }}>
+                            Sent. Waiting for response...
+                          </div>
+                        )}
+                      </div>
+                    ))
+                )}
+              </div>
+
+              {/* Send message form */}
+              <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  value={newChatText} 
+                  onChange={(e) => setNewChatText(e.target.value)} 
+                  required 
+                  placeholder="Ask a question or describe your issue..." 
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    fontSize: '0.8rem',
+                    borderRadius: '10px',
+                    border: '1.5px solid #cbd5e1',
+                    outline: 'none',
+                    background: '#ffffff',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+                  onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                />
+                <button 
+                  type="submit" 
+                  disabled={chatSubmitting}
+                  className="premium-btn premium-btn-primary"
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    borderRadius: '10px',
+                    width: 'auto',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {chatSubmitting ? 'Sending...' : 'Send'}
+                </button>
+              </form>
+            </div>
+            
           </div>
         )}
       </div>

@@ -155,6 +155,9 @@ function doPost(e) {
       case "loginUser":
         responseData = loginUserAction(requestBody.payload);
         break;
+      case "checkAadhar":
+        responseData = checkAadharAction(requestBody.payload);
+        break;
       case "sendOtp":
         responseData = sendOtpAction(requestBody.payload);
         break;
@@ -224,6 +227,9 @@ function doPost(e) {
         break;
       case "deleteFeedback":
         responseData = deleteFeedbackAction(requestBody.id);
+        break;
+      case "replyFeedback":
+        responseData = replyFeedbackAction(requestBody.id, requestBody.responseText);
         break;
         
       // File Uploads directly to Google Drive
@@ -637,6 +643,38 @@ function loginUserAction(loginData) {
   cleanedUser.aadhar = formatNumberString(matchedUser.aadhar);
   
   return cleanedUser;
+}
+
+function checkAadharAction(payload) {
+  var aadhar = payload.aadhar;
+  var aadharClean = aadhar ? formatNumberString(aadhar) : "";
+  if (!aadharClean || aadharClean.length !== 12) {
+    throw new Error("A valid 12-digit Aadhaar number is required.");
+  }
+  
+  var users = getRowsFromSheet("Users");
+  var matchedUser = null;
+  for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    var uAadhar = u.aadhar ? formatNumberString(u.aadhar) : "";
+    if (uAadhar === aadharClean) {
+      matchedUser = u;
+      break;
+    }
+  }
+  
+  if (matchedUser) {
+    return {
+      exists: true,
+      user: {
+        name: matchedUser.name || "",
+        phone: formatNumberString(matchedUser.phone) || "",
+        aadhar_prefix: formatNumberString(matchedUser.aadhar).substring(0, 4)
+      }
+    };
+  } else {
+    return { exists: false };
+  }
 }
 
 // --- OTP ACTIONS ---
@@ -1268,6 +1306,22 @@ function deleteFeedbackAction(id) {
   return { id: id, success: true };
 }
 
+function replyFeedbackAction(id, responseText) {
+  var sheet = getSheet("Feedback");
+  var rowIndex = findRowIndexById(sheet, id);
+  if (rowIndex === -1) throw new Error("Feedback entry not found.");
+  
+  var existingRow = getRowObject(sheet, rowIndex);
+  existingRow.admin_response = responseText || "";
+  existingRow.response_at = new Date().toISOString();
+  
+  updateRowObject(sheet, rowIndex, existingRow);
+  
+  existingRow.user_phone = formatNumberString(existingRow.user_phone);
+  existingRow.user_aadhar = formatNumberString(existingRow.user_aadhar);
+  return existingRow;
+}
+
 // --- 4C. SETTINGS ACTIONS ---
 
 function getSettingsAction() {
@@ -1414,8 +1468,11 @@ function initSpreadsheet() {
   
   // 5B. FEEDBACK SHEET
   ensureSheetExists("Feedback", [
-    "id", "user_name", "user_phone", "user_aadhar", "message", "rating", "created_at"
+    "id", "user_name", "user_phone", "user_aadhar", "message", "rating", "created_at", "admin_response", "response_at"
   ]);
+  var feedbackSheet = getSheet("Feedback");
+  ensureColumnExists(feedbackSheet, "admin_response");
+  ensureColumnExists(feedbackSheet, "response_at");
 
   // 5C. OTP SHEET
   ensureSheetExists("OTP", [

@@ -4,7 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import UserPortal from './pages/UserPortal';
 import AdminPortal from './pages/AdminPortal';
-import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase } from 'lucide-react';
+import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase, MessageSquare } from 'lucide-react';
 import { registerUser, loginUser, sendOtp, verifyOtp, getSettings } from './services/db';
 
 function TrollPage() {
@@ -153,7 +153,7 @@ function PortalLayout() {
   const rawTab = searchParams.get('tab');
   const activeTab = isAdmin
     ? (['posts', 'forms', 'users', 'jobs'].includes(rawTab) ? rawTab : 'posts')
-    : (['home', 'apply', 'status', 'jobs'].includes(rawTab) ? rawTab : 'home');
+    : (['home', 'apply', 'status', 'jobs', 'reviews'].includes(rawTab) ? rawTab : 'home');
 
   const handleTabChange = (tabName) => {
     setSearchParams({ tab: tabName });
@@ -298,7 +298,7 @@ function PortalLayout() {
           {/* Main Contents */}
           <main style={{ flex: 1, paddingBottom: '20px' }}>
             <Routes>
-              <Route path="/user" element={<UserPortal currentUser={currentUser} onUpdateProfile={handleUpdateProfile} onLoginTrigger={() => { setAuthError(''); setAuthSuccess(''); setIsRegisterMode(false); setIsAuthModalOpen(true); }} />} />
+              <Route path="/user" element={<UserPortal currentUser={currentUser} onUpdateProfile={handleUpdateProfile} onLoginTrigger={(prefillPhone, prefillAadharPrefix) => { setAuthError(''); setAuthSuccess(''); setIsRegisterMode(false); if (prefillPhone) setLoginPhone(prefillPhone); if (prefillAadharPrefix) setLoginAadharPrefix(prefillAadharPrefix); setIsAuthModalOpen(true); }} />} />
               <Route path="/tnkpadmin" element={<AdminPortal />} />
               <Route path="/admin" element={<TrollPage />} />
               <Route path="*" element={<Navigate to="/user" replace />} />
@@ -372,6 +372,15 @@ function PortalLayout() {
               <Briefcase className="bottom-nav-icon" size={20} />
               <span>Job alerts</span>
             </button>
+            {currentUser && (
+              <button 
+                onClick={() => handleTabChange('reviews')}
+                className={`bottom-nav-item ${activeTab === 'reviews' ? 'active' : ''}`}
+              >
+                <MessageSquare className="bottom-nav-icon" size={20} />
+                <span>Reviews & Chat</span>
+              </button>
+            )}
           </div>
         )}
 

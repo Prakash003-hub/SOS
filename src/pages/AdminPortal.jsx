@@ -26,6 +26,7 @@ import {
   uploadJobImage,
   getFeedback,
   deleteFeedback,
+  replyFeedback,
   getSettings,
   updateSettings,
   uploadFormImage,
@@ -286,6 +287,8 @@ export default function AdminPortal() {
   const [feedbackList, setFeedbackList] = useState([]);
   const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
   const [feedbackSearchTerm, setFeedbackSearchTerm] = useState('');
+  const [replyTextState, setReplyTextState] = useState({});
+  const [replySubmitting, setReplySubmitting] = useState({});
   
   // Settings
   const [settings, setSettings] = useState({ 
@@ -418,6 +421,42 @@ export default function AdminPortal() {
       setFeedbackList(feedbackData);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleDeleteFeedback = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this feedback/message?')) return;
+    try {
+      setLoading(true);
+      await deleteFeedback(id);
+      alert('Feedback deleted successfully.');
+      handleRefreshFeedback();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to delete feedback.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendFeedbackResponse = async (id) => {
+    const text = replyTextState[id];
+    if (!text || !text.trim()) {
+      alert('Please enter a response.');
+      return;
+    }
+    
+    setReplySubmitting(prev => ({ ...prev, [id]: true }));
+    try {
+      const updatedItem = await replyFeedback(id, text.trim());
+      alert('Response sent successfully.');
+      setReplyTextState(prev => ({ ...prev, [id]: '' }));
+      setFeedbackList(prev => prev.map(f => f.id === id ? { ...f, admin_response: updatedItem.admin_response, response_at: updatedItem.response_at } : f));
+    } catch (e) {
+      console.error(e);
+      alert('Failed to send response: ' + (e.message || e));
+    } finally {
+      setReplySubmitting(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -3237,6 +3276,41 @@ export default function AdminPortal() {
                       transition: 'box-shadow 0.2s',
                       position: 'relative'
                     }}>
+                      {/* Badge for Type */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {(!fb.rating || parseInt(fb.rating) === 0) ? (
+                          <span style={{
+                            display: 'inline-block',
+                            fontSize: '0.62rem',
+                            fontWeight: '800',
+                            color: '#0284c7',
+                            background: '#e0f2fe',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            marginBottom: '6px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}>
+                            💬 Support Inquiry
+                          </span>
+                        ) : (
+                          <span style={{
+                            display: 'inline-block',
+                            fontSize: '0.62rem',
+                            fontWeight: '800',
+                            color: '#15803d',
+                            background: '#dcfce7',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            marginBottom: '6px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}>
+                            ⭐ Public Review
+                          </span>
+                        )}
+                      </div>
+
                       {/* User Info Row */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                         <div>
@@ -3285,6 +3359,67 @@ export default function AdminPortal() {
                       <p style={{ margin: '8px 0 0 0', fontSize: '0.6rem', color: '#94a3b8', textAlign: 'right' }}>
                         {fb.created_at ? new Date(fb.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
                       </p>
+
+                      {/* Admin Response Display */}
+                      {fb.admin_response && (
+                        <div style={{
+                          marginTop: '10px',
+                          padding: '10px',
+                          background: '#f0fdf4',
+                          border: '1.5px dashed #b9f6ca',
+                          borderRadius: '8px'
+                        }}>
+                          <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '800', color: '#1b5e20' }}>🛡️ Admin Response:</p>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#2e7d32', lineHeight: '1.4' }}>{fb.admin_response}</p>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.58rem', color: '#81c784', textAlign: 'right' }}>
+                            {fb.response_at ? new Date(fb.response_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Response Reply Form */}
+                      <div style={{
+                        marginTop: '10px',
+                        borderTop: '1px solid #e2e8f0',
+                        paddingTop: '10px',
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center'
+                      }}>
+                        <input 
+                          type="text" 
+                          placeholder={fb.admin_response ? "Update response..." : "Type response to citizen..."}
+                          value={replyTextState[fb.id] || ''}
+                          onChange={(e) => setReplyTextState(prev => ({ ...prev, [fb.id]: e.target.value }))}
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            fontSize: '0.75rem',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            outline: 'none',
+                            background: '#ffffff'
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSendFeedbackResponse(fb.id)}
+                          disabled={replySubmitting[fb.id]}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            background: 'var(--primary)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            opacity: replySubmitting[fb.id] ? 0.7 : 1
+                          }}
+                        >
+                          {replySubmitting[fb.id] ? 'Sending...' : fb.admin_response ? 'Update' : 'Reply'}
+                        </button>
+                      </div>
+
                     </div>
                   ))}
                 </div>
