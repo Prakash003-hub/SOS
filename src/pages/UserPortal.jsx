@@ -19,9 +19,7 @@ import {
   getAnnouncements,
   sendOtp,
   verifyOtp,
-  checkAadhar,
-  getFeedback,
-  submitFeedback
+  checkAadhar
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -240,15 +238,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [hasSearchedStatus, setHasSearchedStatus] = useState(false);
   const [uploadingScreenshotId, setUploadingScreenshotId] = useState(null);
 
-  // Feedback, reviews, and support chat states
-  const [feedbackList, setFeedbackList] = useState([]);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [newReviewName, setNewReviewName] = useState(currentUser ? currentUser.name : '');
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewText, setNewReviewText] = useState('');
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [newChatText, setNewChatText] = useState('');
-  const [chatSubmitting, setChatSubmitting] = useState(false);
+
 
   // Guest Verification States
   const [showGuestVerification, setShowGuestVerification] = useState(false);
@@ -1488,81 +1478,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   };
 
-  const fetchFeedbackList = async () => {
-    setFeedbackLoading(true);
-    try {
-      const data = await getFeedback();
-      setFeedbackList(data);
-    } catch (err) {
-      console.error("Error fetching feedback:", err);
-    } finally {
-      setFeedbackLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    if (activeTab === 'reviews') {
-      fetchFeedbackList();
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (currentUser) {
-      setNewReviewName(currentUser.name);
-    }
-  }, [currentUser]);
-
-  const handleReviewSubmit = async (e) => {
-    e.preventDefault();
-    if (!newReviewText.trim()) {
-      showToast('Please enter your review message.', 'warning');
-      return;
-    }
-    setReviewSubmitting(true);
-    try {
-      await submitFeedback(
-        newReviewName || 'Anonymous',
-        currentUser.phone || '',
-        currentUser.aadhar || '',
-        newReviewText,
-        newReviewRating
-      );
-      showToast('Review submitted successfully!', 'success');
-      setNewReviewText('');
-      fetchFeedbackList();
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to submit review. Please try again.', 'error');
-    } finally {
-      setReviewSubmitting(false);
-    }
-  };
-
-  const handleChatSubmit = async (e) => {
-    e.preventDefault();
-    if (!newChatText.trim()) {
-      showToast('Please type a message.', 'warning');
-      return;
-    }
-    setChatSubmitting(true);
-    try {
-      await submitFeedback(
-        currentUser.name || 'Citizen',
-        currentUser.phone || '',
-        currentUser.aadhar || '',
-        newChatText,
-        0
-      );
-      showToast('Message sent to admin!', 'success');
-      setNewChatText('');
-      fetchFeedbackList();
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to send message. Please try again.', 'error');
-    } finally {
-      setChatSubmitting(false);
-    }
-  };
 
   // --- LOOKUP & SCREENSHOT PROOF ---
   const handleStatusLookup = async (e) => {
@@ -3882,207 +3798,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           </div>
         )}
 
-        {/* --- TAB 4: REVIEWS & SUPPORT CHAT --- */}
-        {activeTab === 'reviews' && currentUser && (
-          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* Citizen Reviews Panel */}
-            <div className="premium-card" style={{ borderTop: '6px solid var(--primary)' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                ⭐ Citizen Reviews & Ratings
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 16px 0' }}>
-                See what other citizens say about TN sevai, and write your own review.
-              </p>
 
-              {/* Write Review Form */}
-              <form onSubmit={handleReviewSubmit} style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: '700', color: '#1e293b' }}>Write a Review</h4>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Your Name</label>
-                    <input 
-                      type="text" 
-                      value={newReviewName} 
-                      onChange={(e) => setNewReviewName(e.target.value)} 
-                      required 
-                      placeholder="Enter name"
-                      style={{ padding: '8px 12px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
-                    />
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Rating</label>
-                    <div style={{ display: 'flex', gap: '4px', height: '32px', alignItems: 'center' }}>
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setNewReviewRating(star)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', color: star <= newReviewRating ? '#f59e0b' : '#cbd5e1', padding: 0 }}
-                        >
-                          ★
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Review Message</label>
-                  <textarea 
-                    rows={3} 
-                    value={newReviewText} 
-                    onChange={(e) => setNewReviewText(e.target.value)} 
-                    required 
-                    placeholder="Describe your experience with the portal..."
-                    style={{ padding: '8px 12px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', resize: 'none', outline: 'none', fontFamily: 'inherit' }}
-                  />
-                </div>
-
-                <button 
-                  type="submit" 
-                  disabled={reviewSubmitting}
-                  className="premium-btn premium-btn-success"
-                  style={{ padding: '8px 16px', fontSize: '0.8rem', width: 'fit-content', alignSelf: 'flex-end', fontWeight: '700' }}
-                >
-                  {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
-                </button>
-              </form>
-
-              {/* Reviews List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
-                {feedbackLoading ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b', fontSize: '0.8rem' }}>Loading reviews...</div>
-                ) : feedbackList.filter(f => parseInt(f.rating) > 0).length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#94a3b8', fontSize: '0.8rem' }}>No reviews yet. Be the first to write one!</div>
-                ) : (
-                  feedbackList.filter(f => parseInt(f.rating) > 0).map(review => (
-                    <div key={review.id} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>{review.user_name}</span>
-                        <div style={{ display: 'flex', gap: '1px' }}>
-                          {[1,2,3,4,5].map(s => (
-                            <span key={s} style={{ fontSize: '0.8rem', color: s <= parseInt(review.rating) ? '#f59e0b' : '#e2e8f0' }}>★</span>
-                          ))}
-                        </div>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#475569', lineHeight: '1.4' }}>{review.message}</p>
-                      <p style={{ margin: '6px 0 0 0', fontSize: '0.6rem', color: '#94a3b8', textAlign: 'right' }}>
-                        {review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Direct Support Chat Inquiry Panel */}
-            <div className="premium-card" style={{ borderTop: '6px solid var(--secondary)', marginBottom: '30px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                💬 Message / Support Inquiry
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 16px 0' }}>
-                Send a direct message to the admin. You will receive replies from the admin directly here.
-              </p>
-
-              {/* Chat Messages History */}
-              <div style={{ 
-                background: '#f8fafc', 
-                borderRadius: '12px', 
-                border: '1.5px solid #e2e8f0', 
-                padding: '16px', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '12px', 
-                minHeight: '200px', 
-                maxHeight: '350px', 
-                overflowY: 'auto', 
-                marginBottom: '16px' 
-              }}>
-                {feedbackLoading ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b', fontSize: '0.8rem' }}>Loading messages...</div>
-                ) : feedbackList.filter(f => (!f.rating || parseInt(f.rating) === 0) && (f.user_aadhar === currentUser.aadhar || f.user_phone === currentUser.phone)).length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                    <MessageSquare size={32} style={{ opacity: 0.3 }} />
-                    No support queries or messages yet. Need help? Send a message to the admin below.
-                  </div>
-                ) : (
-                  feedbackList.filter(f => (!f.rating || parseInt(f.rating) === 0) && (f.user_aadhar === currentUser.aadhar || f.user_phone === currentUser.phone))
-                    .slice().reverse() // Show chronological order in chat
-                    .map(msg => (
-                      <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {/* User Message (Right Side) */}
-                        <div style={{ alignSelf: 'flex-end', maxWidth: '85%', background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)', color: 'white', padding: '10px 14px', borderRadius: '14px 14px 2px 14px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                          <p style={{ margin: 0, fontSize: '0.78rem', lineHeight: '1.4' }}>{msg.message}</p>
-                          <span style={{ fontSize: '0.55rem', opacity: 0.8, display: 'block', textAlign: 'right', marginTop: '4px' }}>
-                            {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </span>
-                        </div>
-                        
-                        {/* Admin Response (Left Side) */}
-                        {msg.admin_response ? (
-                          <div style={{ alignSelf: 'flex-start', maxWidth: '85%', background: '#ffffff', border: '1px solid #e2e8f0', padding: '10px 14px', borderRadius: '14px 14px 14px 2px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                            <span style={{ fontSize: '0.62rem', fontWeight: '800', color: 'var(--secondary)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              🛡️ Support Agent Reply
-                            </span>
-                            <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: '1.4' }}>{msg.admin_response}</p>
-                            <span style={{ fontSize: '0.55rem', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
-                              {msg.response_at ? new Date(msg.response_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                            </span>
-                          </div>
-                        ) : (
-                          <div style={{ alignSelf: 'flex-start', fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic', paddingLeft: '8px' }}>
-                            Sent. Waiting for response...
-                          </div>
-                        )}
-                      </div>
-                    ))
-                )}
-              </div>
-
-              {/* Send message form */}
-              <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  value={newChatText} 
-                  onChange={(e) => setNewChatText(e.target.value)} 
-                  required 
-                  placeholder="Ask a question or describe your issue..." 
-                  style={{
-                    flex: 1,
-                    padding: '10px 14px',
-                    fontSize: '0.8rem',
-                    borderRadius: '10px',
-                    border: '1.5px solid #cbd5e1',
-                    outline: 'none',
-                    background: '#ffffff',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-                  onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
-                />
-                <button 
-                  type="submit" 
-                  disabled={chatSubmitting}
-                  className="premium-btn premium-btn-primary"
-                  style={{
-                    padding: '10px 20px',
-                    fontSize: '0.8rem',
-                    fontWeight: '700',
-                    borderRadius: '10px',
-                    width: 'auto',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {chatSubmitting ? 'Sending...' : 'Send'}
-                </button>
-              </form>
-            </div>
-            
-          </div>
-        )}
       </div>
       {loading && (
         <div style={{

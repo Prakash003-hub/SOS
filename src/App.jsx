@@ -153,7 +153,7 @@ function PortalLayout() {
   const rawTab = searchParams.get('tab');
   const activeTab = isAdmin
     ? (['posts', 'forms', 'users', 'jobs'].includes(rawTab) ? rawTab : 'posts')
-    : (['home', 'apply', 'status', 'jobs', 'reviews'].includes(rawTab) ? rawTab : 'home');
+    : (['home', 'apply', 'status', 'jobs'].includes(rawTab) ? rawTab : 'home');
 
   const handleTabChange = (tabName) => {
     setSearchParams({ tab: tabName });
@@ -372,15 +372,6 @@ function PortalLayout() {
               <Briefcase className="bottom-nav-icon" size={20} />
               <span>Job alerts</span>
             </button>
-            {currentUser && (
-              <button 
-                onClick={() => handleTabChange('reviews')}
-                className={`bottom-nav-item ${activeTab === 'reviews' ? 'active' : ''}`}
-              >
-                <MessageSquare className="bottom-nav-icon" size={20} />
-                <span>Reviews & Chat</span>
-              </button>
-            )}
           </div>
         )}
 

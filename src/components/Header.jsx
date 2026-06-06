@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, MessageSquare, X, ChevronDown, Send } from 'lucide-react';
-import { submitFeedback } from '../services/db';
+import { User, LogOut, MessageSquare, X, ChevronDown, Send, ArrowLeft, Star } from 'lucide-react';
+import { submitFeedback, getFeedback } from '../services/db';
 
 export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -25,9 +25,46 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
     };
   }, [isProfileOpen]);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackRating, setFeedbackRating] = useState(0);
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [modalSubView, setModalSubView] = useState('menu'); // 'menu' | 'reviews' | 'chat'
+  
+  // Feedback list states
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  // Review form states
+  const [reviewName, setReviewName] = useState(currentUser ? currentUser.name : '');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  // Private chat states
+  const [chatMessageText, setChatMessageText] = useState('');
+  const [chatSubmitting, setChatSubmitting] = useState(false);
+
+  const fetchFeedbackData = async () => {
+    setFeedbackLoading(true);
+    try {
+      const data = await getFeedback();
+      setFeedbackList(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching feedback:', err);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isFeedbackOpen) {
+      fetchFeedbackData();
+      setModalSubView('menu');
+    }
+  }, [isFeedbackOpen]);
+
+  useEffect(() => {
+    if (currentUser) {
+      setReviewName(currentUser.name);
+    }
+  }, [currentUser]);
 
   const getAvatarUrl = () => {
     if (currentUser && currentUser.photo_url) {
@@ -42,37 +79,55 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
     return '/default_avatar.png';
   };
 
-  const handleFeedbackSubmit = async (e) => {
+  const handleReviewSubmit = async (e) => {
     e.preventDefault();
-    if (!feedbackText.trim()) {
-      alert('Please enter your feedback message.');
+    if (!reviewText.trim()) {
+      alert('Please enter your review message.');
       return;
     }
-    if (feedbackRating === 0) {
-      alert('Please select a star rating.');
-      return;
-    }
-
-    setFeedbackSubmitting(true);
+    setReviewSubmitting(true);
     try {
       await submitFeedback(
-        currentUser ? currentUser.name : 'Guest User',
+        reviewName || 'Anonymous',
         currentUser ? currentUser.phone : '',
         currentUser ? currentUser.aadhar : '',
-        feedbackText,
-        feedbackRating
+        reviewText,
+        reviewRating
       );
-      
-      alert('Thank you for your valuable feedback! Your feedback has been recorded successfully.');
-      setFeedbackText('');
-      setFeedbackRating(0);
-      setIsFeedbackOpen(false);
-      setIsProfileOpen(false);
+      alert('Review submitted successfully!');
+      setReviewText('');
+      fetchFeedbackData();
     } catch (err) {
       console.error(err);
-      alert('Failed to submit feedback. Please try again.');
+      alert('Failed to submit review.');
     } finally {
-      setFeedbackSubmitting(false);
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleChatSubmit = async (e) => {
+    e.preventDefault();
+    if (!chatMessageText.trim()) {
+      alert('Please enter a message.');
+      return;
+    }
+    setChatSubmitting(true);
+    try {
+      await submitFeedback(
+        currentUser ? currentUser.name : 'Citizen',
+        currentUser ? currentUser.phone : '',
+        currentUser ? currentUser.aadhar : '',
+        chatMessageText,
+        0
+      );
+      alert('Message sent successfully!');
+      setChatMessageText('');
+      fetchFeedbackData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to send message.');
+    } finally {
+      setChatSubmitting(false);
     }
   };
 
@@ -289,7 +344,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
           <div className="auth-card" style={{
             background: 'white',
             width: '100%',
-            maxWidth: '350px',
+            maxWidth: '380px',
             borderRadius: '16px',
             border: '1px solid #cbd5e1',
             padding: '20px',
@@ -297,8 +352,11 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
             display: 'flex',
             flexDirection: 'column',
             gap: '14px',
-            position: 'relative'
+            position: 'relative',
+            maxHeight: '90vh',
+            overflowY: 'auto'
           }}>
+            {/* Close button - always visible */}
             <button
               onClick={() => setIsFeedbackOpen(false)}
               style={{
@@ -308,82 +366,294 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                 background: 'transparent',
                 border: 'none',
                 color: '#64748b',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                zIndex: 10
               }}
             >
               <X size={18} />
             </button>
 
-            <div style={{ textAlign: 'center', marginBottom: '4px' }}>
-              <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: '800', color: '#1e293b' }}>Feedback & Suggestions</h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', margin: 0 }}>Help us improve TN sevai. We value your suggestions!</p>
-            </div>
+            {/* Sub-view: MENU */}
+            {modalSubView === 'menu' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '10px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '1.2rem', margin: 0, fontWeight: '800', color: '#1e293b' }}>Feedback & Support</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', margin: 0 }}>Select an option to proceed</p>
+                </div>
 
-            <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Star Rating */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Rating *</label>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {[1, 2, 3, 4, 5].map(star => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button
+                    onClick={() => setModalSubView('reviews')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px',
+                      background: '#f8fafc',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s',
+                      outline: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--primary)';
+                      e.currentTarget.style.background = 'rgba(16,185,129,0.02)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#cbd5e1';
+                      e.currentTarget.style.background = '#f8fafc';
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <div style={{ padding: '8px', background: '#dcfce7', color: '#16803d', borderRadius: '8px', display: 'flex' }}>
+                        <Star size={20} fill="#16803d" />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#1e293b', display: 'block' }}>Citizen Reviews</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Read and write public reviews</span>
+                      </div>
+                    </div>
+                    <ChevronDown size={18} style={{ transform: 'rotate(-90deg)', color: '#94a3b8' }} />
+                  </button>
+
+                  {currentUser ? (
                     <button
-                      key={star}
-                      type="button"
-                      onClick={() => setFeedbackRating(star)}
+                      onClick={() => setModalSubView('chat')}
                       style={{
-                        background: 'none',
-                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        background: '#f8fafc',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '12px',
                         cursor: 'pointer',
-                        fontSize: '1.5rem',
-                        color: star <= feedbackRating ? '#f59e0b' : '#cbd5e1',
-                        transition: 'color 0.15s, transform 0.15s',
-                        transform: star <= feedbackRating ? 'scale(1.1)' : 'scale(1)',
-                        padding: '2px'
+                        textAlign: 'left',
+                        transition: 'all 0.2s',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--secondary)';
+                        e.currentTarget.style.background = 'rgba(99,102,241,0.02)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.background = '#f8fafc';
                       }}
                     >
-                      ★
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ padding: '8px', background: '#e0f2fe', color: '#0284c7', borderRadius: '8px', display: 'flex' }}>
+                          <MessageSquare size={20} fill="#0284c7" />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#1e293b', display: 'block' }}>Support Inquiry</span>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Private support chat with admin</span>
+                        </div>
+                      </div>
+                      <ChevronDown size={18} style={{ transform: 'rotate(-90deg)', color: '#94a3b8' }} />
                     </button>
-                  ))}
+                  ) : (
+                    <div style={{
+                      padding: '12px',
+                      background: '#fee2e2',
+                      border: '1px solid #fca5a5',
+                      borderRadius: '12px',
+                      textAlign: 'center',
+                      fontSize: '0.75rem',
+                      color: '#991b1b',
+                      fontWeight: '600'
+                    }}>
+                      🔒 Log in to access direct support chat.
+                    </div>
+                  )}
                 </div>
               </div>
+            )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#334155' }}>Your Message *</label>
-                <textarea
-                  rows={4}
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                  placeholder="Share your thoughts, suggestions, or issues..."
-                  required
-                  style={{
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.8rem',
-                    resize: 'none',
-                    outline: 'none',
-                    fontFamily: 'inherit'
-                  }}
-                />
+            {/* Sub-view: REVIEWS */}
+            {modalSubView === 'reviews' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '4px' }}>
+                  <button
+                    onClick={() => setModalSubView('menu')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: '4px', color: '#64748b' }}
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                  <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#1e293b' }}>Citizen Reviews</span>
+                </div>
+
+                {/* Review form */}
+                <form onSubmit={handleReviewSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: '700', color: '#475569' }}>Name</label>
+                      <input 
+                        type="text" 
+                        value={reviewName} 
+                        onChange={(e) => setReviewName(e.target.value)} 
+                        required 
+                        placeholder="Your name" 
+                        style={{ padding: '6px 10px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: '700', color: '#475569' }}>Rating</label>
+                      <div style={{ display: 'flex', gap: '2px', height: '28px', alignItems: 'center' }}>
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: star <= reviewRating ? '#f59e0b' : '#cbd5e1', padding: 0 }}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: '700', color: '#475569' }}>Message</label>
+                    <textarea
+                      rows={2}
+                      value={reviewText}
+                      onChange={(e) => setReviewText(e.target.value)}
+                      required
+                      placeholder="Share your experience..."
+                      style={{ padding: '6px 10px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', resize: 'none', outline: 'none', fontFamily: 'inherit' }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={reviewSubmitting}
+                    className="premium-btn premium-btn-success"
+                    style={{ padding: '6px 12px', fontSize: '0.72rem', alignSelf: 'flex-end', width: 'auto', fontWeight: '700' }}
+                  >
+                    {reviewSubmitting ? 'Submitting...' : 'Submit'}
+                  </button>
+                </form>
+
+                {/* Reviews List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {feedbackLoading ? (
+                    <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>Loading reviews...</div>
+                  ) : feedbackList.filter(f => parseInt(f.rating) > 0).length === 0 ? (
+                    <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8' }}>No reviews yet.</div>
+                  ) : (
+                    feedbackList.filter(f => parseInt(f.rating) > 0).map(review => (
+                      <div key={review.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1e293b' }}>{review.user_name}</span>
+                          <div style={{ display: 'flex' }}>
+                            {[1,2,3,4,5].map(s => (
+                              <span key={s} style={{ fontSize: '0.75rem', color: s <= parseInt(review.rating) ? '#f59e0b' : '#cbd5e1' }}>★</span>
+                            ))}
+                          </div>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', lineHeight: '1.4' }}>{review.message}</p>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.55rem', color: '#94a3b8', textAlign: 'right' }}>
+                          {review.created_at ? new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={feedbackSubmitting}
-                className="premium-btn premium-btn-success"
-                style={{
-                  padding: '10px',
+            {/* Sub-view: CHAT */}
+            {modalSubView === 'chat' && currentUser && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '4px' }}>
+                  <button
+                    onClick={() => setModalSubView('menu')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: '4px', color: '#64748b' }}
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                  <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#1e293b' }}>Support Inquiry</span>
+                </div>
+
+                {/* Chat messages */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  padding: '12px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: '700',
-                  opacity: feedbackSubmitting ? 0.7 : 1
-                }}
-              >
-                <Send size={14} /> {feedbackSubmitting ? 'Sending...' : 'Send Feedback'}
-              </button>
-            </form>
+                  flexDirection: 'column',
+                  gap: '10px',
+                  height: '240px',
+                  overflowY: 'auto'
+                }}>
+                  {feedbackLoading ? (
+                    <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>Loading messages...</div>
+                  ) : feedbackList.filter(f => (!f.rating || parseInt(f.rating) === 0) && (f.user_aadhar === currentUser.aadhar || f.user_phone === currentUser.phone)).length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px 10px', color: '#94a3b8', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                      <MessageSquare size={24} style={{ opacity: 0.3 }} />
+                      No messages yet. Send a message to the admin below.
+                    </div>
+                  ) : (
+                    feedbackList.filter(f => (!f.rating || parseInt(f.rating) === 0) && (f.user_aadhar === currentUser.aadhar || f.user_phone === currentUser.phone))
+                      .slice().reverse()
+                      .map(msg => (
+                        <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {/* User Inquiry Message */}
+                          <div style={{ alignSelf: 'flex-end', maxWidth: '85%', background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)', color: 'white', padding: '8px 12px', borderRadius: '12px 12px 2px 12px', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
+                            <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>{msg.message}</p>
+                            <span style={{ fontSize: '0.5rem', opacity: 0.8, display: 'block', textAlign: 'right', marginTop: '2px' }}>
+                              {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
+
+                          {/* Admin Reply */}
+                          {msg.admin_response ? (
+                            <div style={{ alignSelf: 'flex-start', maxWidth: '85%', background: '#ffffff', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '12px 12px 12px 2px', boxShadow: '0 2px 4px rgba(0,0,0,0.01)' }}>
+                              <span style={{ fontSize: '0.58rem', fontWeight: '800', color: 'var(--secondary)', display: 'block', marginBottom: '2px', textTransform: 'uppercase' }}>
+                                🛡️ Admin Reply
+                              </span>
+                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#1e293b', lineHeight: '1.4' }}>{msg.admin_response}</p>
+                              <span style={{ fontSize: '0.5rem', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                                {msg.response_at ? new Date(msg.response_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ alignSelf: 'flex-start', fontSize: '0.6rem', color: '#94a3b8', fontStyle: 'italic', paddingLeft: '4px' }}>
+                              Sent. Pending reply...
+                            </span>
+                          )}
+                        </div>
+                      ))
+                  )}
+                </div>
+
+                {/* Send message form */}
+                <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type="text"
+                    value={chatMessageText}
+                    onChange={(e) => setChatMessageText(e.target.value)}
+                    required
+                    placeholder="Type message to admin..."
+                    style={{ flex: 1, padding: '8px 12px', fontSize: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', background: '#ffffff' }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatSubmitting}
+                    className="premium-btn premium-btn-primary"
+                    style={{ padding: '8px 14px', fontSize: '0.75rem', fontWeight: '700', borderRadius: '8px', width: 'auto' }}
+                  >
+                    Send
+                  </button>
+                </form>
+              </div>
+            )}
+
           </div>
         </div>
       )}
