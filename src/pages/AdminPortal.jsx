@@ -635,7 +635,7 @@ export default function AdminPortal() {
       description: post.description || '',
       img_url: post.img_url || '',
       apply_url: post.apply_url || '',
-      coming_soon: post.coming_soon === true || String(post.coming_soon) === 'true'
+      coming_soon: post.coming_soon === true || String(post.coming_soon).toLowerCase() === 'true'
     });
     document.getElementById('post-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -698,7 +698,7 @@ export default function AdminPortal() {
       apply_url: job.apply_url || '',
       details_doc: job.details_doc || '',
       button_name: job.button_name || '',
-      coming_soon: job.coming_soon === true || String(job.coming_soon) === 'true'
+      coming_soon: job.coming_soon === true || String(job.coming_soon).toLowerCase() === 'true'
     });
     document.getElementById('job-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -817,7 +817,7 @@ export default function AdminPortal() {
       custom_docs: normalizeCustomDocs(safeJsonParse(form.custom_docs)),
       fields: safeJsonParse(form.fields),
       img_url: form.img_url || '',
-      coming_soon: form.coming_soon === true || String(form.coming_soon) === 'true'
+      coming_soon: form.coming_soon === true || String(form.coming_soon).toLowerCase() === 'true'
     });
     document.getElementById('form-builder-panel')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -1336,7 +1336,7 @@ export default function AdminPortal() {
                   <div style={{ flex: 1 }}>
                     <h4 style={{ fontSize: '0.95rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {post.title}
-                      {(post.coming_soon === true || String(post.coming_soon) === 'true') && (
+                      {(post.coming_soon === true || String(post.coming_soon).toLowerCase() === 'true') && (
                         <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px' }}>Coming Soon</span>
                       )}
                     </h4>
@@ -1516,7 +1516,7 @@ export default function AdminPortal() {
                   <div style={{ flex: 1 }}>
                     <h4 style={{ fontSize: '0.95rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {job.title}
-                      {(job.coming_soon === true || String(job.coming_soon) === 'true') && (
+                      {(job.coming_soon === true || String(job.coming_soon).toLowerCase() === 'true') && (
                         <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px' }}>Coming Soon</span>
                       )}
                     </h4>
@@ -2120,7 +2120,7 @@ export default function AdminPortal() {
                     </div>
                     <h4 style={{ fontSize: '0.95rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {form.title}
-                      {(form.coming_soon === true || String(form.coming_soon) === 'true') && (
+                      {(form.coming_soon === true || String(form.coming_soon).toLowerCase() === 'true') && (
                         <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px' }}>Coming Soon</span>
                       )}
                     </h4>

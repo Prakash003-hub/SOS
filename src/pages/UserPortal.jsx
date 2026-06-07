@@ -598,6 +598,16 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   };
 
   const selectFormToFill = async (form) => {
+    if (form.coming_soon === true || String(form.coming_soon).toLowerCase() === 'true') {
+      setSelectedForm(form);
+      setWizardStep(1);
+      setFormData({});
+      setUploadedFiles({});
+      setAgreeCheckbox(false);
+      setDeletedSavedDocs({});
+      setDuplicateSubmissionError('');
+      return;
+    }
     if (currentUser && currentUser.aadhar) {
       setLoading(true);
       try {
@@ -1874,7 +1884,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {post.description}
                     </p>
 
-                    {(post.coming_soon === true || String(post.coming_soon) === 'true') ? (
+                    {(post.coming_soon === true || String(post.coming_soon).toLowerCase() === 'true') ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', marginTop: '4px' }}>
                         <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.05)' }}>
                           <Clock size={18} style={{ color: '#d97706', animation: 'pulse-text 2s ease-in-out infinite' }} />
@@ -1930,7 +1940,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {activeTab === 'jobs' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
             {selectedJobDetails ? (
-              (selectedJobDetails.coming_soon === true || String(selectedJobDetails.coming_soon) === 'true') ? (
+              (selectedJobDetails.coming_soon === true || String(selectedJobDetails.coming_soon).toLowerCase() === 'true') ? (
                 <div style={{ gridColumn: 'span 2' }}>
                   <div className="premium-card text-center" style={{ padding: '32px 24px', borderTop: '6px solid #f59e0b', background: 'white', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
                     <button 
@@ -2037,7 +2047,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               </div>
             ) : (
               jobs.map((job) => {
-                const isJobComingSoon = job.coming_soon === true || String(job.coming_soon) === 'true';
+                const isJobComingSoon = job.coming_soon === true || String(job.coming_soon).toLowerCase() === 'true';
                 return (
                   <div key={job.id} className="instagram-post-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-light-main)', margin: 0, lineHeight: '1.3', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
@@ -2124,7 +2134,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       const fieldsCount = safeJsonParse(form.required_fields, []).length;
                       const docsCount = safeJsonParse(form.required_docs, []).length;
                       const isAutoUpcoming = fieldsCount === 0 && docsCount === 0;
-                      const isManualComingSoon = form.coming_soon === true || String(form.coming_soon) === 'true';
+                      const isManualComingSoon = form.coming_soon === true || String(form.coming_soon).toLowerCase() === 'true';
                       const isUpcoming = isAutoUpcoming; // only disable automatically upcoming forms (0 fields and 0 docs)
                       const showUpcomingLabel = isAutoUpcoming || isManualComingSoon;
 
@@ -2180,6 +2190,27 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   </div>
                 )}
               </div>
+            ) : (selectedForm.coming_soon === true || String(selectedForm.coming_soon).toLowerCase() === 'true') ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderBottom: '1px solid var(--border-light)' }}>
+                  <button onClick={() => setSelectedForm(null)} className="premium-btn premium-btn-secondary" style={{ width: '40px', height: '40px', padding: 0, borderRadius: '50%' }}>
+                    <ArrowLeft size={18} />
+                  </button>
+                  <div>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>{selectedForm.title}</h3>
+                  </div>
+                </div>
+                
+                <div style={{ padding: '32px 16px' }}>
+                  <div className="premium-card text-center" style={{ borderTop: '6px solid #f59e0b', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                    <Clock size={48} style={{ color: '#f59e0b', margin: '0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>updated .... coming soon...</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, maxWidth: '360px', lineHeight: '1.5' }}>
+                      This application form is currently being updated and will be available soon. Please check back later.
+                    </p>
+                  </div>
+                </div>
+              </div>
             ) : (
               // Active 5-Step Application Wizard
               <div>
@@ -2231,7 +2262,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 {/* STEP 1: INSTRUCTIONS & TERMS */}
                 {wizardStep === 1 && (
                   <div style={{ padding: '0 16px' }}>
-                    {(selectedForm.coming_soon === true || String(selectedForm.coming_soon) === 'true') ? (
+                    {(selectedForm.coming_soon === true || String(selectedForm.coming_soon).toLowerCase() === 'true') ? (
                       <>
                         <div className="premium-card text-center" style={{ borderTop: '6px solid #f59e0b', margin: '0 0 20px 0', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
                           <Clock size={48} style={{ color: '#f59e0b', margin: '12px auto 0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
