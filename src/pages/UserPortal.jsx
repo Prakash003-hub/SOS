@@ -1771,6 +1771,22 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     );
   };
 
+  // --- SORTING HELPER ---
+  const sortItems = (list) => {
+    return [...list].sort((a, b) => {
+      const orderA = a.order_index === undefined || a.order_index === null ? 0 : Number(a.order_index);
+      const orderB = b.order_index === undefined || b.order_index === null ? 0 : Number(b.order_index);
+      if (orderA !== orderB) return orderA - orderB;
+      
+      const idA = isNaN(a.id) ? a.id : Number(a.id);
+      const idB = isNaN(b.id) ? b.id : Number(b.id);
+      if (typeof idA === 'number' && typeof idB === 'number') {
+        return idB - idA;
+      }
+      return String(idB).localeCompare(String(idA));
+    });
+  };
+
   // --- CATEGORIES HELPER ---
   const filteredForms = selectedCategory === 'all'
     ? forms
@@ -1863,7 +1879,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 <p className="text-muted">No services published yet.</p>
               </div>
             ) : (
-              posts.map((post) => {
+              sortItems(posts).map((post) => {
                 return (
                   <div id={`post-${post.id}`} className="instagram-post-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-light-main)', margin: 0, lineHeight: '1.3' }}>
@@ -1941,8 +1957,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
             {selectedJobDetails ? (
               (selectedJobDetails.coming_soon === true || String(selectedJobDetails.coming_soon).toLowerCase() === 'true') ? (
-                <div style={{ gridColumn: 'span 2' }}>
-                  <div className="premium-card text-center" style={{ padding: '32px 24px', borderTop: '6px solid #f59e0b', background: 'white', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                <div style={{ gridColumn: 'span 2', minHeight: 'calc(100vh - 270px)', display: 'flex', flexDirection: 'column' }}>
+                  <div className="premium-card text-center" style={{ flex: 1, padding: '32px 24px', borderTop: '6px solid #f59e0b', background: 'white', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
                     <button 
                       onClick={() => setSelectedJobDetails(null)} 
                       className="premium-btn premium-btn-secondary" 
@@ -1950,14 +1966,16 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     >
                       <ArrowLeft size={16} /> Back to Jobs
                     </button>
-                    <Clock size={48} style={{ color: '#f59e0b', margin: '12px auto 0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0', lineHeight: '1.3' }}>
-                      {selectedJobDetails.title}
-                    </h2>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#d97706', margin: '0' }}>updated .... coming soon...</h3>
-                    <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, maxWidth: '360px', lineHeight: '1.5' }}>
-                      The details for this job alert are currently being updated. Please check back soon!
-                    </p>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '16px' }}>
+                      <Clock size={48} style={{ color: '#f59e0b', margin: '0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
+                      <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0', lineHeight: '1.3' }}>
+                        {selectedJobDetails.title}
+                      </h2>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#d97706', margin: '0' }}>updated .... coming soon...</h3>
+                      <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, maxWidth: '360px', lineHeight: '1.5' }}>
+                        The details for this job alert are currently being updated. Please check back soon!
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -2046,7 +2064,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 <p className="text-muted">No job alerts published yet.</p>
               </div>
             ) : (
-              jobs.map((job) => {
+              sortItems(jobs).map((job) => {
                 const isJobComingSoon = job.coming_soon === true || String(job.coming_soon).toLowerCase() === 'true';
                 return (
                   <div key={job.id} className="instagram-post-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -2130,7 +2148,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   </div>
                 ) : (
                   <div className="desktop-grid-2">
-                    {filteredForms.map((form) => {
+                    {sortItems(filteredForms).map((form) => {
                       const fieldsCount = safeJsonParse(form.required_fields, []).length;
                       const docsCount = safeJsonParse(form.required_docs, []).length;
                       const isAutoUpcoming = fieldsCount === 0 && docsCount === 0;
@@ -2191,7 +2209,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 )}
               </div>
             ) : (selectedForm.coming_soon === true || String(selectedForm.coming_soon).toLowerCase() === 'true') ? (
-              <div>
+              <div style={{ minHeight: 'calc(100vh - 270px)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderBottom: '1px solid var(--border-light)' }}>
                   <button onClick={() => setSelectedForm(null)} className="premium-btn premium-btn-secondary" style={{ width: '40px', height: '40px', padding: 0, borderRadius: '50%' }}>
                     <ArrowLeft size={18} />
@@ -2201,8 +2219,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   </div>
                 </div>
                 
-                <div style={{ padding: '32px 16px' }}>
-                  <div className="premium-card text-center" style={{ borderTop: '6px solid #f59e0b', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                <div style={{ padding: '32px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div className="premium-card text-center" style={{ flex: 1, borderTop: '6px solid #f59e0b', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
                     <Clock size={48} style={{ color: '#f59e0b', margin: '0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
                     <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>updated .... coming soon...</h3>
                     <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, maxWidth: '360px', lineHeight: '1.5' }}>

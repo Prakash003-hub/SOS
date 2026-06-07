@@ -550,7 +550,13 @@ export default function AdminPortal() {
       const orderA = a.order_index === undefined || a.order_index === null ? 0 : Number(a.order_index);
       const orderB = b.order_index === undefined || b.order_index === null ? 0 : Number(b.order_index);
       if (orderA !== orderB) return orderA - orderB;
-      return Number(a.id || 0) - Number(b.id || 0);
+      
+      const idA = isNaN(a.id) ? a.id : Number(a.id);
+      const idB = isNaN(b.id) ? b.id : Number(b.id);
+      if (typeof idA === 'number' && typeof idB === 'number') {
+        return idB - idA;
+      }
+      return String(idB).localeCompare(String(idA));
     });
   };
 
