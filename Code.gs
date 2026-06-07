@@ -293,6 +293,7 @@ function createPostAction(postData) {
     img_url: postData.img_url || "",
     apply_url: postData.apply_url || "",
     order_index: parseInt(postData.order_index) || 0,
+    coming_soon: postData.coming_soon !== undefined ? String(postData.coming_soon) : "false",
     created_at: new Date().toISOString()
   };
   
@@ -311,6 +312,7 @@ function updatePostAction(id, postData) {
   existingRow.img_url = postData.img_url !== undefined ? postData.img_url : existingRow.img_url;
   existingRow.apply_url = postData.apply_url !== undefined ? postData.apply_url : existingRow.apply_url;
   if (postData.order_index !== undefined) existingRow.order_index = parseInt(postData.order_index) || 0;
+  existingRow.coming_soon = postData.coming_soon !== undefined ? String(postData.coming_soon) : existingRow.coming_soon;
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -350,6 +352,7 @@ function createJobAction(jobData) {
     details_doc: jobData.details_doc || "",
     button_name: jobData.button_name || "",
     order_index: parseInt(jobData.order_index) || 0,
+    coming_soon: jobData.coming_soon !== undefined ? String(jobData.coming_soon) : "false",
     created_at: new Date().toISOString()
   };
   
@@ -370,6 +373,7 @@ function updateJobAction(id, jobData) {
   existingRow.details_doc = jobData.details_doc !== undefined ? jobData.details_doc : existingRow.details_doc;
   existingRow.button_name = jobData.button_name !== undefined ? jobData.button_name : existingRow.button_name;
   if (jobData.order_index !== undefined) existingRow.order_index = parseInt(jobData.order_index) || 0;
+  existingRow.coming_soon = jobData.coming_soon !== undefined ? String(jobData.coming_soon) : existingRow.coming_soon;
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -408,6 +412,7 @@ function getFormsAction() {
       fields: parseJsonField(row.fields),
       img_url: row.img_url || "",
       order_index: parseInt(row.order_index) || 0,
+      coming_soon: row.coming_soon || "false",
       created_at: row.created_at
     };
   });
@@ -432,6 +437,7 @@ function getFormByIdAction(id) {
     fields: parseJsonField(row.fields),
     img_url: row.img_url || "",
     order_index: parseInt(row.order_index) || 0,
+    coming_soon: row.coming_soon || "false",
     created_at: row.created_at
   };
 }
@@ -453,6 +459,7 @@ function createFormAction(formData) {
     fields: typeof formData.fields === "string" ? formData.fields : JSON.stringify(formData.fields || []),
     img_url: formData.img_url || "",
     order_index: parseInt(formData.order_index) || 0,
+    coming_soon: formData.coming_soon !== undefined ? String(formData.coming_soon) : "false",
     created_at: new Date().toISOString()
   };
   
@@ -477,6 +484,7 @@ function updateFormAction(id, formData) {
   if (formData.fields !== undefined) existingRow.fields = typeof formData.fields === "string" ? formData.fields : JSON.stringify(formData.fields);
   if (formData.img_url !== undefined) existingRow.img_url = formData.img_url;
   if (formData.order_index !== undefined) existingRow.order_index = parseInt(formData.order_index) || 0;
+  if (formData.coming_soon !== undefined) existingRow.coming_soon = String(formData.coming_soon);
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -519,7 +527,8 @@ function duplicateFormAction(id) {
     custom_docs: form.custom_docs,
     fields: form.fields,
     img_url: form.img_url,
-    order_index: form.order_index
+    order_index: form.order_index,
+    coming_soon: form.coming_soon
   };
   return createFormAction(duplicatedForm);
 }
@@ -1434,6 +1443,7 @@ function initSpreadsheet() {
   ]);
   ensureColumnExists(formsSheet, "img_url");
   ensureColumnExists(formsSheet, "order_index");
+  ensureColumnExists(formsSheet, "coming_soon");
   
   // 2. USERS PROFILE SHEET
   var usersSheet = ensureSheetExists("Users", [
@@ -1457,6 +1467,7 @@ function initSpreadsheet() {
     "id", "title", "description", "img_url", "apply_url", "order_index", "created_at"
   ]);
   ensureColumnExists(postsSheet, "order_index");
+  ensureColumnExists(postsSheet, "coming_soon");
 
   // 4B. JOBS FEED SHEET
   var jobsSheet = ensureSheetExists("Jobs", [
@@ -1465,6 +1476,7 @@ function initSpreadsheet() {
   ensureColumnExists(jobsSheet, "details_doc");
   ensureColumnExists(jobsSheet, "button_name");
   ensureColumnExists(jobsSheet, "order_index");
+  ensureColumnExists(jobsSheet, "coming_soon");
   
   // 5B. FEEDBACK SHEET
   ensureSheetExists("Feedback", [

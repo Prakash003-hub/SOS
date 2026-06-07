@@ -1874,42 +1874,51 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {post.description}
                     </p>
 
-                    <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
-                      {post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' && (
-                        <button 
-                          onClick={() => {
-                            if (post.apply_url.startsWith('/user')) {
-                              const urlParams = new URLSearchParams(post.apply_url.split('?')[1]);
-                              setSearchParams(urlParams);
-                            } else {
-                              window.open(post.apply_url, '_blank');
-                            }
-                          }}
+                    {(post.coming_soon === true || String(post.coming_soon) === 'true') ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', marginTop: '4px' }}>
+                        <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.05)' }}>
+                          <Clock size={18} style={{ color: '#d97706', animation: 'pulse-text 2s ease-in-out infinite' }} />
+                          <span style={{ color: '#d97706', fontWeight: '800', fontSize: '0.9rem', letterSpacing: '0.05em' }}>updated .... coming soon...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
+                        {post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' && (
+                          <button 
+                            onClick={() => {
+                              if (post.apply_url.startsWith('/user')) {
+                                const urlParams = new URLSearchParams(post.apply_url.split('?')[1]);
+                                setSearchParams(urlParams);
+                              } else {
+                                window.open(post.apply_url, '_blank');
+                              }
+                            }}
+                            className="premium-btn premium-btn-primary"
+                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                          >
+                            Apply Now <ChevronRight size={18} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppShare(post.title, post.description, `/post/${post.id}`)}
                           className="premium-btn premium-btn-primary"
-                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                          style={{ 
+                            width: post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' ? '42px' : '100%', 
+                            padding: '11px 0', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '6px',
+                            fontWeight: 'bold'
+                          }}
+                          title="Share on WhatsApp"
                         >
-                          Apply Now <ChevronRight size={18} />
+                          <Share2 size={18} />
+                          {!(post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none') && <span>Share on WhatsApp</span>}
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleWhatsAppShare(post.title, post.description, `/post/${post.id}`)}
-                        className="premium-btn premium-btn-primary"
-                        style={{ 
-                          width: post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' ? '42px' : '100%', 
-                          padding: '11px 0', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          gap: '6px',
-                          fontWeight: 'bold'
-                        }}
-                        title="Share on WhatsApp"
-                      >
-                        <Share2 size={18} />
-                        {!(post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none') && <span>Share on WhatsApp</span>}
-                      </button>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -1921,83 +1930,105 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {activeTab === 'jobs' && (
           <div className="desktop-grid-2" style={{ padding: '0 8px' }}>
             {selectedJobDetails ? (
-              <div style={{ gridColumn: 'span 2' }}>
-                <div className="premium-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '6px solid var(--primary)', background: 'white', borderRadius: '16px' }}>
-                  
-                  {/* Nested Details Back Button */}
-                  <button 
-                    onClick={() => setSelectedJobDetails(null)} 
-                    className="premium-btn premium-btn-secondary" 
-                    style={{ width: 'fit-content', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}
-                  >
-                    <ArrowLeft size={16} /> Back to Jobs
-                  </button>
-
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0', lineHeight: '1.3' }}>
-                    {selectedJobDetails.title}
-                  </h2>
-
-                  {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
-                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' }}>
-                      <img 
-                        src={getImageUrl(selectedJobDetails.img_url)} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        alt={selectedJobDetails.title} 
-                      />
-                    </div>
-                  )}
-
-                  <p style={{ color: '#475569', fontSize: '1rem', lineHeight: '1.6', margin: 0, paddingBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                    {selectedJobDetails.description}
-                  </p>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                    {parseDetailsDoc(selectedJobDetails.details_doc)}
+              (selectedJobDetails.coming_soon === true || String(selectedJobDetails.coming_soon) === 'true') ? (
+                <div style={{ gridColumn: 'span 2' }}>
+                  <div className="premium-card text-center" style={{ padding: '32px 24px', borderTop: '6px solid #f59e0b', background: 'white', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                    <button 
+                      onClick={() => setSelectedJobDetails(null)} 
+                      className="premium-btn premium-btn-secondary" 
+                      style={{ width: 'fit-content', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start' }}
+                    >
+                      <ArrowLeft size={16} /> Back to Jobs
+                    </button>
+                    <Clock size={48} style={{ color: '#f59e0b', margin: '12px auto 0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0', lineHeight: '1.3' }}>
+                      {selectedJobDetails.title}
+                    </h2>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#d97706', margin: '0' }}>updated .... coming soon...</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, maxWidth: '360px', lineHeight: '1.5' }}>
+                      The details for this job alert are currently being updated. Please check back soon!
+                    </p>
                   </div>
-
-                  {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' ? (
-                    <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px', display: 'flex', gap: '10px' }}>
-                      <button 
-                        onClick={() => {
-                          const url = selectedJobDetails.apply_url;
-                          setSelectedJobDetails(null);
-                          if (url.startsWith('/user')) {
-                            const urlParams = new URLSearchParams(url.split('?')[1]);
-                            setSearchParams(urlParams);
-                          } else {
-                            window.open(url, '_blank');
-                          }
-                        }}
-                        className="premium-btn premium-btn-primary"
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem' }}
-                      >
-                        {selectedJobDetails.button_name || 'Apply Now'} <ChevronRight size={20} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/job/${selectedJobDetails.id}`)}
-                        className="premium-btn premium-btn-primary"
-                        style={{ width: '52px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}
-                        title="Share on WhatsApp"
-                      >
-                        <Share2 size={22} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/job/${selectedJobDetails.id}`)}
-                        className="premium-btn premium-btn-primary"
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem', borderRadius: '8px', fontWeight: 'bold' }}
-                        title="Share on WhatsApp"
-                      >
-                        <Share2 size={20} /> Share on WhatsApp
-                      </button>
-                    </div>
-                  )}
                 </div>
-              </div>
+              ) : (
+                <div style={{ gridColumn: 'span 2' }}>
+                  <div className="premium-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '6px solid var(--primary)', background: 'white', borderRadius: '16px' }}>
+                    
+                    {/* Nested Details Back Button */}
+                    <button 
+                      onClick={() => setSelectedJobDetails(null)} 
+                      className="premium-btn premium-btn-secondary" 
+                      style={{ width: 'fit-content', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}
+                    >
+                      <ArrowLeft size={16} /> Back to Jobs
+                    </button>
+
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0', lineHeight: '1.3' }}>
+                      {selectedJobDetails.title}
+                    </h2>
+
+                    {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
+                      <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' }}>
+                        <img 
+                          src={getImageUrl(selectedJobDetails.img_url)} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          alt={selectedJobDetails.title} 
+                        />
+                      </div>
+                    )}
+
+                    <p style={{ color: '#475569', fontSize: '1rem', lineHeight: '1.6', margin: 0, paddingBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      {selectedJobDetails.description}
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                      {parseDetailsDoc(selectedJobDetails.details_doc)}
+                    </div>
+
+                    {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' ? (
+                      <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px', display: 'flex', gap: '10px' }}>
+                        <button 
+                          onClick={() => {
+                            const url = selectedJobDetails.apply_url;
+                            setSelectedJobDetails(null);
+                            if (url.startsWith('/user')) {
+                              const urlParams = new URLSearchParams(url.split('?')[1]);
+                              setSearchParams(urlParams);
+                            } else {
+                              window.open(url, '_blank');
+                            }
+                          }}
+                          className="premium-btn premium-btn-primary"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem' }}
+                        >
+                          {selectedJobDetails.button_name || 'Apply Now'} <ChevronRight size={20} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/job/${selectedJobDetails.id}`)}
+                          className="premium-btn premium-btn-primary"
+                          style={{ width: '52px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}
+                          title="Share on WhatsApp"
+                        >
+                          <Share2 size={22} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppShare(selectedJobDetails.title, selectedJobDetails.description, `/job/${selectedJobDetails.id}`)}
+                          className="premium-btn premium-btn-primary"
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', fontSize: '1.1rem', borderRadius: '8px', fontWeight: 'bold' }}
+                          title="Share on WhatsApp"
+                        >
+                          <Share2 size={20} /> Share on WhatsApp
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
             ) : jobsLoading ? (
               renderMintGreenLoader("LOADING...")
             ) : jobs.length === 0 ? (
@@ -2006,10 +2037,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               </div>
             ) : (
               jobs.map((job) => {
+                const isJobComingSoon = job.coming_soon === true || String(job.coming_soon) === 'true';
                 return (
                   <div key={job.id} className="instagram-post-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-light-main)', margin: 0, lineHeight: '1.3' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-light-main)', margin: 0, lineHeight: '1.3', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       {job.title}
+                      {isJobComingSoon && (
+                        <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Upcoming</span>
+                      )}
                     </h3>
 
                     {job.img_url && job.img_url.trim() !== '' && (
@@ -2033,7 +2068,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           className="premium-btn premium-btn-primary"
                           style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                         >
-                          View Details & Apply <ChevronRight size={18} />
+                          {isJobComingSoon ? 'View Details' : 'View Details & Apply'} <ChevronRight size={18} />
                         </button>
                         <button
                           type="button"
@@ -2088,13 +2123,16 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     {filteredForms.map((form) => {
                       const fieldsCount = safeJsonParse(form.required_fields, []).length;
                       const docsCount = safeJsonParse(form.required_docs, []).length;
-                      const isUpcoming = fieldsCount === 0 && docsCount === 0;
+                      const isAutoUpcoming = fieldsCount === 0 && docsCount === 0;
+                      const isManualComingSoon = form.coming_soon === true || String(form.coming_soon) === 'true';
+                      const isUpcoming = isAutoUpcoming; // only disable automatically upcoming forms (0 fields and 0 docs)
+                      const showUpcomingLabel = isAutoUpcoming || isManualComingSoon;
 
                       return (
                         <div key={form.id} className="premium-card">
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                             <span className="badge badge-info">{form.category}</span>
-                            {isUpcoming ? (
+                            {showUpcomingLabel ? (
                               <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>Upcoming</span>
                             ) : (
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>Apply</span>
@@ -2122,9 +2160,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               style={{ flex: 1, padding: '10px', opacity: isUpcoming ? 0.7 : 1, cursor: isUpcoming ? 'not-allowed' : 'pointer' }}
                               disabled={isUpcoming}
                             >
-                              {isUpcoming ? 'Upcoming soon' : 'Click to Apply'}
+                              {isManualComingSoon ? 'Upcoming soon' : isUpcoming ? 'Upcoming soon' : 'Click to Apply'}
                             </button>
-                            {!isUpcoming && (
+                            {(!isUpcoming || isManualComingSoon) && (
                               <button
                                 type="button"
                                 onClick={() => handleWhatsAppShare(form.title, `Apply for ${form.title} easily through our E-Sevai portal.`, `/form/${form.id}`)}
@@ -2193,7 +2231,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 {/* STEP 1: INSTRUCTIONS & TERMS */}
                 {wizardStep === 1 && (
                   <div style={{ padding: '0 16px' }}>
-                    {showGuestVerification ? (
+                    {(selectedForm.coming_soon === true || String(selectedForm.coming_soon) === 'true') ? (
+                      <>
+                        <div className="premium-card text-center" style={{ borderTop: '6px solid #f59e0b', margin: '0 0 20px 0', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                          <Clock size={48} style={{ color: '#f59e0b', margin: '12px auto 0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
+                          <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', marginBottom: '8px' }}>updated .... coming soon...</h3>
+                          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, maxWidth: '360px', lineHeight: '1.5' }}>
+                            This application form is currently being updated and will be available soon. Please check back later.
+                          </p>
+                        </div>
+                        <button 
+                          disabled
+                          className="premium-btn premium-btn-secondary"
+                          style={{ marginBottom: '20px', cursor: 'not-allowed', opacity: 0.6 }}
+                        >
+                          Unavailable <ChevronRight size={18} />
+                        </button>
+                      </>
+                    ) : showGuestVerification ? (
                       <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '0 0 20px 0' }}>
                         <h4 style={{ fontSize: '1.1rem', marginBottom: '12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           🔑 Identity Verification

@@ -610,6 +610,7 @@ const callMockFallback = (action, payload) => {
         apply_url: "/user?tab=apply",
         details_doc: "H1: TNEB ITI Wireman Openings 2026\nH2: Selection Criteria and Key Details\n---\nH3: Category Vacancy Details\ntable:\nCategory, Vacancies, Qualification\nGeneral Turn, 50, ITI in Electrical Trade\nBackward Classes (BC), 45, ITI in Electrical Trade\nMost Backward Classes (MBC), 35, ITI in Electrical Trade\nScheduled Castes / Tribes (SC/ST), 20, ITI in Electrical Trade\n---\nH3: Selection Procedure\nCandidates will be selected based on marks secured in competitive examination followed by document verification.\nApply directly through the local citizen portal by clicking the link below.",
         button_name: "Apply on Citizen Portal",
+        coming_soon: "false",
         created_at: new Date().toISOString()
       },
       {
@@ -620,6 +621,7 @@ const callMockFallback = (action, payload) => {
         apply_url: "https://www.tnpsc.gov.in",
         details_doc: "H1: TNPSC Group 4 & VAO Recruitment 2026\nH2: Tamil Nadu Public Service Commission (TNPSC)\n---\nH3: Available Positions & Payscale\ntable:\nPosition Name, Minimum Qualification, Tentative Vacancies\nVillage Administrative Officer (VAO), 10th Standard Pass, 350\nJunior Assistant, 10th Standard Pass, 1200\nTypist / Steno-Typist, 10th Standard Pass + Technical, 850\n---\nH3: Important Guidelines\n1. Candidates must register through One-Time Registration (OTR).\n2. Language section is mandatory for examination scoring.\nVisit official TNPSC portal to complete application.",
         button_name: "Open TNPSC Website",
+        coming_soon: "false",
         created_at: new Date().toISOString()
       }
     ];

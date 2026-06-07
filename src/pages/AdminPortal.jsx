@@ -377,11 +377,11 @@ export default function AdminPortal() {
   
   // Post Editor states
   const [editingPostId, setEditingPostId] = useState(null);
-  const [postForm, setPostForm] = useState({ title: '', description: '', img_url: '', apply_url: '' });
+  const [postForm, setPostForm] = useState({ title: '', description: '', img_url: '', apply_url: '', coming_soon: false });
   
   // Job Editor states
   const [editingJobId, setEditingJobId] = useState(null);
-  const [jobForm, setJobForm] = useState({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '' });
+  const [jobForm, setJobForm] = useState({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false });
   const [uploadingJobImg, setUploadingJobImg] = useState(false);
   
   // Form Builder states
@@ -396,7 +396,8 @@ export default function AdminPortal() {
     required_docs: [],   // List of default doc IDs ('photo', 'aadhar', etc)
     custom_docs: [],     // List of custom doc upload labels
     fields: [],           // Any extra custom inputs
-    img_url: ''          // Form image
+    img_url: '',          // Form image
+    coming_soon: false
   });
   const [uploadingFormImg, setUploadingFormImg] = useState(false);
   
@@ -617,7 +618,7 @@ export default function AdminPortal() {
         await createPost(postForm);
         alert('New post added successfully!');
       }
-      setPostForm({ title: '', description: '', img_url: '', apply_url: '' });
+      setPostForm({ title: '', description: '', img_url: '', apply_url: '', coming_soon: false });
       setEditingPostId(null);
       const postsData = await getPosts();
       setPosts(postsData);
@@ -633,7 +634,8 @@ export default function AdminPortal() {
       title: post.title,
       description: post.description || '',
       img_url: post.img_url || '',
-      apply_url: post.apply_url || ''
+      apply_url: post.apply_url || '',
+      coming_soon: post.coming_soon === true || String(post.coming_soon) === 'true'
     });
     document.getElementById('post-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -677,7 +679,7 @@ export default function AdminPortal() {
         await createJob(jobForm);
         alert('New job alert published successfully!');
       }
-      setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '' });
+      setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false });
       setEditingJobId(null);
       const jobsData = await getJobs();
       setJobs(jobsData);
@@ -695,7 +697,8 @@ export default function AdminPortal() {
       img_url: job.img_url || '',
       apply_url: job.apply_url || '',
       details_doc: job.details_doc || '',
-      button_name: job.button_name || ''
+      button_name: job.button_name || '',
+      coming_soon: job.coming_soon === true || String(job.coming_soon) === 'true'
     });
     document.getElementById('job-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -780,7 +783,8 @@ export default function AdminPortal() {
       required_docs: JSON.stringify(formBuilder.required_docs),
       custom_docs: JSON.stringify(formBuilder.custom_docs),
       fields: JSON.stringify(formBuilder.fields),
-      img_url: formBuilder.img_url
+      img_url: formBuilder.img_url,
+      coming_soon: formBuilder.coming_soon ? "true" : "false"
     };
 
     try {
@@ -812,7 +816,8 @@ export default function AdminPortal() {
       required_docs: normalizeRequiredDocs(safeJsonParse(form.required_docs)),
       custom_docs: normalizeCustomDocs(safeJsonParse(form.custom_docs)),
       fields: safeJsonParse(form.fields),
-      img_url: form.img_url || ''
+      img_url: form.img_url || '',
+      coming_soon: form.coming_soon === true || String(form.coming_soon) === 'true'
     });
     document.getElementById('form-builder-panel')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -854,7 +859,8 @@ export default function AdminPortal() {
       required_docs: [],
       custom_docs: [],
       fields: [],
-      img_url: ''
+      img_url: '',
+      coming_soon: false
     });
   };
 
@@ -1289,6 +1295,19 @@ export default function AdminPortal() {
                   </span>
                 </div>
 
+                <div className="premium-input-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', marginTop: '10px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="post-coming-soon"
+                    checked={postForm.coming_soon} 
+                    onChange={(e) => setPostForm({ ...postForm, coming_soon: e.target.checked })} 
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="post-coming-soon" className="premium-label" style={{ margin: 0, cursor: 'pointer', fontWeight: 'bold' }}>
+                    Mark as Coming Soon (Upcoming)
+                  </label>
+                </div>
+
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button type="submit" className="premium-btn premium-btn-primary" style={{ flex: 2 }}>
                     {editingPostId ? 'Update Post' : 'Publish Post'}
@@ -1296,7 +1315,7 @@ export default function AdminPortal() {
                   {editingPostId && (
                     <button 
                       type="button" 
-                      onClick={() => { setEditingPostId(null); setPostForm({ title: '', description: '', img_url: '', apply_url: '' }) }} 
+                      onClick={() => { setEditingPostId(null); setPostForm({ title: '', description: '', img_url: '', apply_url: '', coming_soon: false }) }} 
                       className="premium-btn premium-btn-secondary"
                       style={{ flex: 1 }}
                     >
@@ -1315,7 +1334,12 @@ export default function AdminPortal() {
               {sortItems(posts).map((post, idx) => (
                 <div key={post.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
-                    <h4 style={{ fontSize: '0.95rem', marginBottom: '4px' }}>{post.title}</h4>
+                    <h4 style={{ fontSize: '0.95rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {post.title}
+                      {(post.coming_soon === true || String(post.coming_soon) === 'true') && (
+                        <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px' }}>Coming Soon</span>
+                      )}
+                    </h4>
                     <p className="text-muted" style={{ fontSize: '0.8rem', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {post.description}
                     </p>
@@ -1451,6 +1475,19 @@ export default function AdminPortal() {
                   </span>
                 </div>
 
+                <div className="premium-input-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', marginTop: '10px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="job-coming-soon"
+                    checked={jobForm.coming_soon} 
+                    onChange={(e) => setJobForm({ ...jobForm, coming_soon: e.target.checked })} 
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="job-coming-soon" className="premium-label" style={{ margin: 0, cursor: 'pointer', fontWeight: 'bold' }}>
+                    Mark as Coming Soon (Upcoming)
+                  </label>
+                </div>
+
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button type="submit" className="premium-btn premium-btn-primary" style={{ flex: 2 }}>
                     {editingJobId ? 'Update Job Alert' : 'Publish Job Alert'}
@@ -1458,7 +1495,7 @@ export default function AdminPortal() {
                   {editingJobId && (
                     <button 
                       type="button" 
-                      onClick={() => { setEditingJobId(null); setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '' }) }} 
+                      onClick={() => { setEditingJobId(null); setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false }) }} 
                       className="premium-btn premium-btn-secondary"
                       style={{ flex: 1 }}
                     >
@@ -1477,7 +1514,12 @@ export default function AdminPortal() {
               {sortItems(jobs).map((job, idx) => (
                 <div key={job.id} className="premium-card admin-item-card" style={{ alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
-                    <h4 style={{ fontSize: '0.95rem', marginBottom: '4px' }}>{job.title}</h4>
+                    <h4 style={{ fontSize: '0.95rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {job.title}
+                      {(job.coming_soon === true || String(job.coming_soon) === 'true') && (
+                        <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px' }}>Coming Soon</span>
+                      )}
+                    </h4>
                     <p className="text-muted" style={{ fontSize: '0.8rem', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {job.description}
                     </p>
@@ -2030,6 +2072,19 @@ export default function AdminPortal() {
                   ))}
                 </div>
 
+                <div className="premium-input-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', marginTop: '10px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="form-coming-soon"
+                    checked={formBuilder.coming_soon} 
+                    onChange={(e) => setFormBuilder({ ...formBuilder, coming_soon: e.target.checked })} 
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="form-coming-soon" className="premium-label" style={{ margin: 0, cursor: 'pointer', fontWeight: 'bold' }}>
+                    Mark as Coming Soon (Upcoming)
+                  </label>
+                </div>
+
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                   <button type="submit" className="premium-btn premium-btn-primary" style={{ flex: 2 }}>
                     {editingFormId ? 'Update Template' : 'Save Form Template'}
@@ -2063,7 +2118,12 @@ export default function AdminPortal() {
                       <span className="badge badge-info">{form.category}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-light-muted)', fontWeight: 600 }}>{safeJsonParse(form.fields).length} custom fields</span>
                     </div>
-                    <h4 style={{ fontSize: '0.95rem', marginBottom: '2px' }}>{form.title}</h4>
+                    <h4 style={{ fontSize: '0.95rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {form.title}
+                      {(form.coming_soon === true || String(form.coming_soon) === 'true') && (
+                        <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px' }}>Coming Soon</span>
+                      )}
+                    </h4>
                     <p className="text-muted" style={{ fontSize: '0.8rem' }}>{form.description}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
