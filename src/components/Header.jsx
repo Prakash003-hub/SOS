@@ -7,7 +7,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
 
   useEffect(() => {
     if (!isProfileOpen) return;
-    
+
     const handleOutsideClick = (e) => {
       const popover = document.getElementById('profile-popover-container');
       const avatarBtn = document.getElementById('profile-avatar-button');
@@ -15,10 +15,10 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
         setIsProfileOpen(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleOutsideClick);
     document.addEventListener('touchstart', handleOutsideClick);
-    
+
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
@@ -26,7 +26,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
   }, [isProfileOpen]);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [modalSubView, setModalSubView] = useState('menu'); // 'menu' | 'reviews' | 'chat'
-  
+
   // Feedback list states
   const [feedbackList, setFeedbackList] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
@@ -129,30 +129,30 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
   return (
     <header className="fixed-header" style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 9999 }}>
       <div className="logo-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <img 
-          src="/whatsbro_logo.png" 
-          alt="WhatsBro Logo" 
-          style={{ 
-            width: '48px', 
-            height: '48px', 
+        <img
+          src="/whatsbro_logo.png"
+          alt="WhatsBro Logo"
+          style={{
+            width: '48px',
+            height: '48px',
             objectFit: 'contain',
             pointerEvents: 'none',
             userSelect: 'none',
             WebkitUserSelect: 'none',
             WebkitTouchCallout: 'none'
-          }} 
+          }}
         />
         <div>
           <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>SUBI Online Service</div>
-          <div className="brand-subtitle" style={{ fontSize: '0.8rem' }}>Online Service Portal</div>
+          <div className="brand-subtitle" style={{ fontSize: '0.8rem' }}>Burkitmanagaram</div>
         </div>
       </div>
-      
+
       {!isAdmin && (
         <div className="header-auth-section" style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
           {currentUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-              
+
               {/* Circular profile avatar button */}
               <button
                 id="profile-avatar-button"
@@ -181,9 +181,9 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                   justifyContent: 'center',
                   background: '#f1f5f9'
                 }}>
-                  <img 
-                    src={getAvatarUrl()} 
-                    alt={currentUser.name} 
+                  <img
+                    src={getAvatarUrl()}
+                    alt={currentUser.name}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={(e) => { e.target.onerror = null; e.target.src = '/default_avatar.png'; }}
                   />
@@ -196,24 +196,24 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
 
               {/* Profile Popover Overlay Dropdown */}
               {isProfileOpen && (
-                <div 
+                <div
                   id="profile-popover-container"
                   style={{
                     position: 'absolute',
-                  top: '46px',
-                  right: 0,
-                  width: '240px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '16px',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '12px',
-                  zIndex: 99999
-                }}>
+                    top: '46px',
+                    right: 0,
+                    width: '240px',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '16px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '12px',
+                    zIndex: 99999
+                  }}>
                   {/* Large avatar and details */}
                   <div style={{
                     width: '64px',
@@ -224,14 +224,14 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                     background: '#f8fafc',
                     boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
                   }}>
-                    <img 
-                      src={getAvatarUrl()} 
-                      alt={currentUser.name} 
+                    <img
+                      src={getAvatarUrl()}
+                      alt={currentUser.name}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => { e.target.onerror = null; e.target.src = '/default_avatar.png'; }}
                     />
                   </div>
-                  
+
                   <div style={{ textAlign: 'center', width: '100%' }}>
                     <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: '800', color: '#1e293b' }}>{currentUser.name}</h4>
                     <p style={{ margin: 0, fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Phone: {currentUser.phone}</p>
@@ -276,7 +276,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                         border: 'none'
                       }}
                     >
-                      <LogOut size={14} /> Logout 
+                      <LogOut size={14} /> Logout
                     </button>
                   </div>
                 </div>
@@ -284,7 +284,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
             </div>
           ) : (
             // Prominent and highly visible green Login button at top
-            <button 
+            <button
               onClick={onLoginTrigger}
               className="premium-btn premium-btn-success"
               style={{
@@ -314,7 +314,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
               }}
             >
-              <User size={14} /> Login / Register
+              <User size={14} /> Login
             </button>
           )}
         </div>
@@ -487,7 +487,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                       <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1e293b' }}>
                         Review as: <span style={{ color: 'var(--primary)', fontWeight: '800' }}>{currentUser.name}</span>
                       </div>
-                      
+
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#475569' }}>Rating:</span>
                         <div style={{ display: 'flex', gap: '2px', height: '28px', alignItems: 'center' }}>
@@ -543,7 +543,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1e293b' }}>{review.user_name}</span>
                           <div style={{ display: 'flex' }}>
-                            {[1,2,3,4,5].map(s => (
+                            {[1, 2, 3, 4, 5].map(s => (
                               <span key={s} style={{ fontSize: '0.75rem', color: s <= parseInt(review.rating) ? '#f59e0b' : '#cbd5e1' }}>★</span>
                             ))}
                           </div>
