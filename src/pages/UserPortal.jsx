@@ -19,7 +19,9 @@ import {
   getAnnouncements,
   sendOtp,
   verifyOtp,
-  checkAadhar
+  checkAadhar,
+  getProducts,
+  getTemperedGlass
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -179,16 +181,43 @@ const STANDARD_FIELDS = {
   signature: { label: 'Signature Upload (img/pdf < 10MB)' }
 };
 
+const cleanPhone = (phone) => {
+  if (!phone) return '';
+  let cleaned = phone.toString().replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    cleaned = '91' + cleaned;
+  }
+  return cleaned;
+};
+
 export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigger }) {
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Tab states: 'home' | 'apply' | 'status'
+  // Tab states: 'home' | 'apply' | 'status' | 'accessories'
   const activeTab = searchParams.get('tab') || 'home';
   const initialCategory = searchParams.get('category') || '';
   
   const [posts, setPosts] = useState([]);
   const [forms, setForms] = useState([]);
   const [jobs, setJobs] = useState([]);
+  
+  // Accessories & Tempered Glass states
+  const [products, setProducts] = useState([]);
+  const [temperedGlassList, setTemperedGlassList] = useState([]);
+  
+  // Search Tempered Glass states
+  const [tgSearchQuery, setTgSearchQuery] = useState('');
+  const [tgSearchResult, setTgSearchResult] = useState(null);
+  
+  // Catalog Filters
+  const [selectedAccessoryCategory, setSelectedAccessoryCategory] = useState('All');
+  const [selectedBrand, setSelectedBrand] = useState('All');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [accessorySearchKeyword, setAccessorySearchKeyword] = useState('');
+  
+  // Accessory Details Modal
+  const [selectedProductDetails, setSelectedProductDetails] = useState(null);
+  
   const [selectedJobDetails, setSelectedJobDetails] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'all');
   const [systemSettings, setSystemSettings] = useState({});
@@ -228,6 +257,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [uploadedUrls, setUploadedUrls] = useState({});
   const [uploadProgress, setUploadProgress] = useState('');
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [lastResponsesPack, setLastResponsesPack] = useState(null);
+  const [lastDocReferencesPack, setLastDocReferencesPack] = useState(null);
   
   // Status Lookup States
   const [lookupType, setLookupType] = useState('phone'); // 'phone' or 'aadhar'
@@ -266,6 +297,53 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // Tracks when userApplications was last populated after a submission.
   // Prevents the status useEffect from overwriting fresh data with stale Google Sheets data.
   const lastStatusFetchRef = useRef(0);
+
+  const sendSubmissionToWhatsApp = (submission, formInfo, responsesPack, docReferencesPack) => {
+    const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
+    const formattedAdminWhatsApp = cleanPhone(adminWhatsApp);
+    
+    let msg = `*NEW FORM SUBMISSION*\n`;
+    msg += `----------------------------------\n`;
+    msg += `*Service:* ${(formInfo && formInfo.title) ? formInfo.title : (selectedForm && selectedForm.title) ? selectedForm.title : 'Service'}\n`;
+    msg += `*Receipt ID:* ${submission.id}\n`;
+    msg += `*Submitted At:* ${new Date(submission.submitted_at).toLocaleString('en-IN')}\n\n`;
+    
+    msg += `*APPLICANT PROFILE:*\n\`\`\`\n`;
+    msg += `${"Phone".padEnd(12, ' ')} : ${submission.phone}\n`;
+    msg += `${"Aadhaar".padEnd(12, ' ')} : ${submission.aadhar}\n`;
+    msg += `\`\`\`\n`;
+    
+    msg += `*FORM DETAILS:*\n`;
+    if (responsesPack && Object.keys(responsesPack).length > 0) {
+      msg += `\`\`\`\n`;
+      const responseKeys = Object.keys(responsesPack);
+      const maxKeyLen = Math.max(...responseKeys.map(k => k.length), 10);
+      responseKeys.forEach(key => {
+        msg += `${key.padEnd(maxKeyLen, ' ')} : ${responsesPack[key]}\n`;
+      });
+      msg += `\`\`\`\n`;
+    } else {
+      msg += `No form details.\n`;
+    }
+    msg += `\n`;
+    
+    if (docReferencesPack && Object.keys(docReferencesPack).length > 0) {
+      msg += `*UPLOADED DOCUMENTS:*\n`;
+      Object.keys(docReferencesPack).forEach(docKey => {
+        const urls = docReferencesPack[docKey];
+        if (urls && urls.length > 0) {
+          msg += `- *${docKey}:*\n  ${urls.join('\n  ')}\n`;
+        }
+      });
+    }
+    
+    msg += `\n----------------------------------\n`;
+    msg += `Please process this application. Thank you!`;
+    
+    const encoded = encodeURIComponent(msg);
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(formattedAdminWhatsApp)}&text=${encoded}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   // Premium custom Toast Alerts system (Intercepts and upgrades native alert dialogs)
   const [toast, setToast] = useState(null);
@@ -386,10 +464,25 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   }
 
+  const [accessoryProductsLoading, setAccessoryProductsLoading] = useState(false);
+
+  const fetchProductsAndTG = () => {
+    setAccessoryProductsLoading(true);
+    getProducts().then(data => {
+      if (data) setProducts(data);
+    }).catch(err => console.error('Failed to load products', err))
+      .finally(() => setAccessoryProductsLoading(false));
+
+    getTemperedGlass().then(data => {
+      if (data) setTemperedGlassList(data);
+    }).catch(err => console.error('Failed to load tempered glass', err));
+  };
+
   useEffect(() => {
     fetchPosts();
     fetchForms();
     fetchJobs();
+    fetchProductsAndTG();
     getSettings().then(data => {
       if (data) setSystemSettings(data);
     }).catch(err => console.error('Failed to load settings', err));
@@ -839,7 +932,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
         const registeredUser = await registerUser(regPayload);
         onUpdateProfile(registeredUser);
-        alert('Welcome! We have registered your details in TN sevai so you can pre-fill forms easily in the future.');
+        alert('Welcome! We have registered your details in SUBI Online Service so you can pre-fill forms easily in the future.');
       } else {
         // User is logged in: update profile with any inline corrections
         const updatePayload = {
@@ -1357,6 +1450,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       );
 
       setSubmissionResult(submission);
+      setLastResponsesPack(responsesPack);
+      setLastDocReferencesPack(docReferencesPack);
 
       // Save filled custom fields to user profile for future auto-filling
       if (currentUser) {
@@ -1403,64 +1498,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         }
       }
 
-      // Fetch latest profile state to sync document and custom URLs
-      const phoneVal = currentUser?.phone || formData.phone || '';
-      const dobVal = '';
-      const aadharVal = currentUser?.aadhar || formData.aadhar || '';
-
-      console.log('[Upload Success] Form submission completed successfully.', {
-        submissionId: submission.id,
-        formId: selectedForm.id,
-        phone: phoneVal,
-        dob: dobVal,
-        aadhar: aadharVal
-      });
-
-      // Wait briefly for Google Sheets to propagate the new row before re-fetching
-      console.log('[Fetch] Waiting 2s for Google Sheets propagation before refreshing status...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      if (phoneVal) {
-        try {
-          console.log('[Fetch] Re-fetching user applications after submission...');
-          const freshApps = await getUserStatus(phoneVal, dobVal, aadharVal);
-          console.log('[Fetch] Refreshed applications data:', freshApps?.length, 'records found');
-          
-          // Optimistic merge: ensure the new submission appears even if Google Sheets
-          // hasn't propagated yet. Check if the submission is already in the list.
-          let mergedApps = freshApps || [];
-          const submissionExists = mergedApps.some(app => app.id === submission.id);
-          if (!submissionExists && submission) {
-            console.log('[State] New submission not found in fetched data — adding optimistically');
-            mergedApps = [submission, ...mergedApps];
-          }
-          
-          setUserApplications(mergedApps);
-          setHasSearchedStatus(true);
-          lastStatusFetchRef.current = Date.now();
-          console.log('[State] userApplications set with', mergedApps.length, 'records (timestamp:', lastStatusFetchRef.current, ')');
-        } catch (e) {
-          console.error("Error refreshing applications list on submit:", e);
-          // Even on error, optimistically add the submission
-          setUserApplications(prev => {
-            const exists = prev.some(app => app.id === submission.id);
-            if (!exists) return [submission, ...prev];
-            return prev;
-          });
-          setHasSearchedStatus(true);
-          lastStatusFetchRef.current = Date.now();
-        }
-      } else {
-        // No credentials to fetch — just optimistically add the submission
-        setUserApplications(prev => {
-          const exists = prev.some(app => app.id === submission.id);
-          if (!exists) return [submission, ...prev];
-          return prev;
-        });
-        setHasSearchedStatus(true);
-        lastStatusFetchRef.current = Date.now();
-      }
-
       if (currentUser) {
         // Simply reload the profile locally
         const latestProfile = await loginUser({ dob: currentUser.dob, phone: currentUser.phone }).catch(() => null);
@@ -1469,13 +1506,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         }
       }
 
-      // Increment refresh key to force the status useEffect to re-fetch
-      // when the user navigates to the Status tab
-      setStatusRefreshKey(prev => {
-        const newKey = prev + 1;
-        console.log('[State] statusRefreshKey incremented to:', newKey);
-        return newKey;
-      });
+      // Automatically trigger WhatsApp redirect
+      try {
+        sendSubmissionToWhatsApp(submission, selectedForm, responsesPack, docReferencesPack);
+      } catch (err) {
+        console.error("WhatsApp redirect failed or was blocked:", err);
+      }
 
       setUploadProgress('');
       setWizardStep(5); // Final Step: Get Receipt
@@ -1522,41 +1558,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   };
 
-  // Load submissions automatically if logged-in user clicks Status tab
-  // statusRefreshKey is included to force a re-fetch after form submission
-  // even if activeTab and currentUser haven't changed references.
-  useEffect(() => {
-    if (activeTab === 'status' && currentUser) {
-      // Skip re-fetch if data was freshly populated after a submission (within 10 seconds).
-      // This prevents the useEffect from overwriting optimistically-merged data with
-      // stale Google Sheets data that hasn't propagated the new row yet.
-      const timeSinceLastFetch = Date.now() - lastStatusFetchRef.current;
-      if (timeSinceLastFetch < 10000) {
-        console.log('[Fetch] Status useEffect SKIPPED — data is fresh (age:', timeSinceLastFetch, 'ms). Using existing userApplications.');
-        return;
-      }
 
-      const loadUserSubmissions = async () => {
-        try {
-          console.log('[Fetch] Status useEffect triggered. Fetching user submissions...', {
-            activeTab,
-            statusRefreshKey,
-            phone: currentUser.phone,
-            dob: currentUser.dob
-          });
-          const data = await getUserStatus(currentUser.phone, '', currentUser.aadhar);
-          console.log('[Fetch] Status useEffect received', data?.length, 'applications');
-          setUserApplications(data);
-          setHasSearchedStatus(true);
-          lastStatusFetchRef.current = Date.now();
-          console.log('[State] userApplications updated with', data?.length, 'records');
-        } catch (e) {
-          console.error('[Fetch] Status useEffect error:', e);
-        }
-      };
-      loadUserSubmissions();
-    }
-  }, [activeTab, currentUser, statusRefreshKey]);
 
   const handleScreenshotUpload = async (subId, file) => {
     if (!file) return;
@@ -1621,7 +1623,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       <!DOCTYPE html>
       <html>
       <head>
-        <title>TN Sevai Receipt - ${receiptId}</title>
+        <title>SUBI Online Service Receipt - ${receiptId}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', sans-serif; background: #fff; color: #1e293b; padding: 30px; }
@@ -1647,10 +1649,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       </head>
       <body>
         <div class="receipt">
-          <div class="watermark">TN SEVAI</div>
+          <div class="watermark">SUBI ONLINE SERVICE</div>
           <div class="header">
             <h2>${certName}</h2>
-            <div class="sub">TN SEVAI </div>
+            <div class="sub">SUBI ONLINE SERVICE </div>
             <div class="sub2"> Receipt</div>
           </div>
           <div class="row"><span class="label">Receipt ID:</span><span class="value green">${receiptId}</span></div>
@@ -1663,7 +1665,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           <div class="divider"></div>
           <div class="row"><span class="label">Service Fee:</span><span class="value" style="font-size:1rem;font-weight:800;">Rs. ${fee}</span></div>
           <div class="row"><span class="label">Payment Status:</span><span class="badge ${status === 'PAID' ? 'badge-paid' : 'badge-unpaid'}">${status}</span></div>
-          <div class="footer">Thank you for using TN Sevai E-Service Portal.<br/>Save this receipt for your records.</div>
+          <div class="footer">Thank you for using SUBI Online Service Portal.<br/>Save this receipt for your records.</div>
         </div>
         <script>window.onload = function() { window.print(); }</script>
       </body>
@@ -3033,15 +3035,15 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     <div className="premium-card text-center" style={{ margin: '0 0 16px 0', borderBottom: '4px solid var(--success)' }}>
                       <CheckCircle size={44} style={{ color: 'var(--success)', margin: '0 auto 10px auto' }} />
                       <h3 style={{ fontSize: '1.2rem', marginBottom: '4px', color: '#1e293b' }}>Application Submitted!</h3>
-                      <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Your application has been stored securely in TN sevai database.</p>
+                      <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Your application has been stored securely in SUBI Online Service database.</p>
                     </div>
 
                     <div className="receipt-wrapper" id="receipt-downloadable-card" style={{ display: 'none' }}>
-                      <div className="receipt-watermark" style={{ opacity: 0.05, fontSize: '2.5rem', color: '#10b981' }}>TN SEVAI</div>
+                      <div className="receipt-watermark" style={{ opacity: 0.05, fontSize: '2.5rem', color: '#10b981' }}>SUBI ONLINE SERVICE</div>
                       <div className="receipt-header" style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '12px', marginBottom: '16px' }}>
                         <h4 style={{ fontSize: '1.25rem', color: '#047857', margin: '0 0 6px 0', fontWeight: '900', textTransform: 'uppercase' }}>{selectedForm.title}</h4>
-                        <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: '700', display: 'block', marginBottom: '4px' }}>TN SEVAI E-SERVICE</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Official TN sevai E-Receipt</span>
+                        <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: '700', display: 'block', marginBottom: '4px' }}>SUBI ONLINE SERVICE</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Official SUBI Online Service E-Receipt</span>
                       </div>
                       
                       <div className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '8px' }}>
@@ -3209,7 +3211,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       })()}
  
                       <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.7rem', color: '#94a3b8' }}>
-                        Thank you for using TN sevai! Save this receipt for status lookups.
+                        Thank you for using SUBI Online Service! Save this receipt for your records.
                       </div>
                     </div>
 
@@ -3222,11 +3224,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         <Printer size={18} /> Download PDF Receipt
                       </button>
                       <button 
-                        onClick={() => handleTabChange('status')}
-                        className="premium-btn premium-btn-primary"
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        onClick={() => sendSubmissionToWhatsApp(submissionResult, selectedForm, lastResponsesPack, lastDocReferencesPack)}
+                        className="premium-btn premium-btn-success"
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#22c55e', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)' }}
                       >
-                        <CheckCircle size={18} /> Payment & Status Check
+                        <span style={{ fontSize: '1.1rem' }}>💬</span> Send to WhatsApp
                       </button>
                     </div>
                   </div>
@@ -3236,671 +3238,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           </div>
         )}
 
-        {/* --- TAB 3: APPLICATION STATUS TRACKING & LOOKUP --- */}
-        {activeTab === 'status' && (
-          <div style={{ padding: '0 16px' }}>
-            
-            {/* If logged in: show status immediately. If guest: show search form first */}
-            {!currentUser && (
-              <form onSubmit={handleStatusLookup} className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '16px 0' }}>
-                <h3 style={{ fontSize: '1.05rem', marginBottom: '6px', color: '#1e293b' }}>Enquire Application Status</h3>
-                <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '16px' }}>Verify status of submitted certificates using your registered credentials.</p>
-
-                {/* Lookup Identifier Type selector */}
-                <div style={{ display: 'flex', backgroundColor: '#e2e8f0', borderRadius: '8px', padding: '2px', border: '1px solid #cbd5e1', marginBottom: '12px' }}>
-                  <button
-                    type="button"
-                    onClick={() => { setLookupType('phone'); setHasSearchedStatus(false); }}
-                    style={{
-                      flex: 1,
-                      padding: '6px',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      backgroundColor: lookupType === 'phone' ? '#10b981' : 'transparent',
-                      color: lookupType === 'phone' ? '#ffffff' : '#64748b',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Use Phone
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setLookupType('aadhar'); setHasSearchedStatus(false); }}
-                    style={{
-                      flex: 1,
-                      padding: '6px',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      backgroundColor: lookupType === 'aadhar' ? '#10b981' : 'transparent',
-                      color: lookupType === 'aadhar' ? '#ffffff' : '#64748b',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Use Aadhaar
-                  </button>
-                </div>
-
-                <div className="premium-input-group">
-                  <label className="premium-label">Date of Birth *</label>
-                  <input 
-                    type="date" 
-                    value={lookupDob} 
-                    onChange={(e) => setLookupDob(e.target.value)} 
-                    className="premium-input" 
-                    required 
-                  />
-                </div>
-
-                {lookupType === 'phone' ? (
-                  <div className="premium-input-group">
-                    <label className="premium-label">Phone Number *</label>
-                    <input 
-                      type="tel" 
-                      value={lookupPhone} 
-                      onChange={(e) => setLookupPhone(e.target.value)} 
-                      placeholder="10-digit Phone Number" 
-                      maxLength={10} 
-                      className="premium-input" 
-                      required 
-                    />
-                  </div>
-                ) : (
-                  <div className="premium-input-group">
-                    <label className="premium-label">Aadhaar Number *</label>
-                    <input 
-                      type="text" 
-                      value={lookupAadhar} 
-                      onChange={(e) => setLookupAadhar(e.target.value.replace(/\D/g, ''))} 
-                      placeholder="12-digit Aadhaar Number" 
-                      maxLength={12} 
-                      className="premium-input" 
-                      required 
-                    />
-                  </div>
-                )}
-
-                <button 
-                  type="submit" 
-                  disabled={searchingStatus}
-                  className="premium-btn premium-btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                >
-                  {searchingStatus ? (
-                    <>
-                      <div className="inner-spinner" style={{ width: '14px', height: '14px', border: '2px solid white', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                      Searching...
-                    </>
-                  ) : 'Enquire Status'}
-                </button>
-              </form>
-            )}
-
-            {/* Inline loader while searching status */}
-            {searchingStatus && (
-              <div className="premium-card text-center" style={{ padding: '40px 20px', marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                <div className="inner-spinner" style={{ width: '32px', height: '32px', border: '3px solid var(--primary)', borderTop: '3px solid transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                <p style={{ color: '#475569', fontSize: '0.85rem', fontWeight: '600', margin: 0 }}>Checking data from TN sevai database...</p>
-              </div>
-            )}
-
-            {/* Results Board */}
-            {!searchingStatus && hasSearchedStatus && (
-              <div style={{ marginTop: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '12px' }}>
-                  <h4 style={{ fontSize: '0.95rem', margin: 0, color: '#1e293b' }}>
-                    Active Submissions ({userApplications.length})
-                  </h4>
-                  {!currentUser && (
-                    <button 
-                      onClick={() => setHasSearchedStatus(false)}
-                      className="premium-btn premium-btn-secondary"
-                      style={{ padding: '2px 8px', fontSize: '0.7rem', width: 'auto' }}
-                    >
-                      New Search
-                    </button>
-                  )}
-                </div>
-
-                {userApplications.length === 0 ? (
-                  <div className="premium-card text-center" style={{ padding: '40px 20px' }}>
-                    <p className="text-muted">No applications found with these credentials.</p>
-                  </div>
-                ) : (
-                  userApplications.map((app) => (
-                    <div key={app.id} className="premium-card" style={{ borderLeft: '4px solid var(--primary)', marginBottom: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                        <div>
-                          <h4 style={{ fontSize: '1.05rem', color: '#1e293b', fontWeight: '800', marginBottom: '2px' }}>
-                            {forms.find(f => f.id === app.form_id)?.title || 'Application Form'}
-                          </h4>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600', display: 'block' }}>
-                            Application ID: {app.id}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)' }}>
-                            Submitted: {new Date(app.submitted_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          {app.payment_status === 'rejected' ? (
-                            <span className="badge badge-danger" style={{ backgroundColor: '#ef4444' }}>Rejected</span>
-                          ) : app.payment_status === 'draft' ? (
-                            <span className="badge" style={{ backgroundColor: '#64748b', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>Draft</span>
-                          ) : app.uploaded_pdf_url ? (
-                            <span className="badge badge-success" style={{ backgroundColor: '#10b981' }}>Received</span>
-                          ) : app.info_request_label && !app.info_request_response ? (
-                            <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b' }}>Awaiting Upload</span>
-                          ) : app.info_request_label && app.info_request_response ? (
-                            <span className="badge badge-info" style={{ backgroundColor: '#3b82f6' }}>Upload Submitted</span>
-                          ) : app.payment_status === 'paid' ? (
-                            <span className="badge badge-success">Paid</span>
-                          ) : app.payment_screenshot ? (
-                            <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: 'white' }}>Verification Pending</span>
-                          ) : (
-                            <span className="badge badge-danger" style={{ backgroundColor: '#ef4444', color: 'white' }}>Unpaid</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Payment Action for Unpaid Status */}
-                      {app.payment_status === 'unpaid' && (() => {
-                        const formTemplate = forms.find(f => f.id === app.form_id);
-                        const fee = formTemplate ? Number(formTemplate.fee) : 0;
-                        if (!fee || fee <= 0) return null;
-                        
-                        const paymentNo = systemSettings.payment_number || '';
-                        const formattedVpa = formatUpiVpa(paymentNo);
-                        const upiUrl = `upi://pay?pa=${formattedVpa}&am=${fee}`;
-                        const qrCodeUrl = systemSettings.qr_code_url;
-
-                        if (app.payment_screenshot) {
-                          const isProofPdf = checkIfPdf(app.payment_screenshot);
-                          return (
-                            <div style={{ 
-                              background: '#fffbeb', 
-                              border: '1.5px solid #fef3c7', 
-                              borderRadius: '12px', 
-                              padding: '16px', 
-                              margin: '12px 0 16px 0',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-                            }}>
-                              <h4 style={{ fontSize: '0.9rem', color: '#b45309', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800' }}>
-                                <Clock size={16} style={{ color: '#d97706' }} /> Waiting for Payment Verification
-                              </h4>
-                              
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#ffffff', padding: '12px', borderRadius: '10px', border: '1px solid #fde68a' }}>
-                                <span style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: 'bold' }}>
-                                  You have uploaded a payment proof. Our administrative team will verify and approve your submission shortly.
-                                </span>
-
-                                {/* Uploaded proof preview */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {isProofPdf ? (
-                                      <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
-                                        <FileText size={16} />
-                                      </div>
-                                    ) : (
-                                      <div style={{ width: '32px', height: '32px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <img src={getImageUrl(app.payment_screenshot)} alt="Payment Screenshot Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                      </div>
-                                    )}
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#334155' }}>Uploaded Proof File</span>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: '6px' }}>
-                                    <a 
-                                      href={getImageUrl(app.payment_screenshot)} 
-                                      target="_blank" 
-                                      rel="noreferrer"
-                                      style={{ color: '#0f766e', background: '#ccfbf1', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #99f6e4' }}
-                                    >
-                                      <Eye size={11} /> View
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Allow Re-upload option */}
-                              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #cbd5e1' }}>
-                                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
-                                  Need to update or replace your payment proof?
-                                </span>
-                                <label className="premium-btn premium-btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', gap: '6px', cursor: 'pointer', background: 'white', width: 'auto' }}>
-                                  <UploadCloud size={14} style={{ color: 'var(--primary)' }} /> 
-                                  {uploadingScreenshotId === app.id ? 'Uploading proof...' : 'Replace Payment Proof'}
-                                  <input 
-                                    type="file" 
-                                    accept="image/*,application/pdf"
-                                    style={{ display: 'none' }}
-                                    disabled={uploadingScreenshotId !== null}
-                                    onChange={(e) => handleScreenshotUpload(app.id, e.target.files[0])}
-                                  />
-                                </label>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        if (String(app.pay_allowed).toLowerCase() !== 'true') {
-                          return (
-                            <div style={{ 
-                              background: '#fffbeb', 
-                              border: '1.5px solid #fef3c7', 
-                              borderRadius: '12px', 
-                              padding: '16px', 
-                              margin: '12px 0 16px 0',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px'
-                            }}>
-                              <h4 style={{ fontSize: '0.9rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', margin: 0 }}>
-                                <Clock size={16} style={{ color: '#d97706' }} /> Verification In Progress
-                              </h4>
-                              <p style={{ fontSize: '0.82rem', color: '#78350f', fontWeight: '600', margin: 0 }}>
-                                Application is under verification, so please wait.
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div style={{ 
-                            background: '#f8fafc', 
-                            border: '1.5px solid #e2e8f0', 
-                            borderRadius: '12px', 
-                            padding: '16px', 
-                            margin: '12px 0 16px 0',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-                          }}>
-                            <h4 style={{ fontSize: '0.9rem', color: '#1e293b', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800' }}>
-                              <CreditCard size={16} style={{ color: 'var(--primary)' }} /> UPI Payment Transfer
-                            </h4>
-                            
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center', background: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                              
-                              {/* Amount Display */}
-                              <div style={{ textAlign: 'center' }}>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount to Pay</span>
-                                <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#10b981' }}>₹{fee}</span>
-                              </div>
-                              
-                              {/* QR Code Container */}
-                              {qrCodeUrl && (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '8px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                                  <img 
-                                    src={getImageUrl(qrCodeUrl)} 
-                                    alt="UPI Payment QR Code" 
-                                    style={{ width: '130px', height: '130px', objectFit: 'contain' }} 
-                                  />
-                                  <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 'bold' }}>Scan QR Code with any UPI App</span>
-                                </div>
-                              )}
-
-                              {/* Pay Intent Buttons */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '240px', justifyContent: 'center', alignItems: 'center' }}>
-                                <button 
-                                  onClick={() => handleUpiPay(fee, app.id, paymentNo, 'phonepe')}
-                                  className="premium-btn"
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    gap: '8px', 
-                                    padding: '10px 16px', 
-                                    width: '100%', 
-                                    fontSize: '0.8rem', 
-                                    fontWeight: '800',
-                                    borderRadius: '8px',
-                                    background: '#5f259f',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(95, 37, 159, 0.25)',
-                                    transition: 'all 0.25s ease'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.03)';
-                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(95, 37, 159, 0.35)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(95, 37, 159, 0.25)';
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}>
-                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
-                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
-                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
-                                  </svg>
-                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>PhonePe</span>
-                                </button>
-
-                                <button 
-                                  onClick={() => handleUpiPay(fee, app.id, paymentNo, 'gpay')}
-                                  className="premium-btn"
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    gap: '8px', 
-                                    padding: '10px 16px', 
-                                    width: '100%', 
-                                    fontSize: '0.8rem', 
-                                    fontWeight: '800',
-                                    borderRadius: '8px',
-                                    background: '#000000',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                    transition: 'all 0.25s ease'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.03)';
-                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.25)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" style={{ marginRight: '2px' }}>
-                                    <path fill="#4285F4" d="M24 12.27c0-.81-.07-1.59-.2-2.34H12v4.42h6.08c-.26 1.39-1.04 2.57-2.21 3.34v2.73h3.64c2.13-1.96 3.36-4.85 3.36-8.15z"/>
-                                    <path fill="#34A853" d="M12 24c3.04 0 5.58-1.01 7.44-2.73l-3.64-2.73c-1.01.68-2.3 1.08-3.8 1.08-2.92 0-5.39-1.97-6.27-4.62H2.04v2.81C3.88 21.05 7.55 24 12 24z"/>
-                                    <path fill="#FBBC05" d="M5.73 15.02c-.22-.68-.35-1.41-.35-2.18s.13-1.5.35-2.18V7.85H2.04c-.7 1.4-1.1 2.97-1.1 4.63s.4 3.23 1.1 4.63l3.69-2.87z"/>
-                                    <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
-                                  </svg>
-                                  Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>GPay</span>
-                                </button>
-                              </div>
-
-                            </div>
-
-                            {/* Screenshot Upload Block */}
-                            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #cbd5e1' }}>
-                              <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-                                Upload Payment Screenshot (Image / PDF):
-                              </span>
-                              <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '8px', cursor: 'pointer', background: 'white' }}>
-                                <UploadCloud size={16} /> 
-                                {uploadingScreenshotId === app.id ? 'Uploading proof...' : 'Select Payment Proof File'}
-                                <input 
-                                  type="file" 
-                                  accept="image/*,application/pdf"
-                                  style={{ display: 'none' }}
-                                  disabled={uploadingScreenshotId !== null}
-                                  onChange={(e) => handleScreenshotUpload(app.id, e.target.files[0])}
-                                />
-                              </label>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Info Request from Admin section */}
-                      {app.info_request_label && (
-                        <div style={{ 
-                          background: '#fffbeb', 
-                          border: '1.5px solid #fde68a', 
-                          borderLeft: '5px solid #d97706', 
-                          borderRadius: '12px', 
-                          padding: '16px', 
-                          margin: '16px 0',
-                          boxShadow: '0 4px 6px -1px rgba(217, 119, 6, 0.05)'
-                        }}>
-                          <h5 style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 'bold', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <AlertCircle size={15} style={{ color: '#d97706' }} /> Action Required: Upload Document / Information Requested by Admin
-                          </h5>
-                          <p style={{ fontSize: '0.75rem', color: '#78350f', margin: '0 0 12px 0', lineHeight: '1.5' }}>
-                            The administrator has requested the following: <strong style={{ color: '#9a3412', background: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>{app.info_request_label}</strong>
-                          </p>
-
-                          {!app.info_request_response ? (
-                            // Render request submission input
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              {app.info_request_type === 'file' ? (
-                                <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1.5px dashed #d97706', justifyContent: 'center' }}>
-                                  <Upload size={16} style={{ color: '#d97706' }} />
-                                  <span>{infoRequestFiles[app.id] ? infoRequestFiles[app.id].name : 'Select Image or PDF Document'}</span>
-                                  <input 
-                                    type="file" 
-                                    accept="image/*,application/pdf"
-                                    onChange={(e) => setInfoRequestFiles(prev => ({ ...prev, [app.id]: e.target.files[0] }))}
-                                    style={{ display: 'none' }}
-                                  />
-                                </label>
-                              ) : (
-                                <input 
-                                  type="text" 
-                                  value={infoRequestTexts[app.id] || ''} 
-                                  onChange={(e) => setInfoRequestTexts(prev => ({ ...prev, [app.id]: e.target.value }))}
-                                  placeholder="Type your answer response here..."
-                                  className="premium-input"
-                                  style={{ padding: '10px 12px', fontSize: '0.85rem', border: '1px solid #cbd5e1' }}
-                                />
-                              )}
-                              
-                              <button
-                                type="button"
-                                onClick={() => handleInfoRequestSubmit(app.id, app.info_request_type)}
-                                className="premium-btn"
-                                style={{ 
-                                  backgroundColor: '#d97706', 
-                                  color: 'white', 
-                                  padding: '10px', 
-                                  fontSize: '0.8rem', 
-                                  fontWeight: 'bold',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 4px rgba(217, 119, 6, 0.2)'
-                                }}
-                              >
-                                Submit Requested Details
-                              </button>
-                            </div>
-                          ) : (
-                            // Premium Render Response Preview with Download / View options
-                            <div style={{ background: '#f59e0b', color: 'white', padding: '12px', borderRadius: '10px', fontSize: '0.75rem', border: '1px solid #d97706' }}>
-                              <span style={{ fontWeight: '800', display: 'block', marginBottom: '8px', color: '#fef3c7', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your Submitted Response:</span>
-                              
-                              {(app.info_request_response.startsWith('/uploads/') || app.info_request_response.startsWith('http')) ? (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'rgba(255, 255, 255, 0.1)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {checkIfPdf(app.info_request_response) || app.info_request_response.includes('mimeType=application/pdf') ? (
-                                      <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
-                                        <FileText size={16} />
-                                      </div>
-                                    ) : (
-                                      <div style={{ width: '32px', height: '32px', borderRadius: '4px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <img src={getImageUrl(app.info_request_response)} alt="Response Thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                      </div>
-                                    )}
-                                    <span style={{ fontWeight: 'bold' }}>Uploaded Document</span>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: '6px' }}>
-                                    <a 
-                                      href={getImageUrl(app.info_request_response)} 
-                                      target="_blank" 
-                                      rel="noreferrer"
-                                      style={{ color: 'white', background: 'rgba(255, 255, 255, 0.15)', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid rgba(255,255,255,0.25)' }}
-                                    >
-                                      <Eye size={11} /> View
-                                    </a>
-                                    <a 
-                                      href={getImageUrl(app.info_request_response)} 
-                                      download
-                                      target="_blank" 
-                                      rel="noreferrer"
-                                      style={{ color: '#b45309', background: '#ffffff', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                                    >
-                                      <Download size={11} /> Download
-                                    </a>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', fontWeight: '700', color: '#ffffff' }}>
-                                  {app.info_request_response}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Status Percent bar */}
-                      <div style={{ marginTop: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px' }}>
-                          <span className="text-muted">Application Processing Progress:</span>
-                          <span style={{ color: 'var(--primary)' }}>{app.progress_percent}%</span>
-                        </div>
-                        <div className="progress-container">
-                          <div className="progress-bar-fill" style={{ width: `${app.progress_percent}%` }}></div>
-                        </div>
-                        <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: '6px', lineHeight: '1.4' }}>
-                          <strong>Current Update:</strong> {app.progress_desc || 'Form processed successfully.'}
-                        </p>
-                      </div>
-
-
-
-                      {/* Documents Received from Admin */}
-                      {(() => {
-                        let docs = [
-                          { key: 'receipt', title: 'Official Receipt', sub: 'Payment Receipt File', url: app.receipt_url },
-                          { key: 'certificate', title: 'Official Certificate', sub: 'Processed Outcome Certificate', url: app.certificate_url },
-                          { key: 'other', title: app.other_doc_name || 'Additional Document', sub: app.other_doc_name ? 'Official Custom Document' : 'Other uploaded attachment', url: app.other_doc_url },
-                          { key: 'legacy', title: 'Processed Final Document', sub: 'Legacy outcome document', url: app.uploaded_pdf_url }
-                        ].filter(d => !!d.url);
-
-                        if (parseInt(app.progress_percent) === 100) {
-                          docs = docs.filter(d => d.key === 'certificate' || d.key === 'legacy');
-                        }
-
-                        if (docs.length === 0) return null;
-
-                        return (
-                          <div style={{ marginTop: '16px', padding: '14px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <h5 style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: 'bold', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <FileCheck size={16} style={{ color: '#16a34a' }} /> 📩 Received Documents from Administrator
-                            </h5>
-                            
-                            {docs.map(doc => {
-                              const isPdf = checkIfPdf(doc.url);
-                              const ext = getFileExtension(doc.url);
-                              return (
-                                <div key={doc.key} style={{ 
-                                  display: 'flex', 
-                                  flexDirection: 'column', 
-                                  gap: '12px', 
-                                  background: 'white', 
-                                  padding: '16px', 
-                                  borderRadius: '12px', 
-                                  border: '1.5px solid #cbd5e1',
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.03)',
-                                  position: 'relative'
-                                }}>
-                                  <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                                    {/* Big Preview (PDF or Image) */}
-                                    {isPdf ? (
-                                      <div style={{ width: '60px', height: '60px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', flexShrink: 0 }}>
-                                        <FileText size={28} />
-                                      </div>
-                                    ) : (
-                                      <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                        <img 
-                                          src={getImageUrl(doc.url)} 
-                                          alt="Preview" 
-                                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                                        />
-                                      </div>
-                                    )}
-                                    
-                                    <div style={{ textAlign: 'left', flex: 1 }}>
-                                      <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '800', display: 'block', marginBottom: '2px' }}>{doc.title}</span>
-                                      <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '6px' }}>{doc.sub}</span>
-                                      <span style={{ fontSize: '0.65rem', color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
-                                        Format: {ext}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Buttons below preview */}
-                                  <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #cbd5e1', paddingTop: '10px' }}>
-                                    <a 
-                                      href={getImageUrl(doc.url)} 
-                                      target="_blank" 
-                                      rel="noreferrer" 
-                                      className="premium-btn premium-btn-secondary" 
-                                      style={{ flex: 1, padding: '8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', textDecoration: 'none', margin: 0 }}
-                                    >
-                                      <Eye size={13} /> View Document
-                                    </a>
-                                    <a 
-                                      href={getImageUrl(doc.url)} 
-                                      download 
-                                      target="_blank" 
-                                      rel="noreferrer" 
-                                      className="premium-btn premium-btn-success" 
-                                      style={{ flex: 1, padding: '8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', textDecoration: 'none', margin: 0 }}
-                                    >
-                                      <Download size={13} /> Download
-                                    </a>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Resume Application for Drafts */}
-                      {app.payment_status === 'draft' && (
-                        <div style={{ 
-                          background: '#f8fafc', 
-                          border: '1.5px solid #e2e8f0', 
-                          borderRadius: '12px', 
-                          padding: '16px', 
-                          margin: '16px 0 0 0',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px'
-                        }}>
-                          <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0, fontWeight: '600', lineHeight: '1.4' }}>
-                            This application has been saved as a draft. You can resume filling out the form and submit it when ready.
-                          </p>
-                          <button
-                            onClick={() => resumeApplicationDraft(app)}
-                            className="premium-btn premium-btn-success"
-                            style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center', 
-                              gap: '8px', 
-                              padding: '10px 16px', 
-                              width: '100%', 
-                              fontSize: '0.8rem', 
-                              fontWeight: '800',
-                              borderRadius: '8px',
-                              border: 'none',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Resume Application <ChevronRight size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
 
       </div>
@@ -3999,12 +3336,575 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 Please wait a moment
               </span>
             </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* App Install Notification Modal */}
-      {showInstallPrompt && (
+        {/* --- TAB 4: ACCESSORIES SHOP CATALOG & TEMPERED GLASS LOOKUP --- */}
+        {activeTab === 'accessories' && (
+          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* 1. SEARCH TEMPERED GLASS BOX LOOKUP REMOVED FROM TOP */}
+
+            {/* 2. ACCESSORIES CATALOG */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 4px' }}>
+                <h3 style={{ fontSize: '1.15rem', color: '#0f172a', fontWeight: '800' }}>🛍️ Accessories Catalog</h3>
+                {products.length > 0 && (
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>{products.length} Items Available</span>
+                )}
+              </div>
+
+              {/* Filters Panel */}
+              <div className="premium-card" style={{ margin: 0, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                
+                {/* Category chips */}
+                <div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>Categories</span>
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', whiteSpace: 'nowrap' }} className="no-scrollbar">
+                    {['All', 'Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable', 'Other Accessories'].map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedAccessoryCategory(cat)}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          border: selectedAccessoryCategory === cat ? 'none' : '1px solid #cbd5e1',
+                          backgroundColor: selectedAccessoryCategory === cat ? 'var(--primary)' : '#ffffff',
+                          color: selectedAccessoryCategory === cat ? '#ffffff' : '#475569',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: selectedAccessoryCategory === cat ? '0 2px 6px rgba(30, 168, 103, 0.2)' : 'none'
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Grid Filters */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>Brand</label>
+                    <select
+                      value={selectedBrand}
+                      onChange={(e) => setSelectedBrand(e.target.value)}
+                      className="premium-input"
+                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                    >
+                      <option value="All">All Brands</option>
+                      {['Samsung', 'Apple', 'Xiaomi (Redmi)', 'Vivo', 'OPPO', 'realme', 'OnePlus', 'POCO', 'Motorola', 'Nokia', 'Google Pixel', 'Huawei', 'Honor', 'Infinix', 'Tecno', 'iQOO', 'Sony', 'ASUS', 'Nothing', 'Lenovo', 'Micromax', 'Lava', 'Karbonn', 'Itel', 'HTC', 'Other'].map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>Model Name</label>
+                    <input
+                      type="text"
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      placeholder="e.g. S24, iPhone 15..."
+                      className="premium-input"
+                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Keyword Search */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>Search Keyword</label>
+                  <input
+                    type="text"
+                    value={accessorySearchKeyword}
+                    onChange={(e) => setAccessorySearchKeyword(e.target.value)}
+                    placeholder="Search product name, brand, model..."
+                    className="premium-input"
+                    style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                  />
+                </div>
+
+              </div>
+
+              {/* Products Listing Grid */}
+              {accessoryProductsLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  Loading products...
+                </div>
+              ) : (() => {
+                const filtered = products.filter(item => {
+                  if (selectedAccessoryCategory !== 'All') {
+                    if (selectedAccessoryCategory === 'Other Accessories') {
+                      const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
+                      if (standardCats.includes(item.Category)) return false;
+                    } else {
+                      if (item.Category !== selectedAccessoryCategory) return false;
+                    }
+                  }
+
+                  if (selectedBrand !== 'All') {
+                    if (item.Brand !== selectedBrand) return false;
+                  }
+
+                  if (selectedModel.trim() !== '') {
+                    const mQuery = selectedModel.toLowerCase();
+                    const modelName = (item.ModelName || '').toLowerCase();
+                    if (!modelName.includes(mQuery)) return false;
+                  }
+
+                  if (accessorySearchKeyword.trim() !== '') {
+                    const query = accessorySearchKeyword.toLowerCase();
+                    const name = (item.ProductName || '').toLowerCase();
+                    const brand = (item.Brand || '').toLowerCase();
+                    const customBrand = (item.CustomBrand || '').toLowerCase();
+                    const model = (item.ModelName || '').toLowerCase();
+                    const type = (item.Type || '').toLowerCase();
+                    const category = (item.Category || '').toLowerCase();
+                    
+                    const match = name.includes(query) || 
+                                  brand.includes(query) || 
+                                  customBrand.includes(query) || 
+                                  model.includes(query) || 
+                                  type.includes(query) || 
+                                  category.includes(query);
+                                  
+                    if (!match) return false;
+                  }
+
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '40px 20px', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 'bold' }}>No accessories match your filters.</p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>Try choosing another category or clearing search keywords.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', padding: '0 4px 20px 4px' }}>
+                    {filtered.map(product => {
+                      const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
+                      const hasPrice = product.Price && product.Price.trim() !== '';
+                      
+                      return (
+                        <div 
+                          key={product.ProductID}
+                          onClick={() => setSelectedProductDetails(product)}
+                          className="premium-card cursor-pointer"
+                          style={{
+                            margin: 0,
+                            padding: '10px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(0,0,0,0.06)',
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
+                            background: '#ffffff',
+                            cursor: 'pointer',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {hasImage ? (
+                            <div style={{
+                              width: '100%',
+                              height: '110px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid #f1f5f9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              position: 'relative'
+                            }}>
+                              <img 
+                                src={getImageUrl(product.ImageURL)} 
+                                alt={product.ProductName || 'Accessory'} 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            </div>
+                          ) : (
+                            <div style={{
+                              width: '100%',
+                              height: '110px',
+                              borderRadius: '8px',
+                              backgroundColor: '#f1f5f9',
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#94a3b8',
+                              gap: '4px'
+                            }}>
+                              <span style={{ fontSize: '1.4rem' }}>📦</span>
+                              <span style={{ fontSize: '0.6rem', fontWeight: 'bold', textTransform: 'uppercase' }}>No Image</span>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
+                            <span style={{
+                              fontSize: '0.65rem',
+                              fontWeight: '800',
+                              color: 'var(--primary)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.02em'
+                            }}>
+                              {product.Category}
+                            </span>
+                            
+                            <h4 style={{
+                              fontSize: '0.8rem',
+                              fontWeight: '700',
+                              color: '#1e293b',
+                              margin: 0,
+                              lineHeight: '1.25',
+                              WebkitLineClamp: 2,
+                              display: '-webkit-box',
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              minHeight: '2.5em'
+                            }}>
+                              {product.ProductName || `${product.Brand} Case`}
+                            </h4>
+
+                            {(product.Brand || product.ModelName) && (
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: '600' }}>
+                                {product.Brand === 'Other' ? product.CustomBrand : product.Brand} {product.ModelName}
+                              </span>
+                            )}
+
+                            {product.Category === 'Phone Cover' && product.CoverType && (
+                              <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                {product.CoverType}
+                              </span>
+                            )}
+
+                            {hasPrice && (
+                              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <strong style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: '800' }}>
+                                  ₹{product.Price}
+                                </strong>
+                                <span style={{ fontSize: '0.6rem', color: '#22c55e', background: '#f0fdf4', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>In Stock</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 3. SEARCH TEMPERED GLASS BOX LOOKUP */}
+            <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '20px 0 16px 0' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🔍 Search Tempered Glass Box
+              </h3>
+              <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '16px' }}>
+                Enter your mobile model name to find and enquire about tempered glass.
+              </p>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const query = tgSearchQuery.trim().toLowerCase();
+                if (!query) {
+                  alert('Please enter a model name.');
+                  return;
+                }
+                
+                // Search in temperedGlassList
+                const results = [];
+                for (const item of temperedGlassList) {
+                  const models = (item.ModelList || "").split(',').map(m => m.trim());
+                  for (const m of models) {
+                    if (m.toLowerCase().includes(query)) {
+                      results.push({
+                        modelName: m,
+                        boxNumber: item.BoxNumber
+                      });
+                    }
+                  }
+                }
+                
+                if (results.length > 0) {
+                  setTgSearchResult({ results, searched: tgSearchQuery });
+                } else {
+                  setTgSearchResult({ notFound: true, searched: tgSearchQuery });
+                }
+              }} style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  value={tgSearchQuery}
+                  onChange={(e) => setTgSearchQuery(e.target.value)}
+                  placeholder="e.g. Samsung A15, Vivo T3..."
+                  className="premium-input"
+                  style={{ flex: 1, margin: 0, padding: '10px 14px', fontSize: '0.85rem' }}
+                />
+                <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '10px 20px', whiteSpace: 'nowrap' }}>
+                  Search Box
+                </button>
+              </form>
+
+              {tgSearchResult && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: tgSearchResult.notFound ? '#fef2f2' : '#f0fdf4',
+                  border: tgSearchResult.notFound ? '1px solid #fca5a5' : '1px solid #bbf7d0',
+                  animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}>
+                  {tgSearchResult.notFound ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: '#991b1b' }}>
+                        Model Not Found: "{tgSearchResult.searched}"
+                      </p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#7f1d1d' }}>
+                        No tempered glass found for this model. Please ask the shop counter.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#166534', fontWeight: '600', textAlign: 'center' }}>
+                        Matching models found. Click to enquire on WhatsApp:
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {tgSearchResult.results && tgSearchResult.results.map((res, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
+                              const cleanedAdminWhatsApp = cleanPhone(adminWhatsApp);
+                              
+                              let msg = `Hello SUBI Online Service,\n\nI would like to buy Tempered Glass.\n\n\`\`\`\n`;
+                              msg += `${"Product".padEnd(12, ' ')}: Tempered Glass\n`;
+                              msg += `${"Model".padEnd(12, ' ')}: ${res.modelName}\n`;
+                              msg += `${"Box Number".padEnd(12, ' ')}: ${res.boxNumber}\n`;
+                              msg += `\`\`\`\n\nPlease check availability and details.`;
+                              
+                              const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanedAdminWhatsApp)}&text=${encodeURIComponent(msg)}`;
+                              window.open(whatsappUrl, '_blank');
+                            }}
+                            className="premium-btn"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: '10px',
+                              background: '#ffffff',
+                              border: '1px solid #bbf7d0',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              width: '100%'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.borderColor = 'var(--primary)';
+                              e.currentTarget.style.background = '#f0fdf4';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.borderColor = '#bbf7d0';
+                              e.currentTarget.style.background = '#ffffff';
+                            }}
+                          >
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#14532d' }}>
+                              📱 {res.modelName}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>
+                              Order ➜
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* Accessory Product Details Modal */}
+        {selectedProductDetails && (() => {
+          const product = selectedProductDetails;
+          const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
+          const hasPrice = product.Price && product.Price.trim() !== '';
+          
+          const handleWhatsAppEnquiry = () => {
+            const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
+            const cleanedAdminWhatsApp = cleanPhone(adminWhatsApp);
+            
+            let msg = `Hello SUBI Online Service,\n\nI would like to buy this product:\n\n\`\`\`\n`;
+            msg += `${"Product Name".padEnd(14, ' ')}: ${product.ProductName || `${product.Brand} Cover Case`}\n`;
+            msg += `${"Category".padEnd(14, ' ')}: ${product.Category}\n`;
+            if (product.Brand) {
+              msg += `${"Brand".padEnd(14, ' ')}: ${product.Brand === 'Other' ? product.CustomBrand : product.Brand}\n`;
+            }
+            if (product.ModelName) {
+              msg += `${"Model".padEnd(14, ' ')}: ${product.ModelName}\n`;
+            }
+            if (product.TagNumber) {
+              msg += `${"Tag Number".padEnd(14, ' ')}: ${product.TagNumber}\n`;
+            }
+            msg += `\`\`\`\n\nPlease provide availability and price details.`;
+            
+            const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanedAdminWhatsApp)}&text=${encodeURIComponent(msg)}`;
+            window.open(whatsappUrl, '_blank');
+          };
+
+          return (
+            <div style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.4)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 99999,
+              padding: '16px'
+            }}>
+              <div style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                width: '100%', maxWidth: '360px',
+                display: 'flex', flexDirection: 'column', gap: '16px',
+                position: 'relative',
+                animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}>
+                <button 
+                  onClick={() => setSelectedProductDetails(null)}
+                  style={{
+                    position: 'absolute',
+                    top: '16px', right: '16px',
+                    background: '#f1f5f9', border: 'none',
+                    color: '#64748b', cursor: 'pointer',
+                    width: '28px', height: '28px',
+                    borderRadius: '50%', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+
+                {hasImage ? (
+                  <div style={{
+                    width: '100%', height: '200px',
+                    borderRadius: '12px', overflow: 'hidden',
+                    border: '1px solid #e2e8f0', background: '#f8fafc',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <img 
+                      src={getImageUrl(product.ImageURL)} 
+                      alt={product.ProductName}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{
+                    width: '100%', height: '140px',
+                    borderRadius: '12px', border: '1px dashed #cbd5e1',
+                    background: '#f8fafc', display: 'flex',
+                    flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'center', color: '#94a3b8', gap: '6px'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>📦</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Product Image Not Available</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                      {product.Category}
+                    </span>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', margin: 0, lineHeight: '1.3' }}>
+                      {product.ProductName || `${product.Brand} Cover Case`}
+                    </h3>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                    <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                      <tbody>
+                        {product.Brand && (
+                          <tr>
+                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Brand:</td>
+                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>
+                              {product.Brand === 'Other' ? product.CustomBrand : product.Brand}
+                            </td>
+                          </tr>
+                        )}
+                        {product.ModelName && (
+                          <tr>
+                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Model Name:</td>
+                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.ModelName}</td>
+                          </tr>
+                        )}
+                        {product.Category === 'Phone Cover' && product.CoverType && (
+                          <tr>
+                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Case Type:</td>
+                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.CoverType}</td>
+                          </tr>
+                        )}
+                        {product.Type && (
+                          <tr>
+                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Type / Spec:</td>
+                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.Type}</td>
+                          </tr>
+                        )}
+                        {hasPrice && (
+                          <tr>
+                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600', fontSize: '0.85rem' }}>Price:</td>
+                            <td style={{ textAlign: 'right', fontWeight: '900', color: '#0f172a', fontSize: '1rem' }}>₹{product.Price}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleWhatsAppEnquiry}
+                  className="premium-btn premium-btn-primary"
+                  style={{
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#22c55e',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.25)',
+                    marginTop: '8px'
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>💬</span> Buy on WhatsApp
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+    {/* App Install Notification Modal */}
+    {showInstallPrompt && (
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -4026,7 +3926,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 <img src="/whatsbro_logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               <div>
-                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b', fontWeight: '800' }}>Install TN sevai</h4>
+                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b', fontWeight: '800' }}>Install SUBI Online Service</h4>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', marginTop: '6px', lineHeight: '1.4' }}>Add our app to your home screen for quick and easy access!</p>
               </div>
             </div>

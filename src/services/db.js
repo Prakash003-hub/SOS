@@ -592,6 +592,57 @@ export const deleteAnnouncement = async (id) => {
   return await callApi("deleteAnnouncement", { id });
 };
 
+// --- PRODUCTS SERVICE ---
+export const getProducts = async () => {
+  try {
+    const data = await callApiGet("getProducts");
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getProducts:", err);
+    return [];
+  }
+};
+
+export const createProduct = async (productData) => {
+  return await callApi("createProduct", { payload: productData });
+};
+
+export const updateProduct = async (id, productData) => {
+  return await callApi("updateProduct", { id, payload: productData });
+};
+
+export const deleteProduct = async (id) => {
+  return await callApi("deleteProduct", { id });
+};
+
+export const uploadProductImage = async (file) => {
+  const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "Accessories_Images"]);
+  return { img_url: url };
+};
+
+// --- TEMPERED GLASS SERVICE ---
+export const getTemperedGlass = async () => {
+  try {
+    const data = await callApiGet("getTemperedGlass");
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("Error in getTemperedGlass:", err);
+    return [];
+  }
+};
+
+export const createTemperedGlass = async (tgData) => {
+  return await callApi("createTemperedGlass", { payload: tgData });
+};
+
+export const updateTemperedGlass = async (boxNumber, tgData) => {
+  return await callApi("updateTemperedGlass", { id: boxNumber, payload: tgData });
+};
+
+export const deleteTemperedGlass = async (boxNumber) => {
+  return await callApi("deleteTemperedGlass", { id: boxNumber });
+};
+
 // --- MOCK DATABASE FALLBACK SYSTEM (LOCALSTORAGE) ---
 const callMockFallback = (action, payload) => {
   console.log(`[Offline Mode] Simulating Action: ${action}`, payload);
@@ -599,6 +650,89 @@ const callMockFallback = (action, payload) => {
   // Set up localStorage models
   if (!localStorage.getItem('mock_posts')) {
     localStorage.setItem('mock_posts', JSON.stringify(mockData.posts));
+  }
+  if (!localStorage.getItem('mock_products')) {
+    const defaultProducts = [
+      {
+        ProductID: "prod-1",
+        Category: "Phone Cover",
+        CoverType: "Normal Case",
+        Brand: "Samsung",
+        CustomBrand: "",
+        ModelName: "Samsung S24 Ultra",
+        ProductName: "Samsung S24 Ultra Clear Case",
+        Type: "",
+        Price: "299",
+        TagNumber: "TAG-S24U-01",
+        ImageURL: "",
+        CreatedDate: new Date().toISOString()
+      },
+      {
+        ProductID: "prod-2",
+        Category: "Phone Cover",
+        CoverType: "Flip Case",
+        Brand: "Apple",
+        CustomBrand: "",
+        ModelName: "iPhone 15 Pro",
+        ProductName: "iPhone 15 Pro Leather Flip Case",
+        Type: "",
+        Price: "499",
+        TagNumber: "TAG-IP15P-02",
+        ImageURL: "",
+        CreatedDate: new Date().toISOString()
+      },
+      {
+        ProductID: "prod-3",
+        Category: "Headphone",
+        CoverType: "",
+        Brand: "Sony",
+        CustomBrand: "",
+        ModelName: "",
+        ProductName: "SUBI BassBoost Wireless Headphone",
+        Type: "",
+        Price: "999",
+        TagNumber: "TAG-HP-03",
+        ImageURL: "",
+        CreatedDate: new Date().toISOString()
+      },
+      {
+        ProductID: "prod-4",
+        Category: "Speaker",
+        CoverType: "",
+        Brand: "JBL",
+        CustomBrand: "",
+        ModelName: "",
+        ProductName: "SUBI Go Portable Bluetooth Speaker",
+        Type: "",
+        Price: "1499",
+        TagNumber: "TAG-SPK-04",
+        ImageURL: "",
+        CreatedDate: new Date().toISOString()
+      },
+      {
+        ProductID: "prod-5",
+        Category: "Charger",
+        CoverType: "",
+        Brand: "Anker",
+        CustomBrand: "",
+        ModelName: "",
+        ProductName: "SUBI SuperCharge Dual Port 33W",
+        Type: "Fast Charger",
+        Price: "350",
+        TagNumber: "TAG-CHG-05",
+        ImageURL: "",
+        CreatedDate: new Date().toISOString()
+      }
+    ];
+    localStorage.setItem('mock_products', JSON.stringify(defaultProducts));
+  }
+  if (!localStorage.getItem('mock_tempered_glass')) {
+    const defaultTG = [
+      { BoxNumber: "B12", ModelList: "Samsung A15, Samsung A16, Vivo T3, Redmi Note 13, Oppo A59" },
+      { BoxNumber: "B15", ModelList: "iPhone 13, iPhone 14, iPhone 15, iPhone 15 Pro" },
+      { BoxNumber: "A04", ModelList: "OnePlus Nord CE 3, OnePlus 11R, Realme 12 Pro, POCO X6" }
+    ];
+    localStorage.setItem('mock_tempered_glass', JSON.stringify(defaultTG));
   }
   if (!localStorage.getItem('mock_jobs')) {
     const defaultJobs = [
@@ -962,6 +1096,73 @@ const callMockFallback = (action, payload) => {
       console.log(`[Mock] Simulating Admin Login with code ${payload.payload.code}`);
       if (payload.payload.code === "123456") return { success: true };
       throw new Error("Invalid Admin Code");
+      
+    case "getProducts":
+      return getMockList('mock_products');
+      
+    case "createProduct": {
+      const list = getMockList('mock_products');
+      const newProd = {
+        ProductID: "prod-" + Date.now(),
+        CreatedDate: new Date().toISOString(),
+        ...payload.payload
+      };
+      list.push(newProd);
+      saveMockList('mock_products', list);
+      return newProd;
+    }
+    
+    case "updateProduct": {
+      const list = getMockList('mock_products');
+      const idx = list.findIndex(p => p.ProductID === payload.id);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...payload.payload };
+        saveMockList('mock_products', list);
+        return list[idx];
+      }
+      throw new Error("Product not found");
+    }
+    
+    case "deleteProduct": {
+      let list = getMockList('mock_products');
+      list = list.filter(p => p.ProductID !== payload.id);
+      saveMockList('mock_products', list);
+      return { success: true };
+    }
+    
+    case "getTemperedGlass":
+      return getMockList('mock_tempered_glass');
+      
+    case "createTemperedGlass": {
+      const list = getMockList('mock_tempered_glass');
+      const box = (payload.payload.BoxNumber || "").toString().trim();
+      if (!box) throw new Error("Box Number is required.");
+      if (list.some(x => x.BoxNumber.toLowerCase() === box.toLowerCase())) {
+        throw new Error(`Box Number '${box}' already exists.`);
+      }
+      const newTG = { ...payload.payload, BoxNumber: box };
+      list.push(newTG);
+      saveMockList('mock_tempered_glass', list);
+      return newTG;
+    }
+    
+    case "updateTemperedGlass": {
+      const list = getMockList('mock_tempered_glass');
+      const idx = list.findIndex(t => t.BoxNumber.toLowerCase() === payload.id.toLowerCase());
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...payload.payload };
+        saveMockList('mock_tempered_glass', list);
+        return list[idx];
+      }
+      throw new Error("Tempered glass entry not found");
+    }
+    
+    case "deleteTemperedGlass": {
+      let list = getMockList('mock_tempered_glass');
+      list = list.filter(t => t.BoxNumber.toLowerCase() !== payload.id.toLowerCase());
+      saveMockList('mock_tempered_glass', list);
+      return { success: true };
+    }
       
     default:
       console.warn("Unimplemented mock action: " + action);

@@ -1,7 +1,7 @@
 {
-  "name": "TN sevai",
-  "short_name": "TNSevai",
-  "description": "Tamil Nadu Sevai Application Portal",
+  "name": "SUBI Online Service",
+  "short_name": "SUBI",
+  "description": "SUBI Online Service Application Portal",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

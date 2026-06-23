@@ -1,4 +1,4 @@
-// Service Worker for TN Sevai PWA
+// Service Worker for SUBI Online Service PWA
 self.addEventListener('install', (e) => {
   console.log('[Service Worker] Installed');
   self.skipWaiting();

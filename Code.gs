@@ -122,6 +122,12 @@ function doGet(e) {
       case "getAnnouncements":
         responseData = getAnnouncementsAction();
         break;
+      case "getProducts":
+        responseData = getProductsAction();
+        break;
+      case "getTemperedGlass":
+        responseData = getTemperedGlassAction();
+        break;
       default:
         return jsonResponse({ success: false, error: "Invalid GET Action: " + action }, 400);
     }
@@ -254,6 +260,24 @@ function doPost(e) {
         break;
       case "deleteAnnouncement":
         responseData = deleteAnnouncementAction(requestBody.id);
+        break;
+      case "createProduct":
+        responseData = createProductAction(requestBody.payload);
+        break;
+      case "updateProduct":
+        responseData = updateProductAction(requestBody.id, requestBody.payload);
+        break;
+      case "deleteProduct":
+        responseData = deleteProductAction(requestBody.id);
+        break;
+      case "createTemperedGlass":
+        responseData = createTemperedGlassAction(requestBody.payload);
+        break;
+      case "updateTemperedGlass":
+        responseData = updateTemperedGlassAction(requestBody.id, requestBody.payload);
+        break;
+      case "deleteTemperedGlass":
+        responseData = deleteTemperedGlassAction(requestBody.id);
         break;
         
       default:
@@ -726,9 +750,9 @@ function sendOtpAction(payload) {
   try {
     MailApp.sendEmail({
       to: email,
-      subject: "TN Sevai - Your OTP Verification Code",
+      subject: "SUBI Online Service - Your OTP Verification Code",
       htmlBody: '<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px;">'
-        + '<h2 style="color:#047857;text-align:center;">TN Sevai E-Service</h2>'
+        + '<h2 style="color:#047857;text-align:center;">SUBI Online Service</h2>'
         + '<p style="text-align:center;color:#64748b;">Your OTP verification code is:</p>'
         + '<div style="text-align:center;margin:20px 0;">'
         + '<span style="font-size:2rem;font-weight:900;letter-spacing:8px;color:#1e293b;background:#f0fdf4;padding:10px 20px;border-radius:8px;border:2px solid #10b981;">' + otp + '</span>'
@@ -919,12 +943,12 @@ function submitFormResponseAction(payload) {
       
       MailApp.sendEmail({
         to: userEmail,
-        subject: "TN Sevai - Application Receipt (" + formTitle + ")",
+        subject: "SUBI Online Service - Application Receipt (" + formTitle + ")",
         htmlBody: '<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">'
           + '<div style="text-align:center;border-bottom:2px dashed #10b981;padding-bottom:14px;margin-bottom:16px;">'
           + '<h2 style="color:#047857;margin:0 0 4px 0;font-size:1.3rem;">' + formTitle + '</h2>'
-          + '<span style="color:#10b981;font-size:0.8rem;font-weight:700;">TN SEVAI E-SERVICE</span><br/>'
-          + '<span style="color:#64748b;font-size:0.7rem;">Official E-Governance Receipt</span>'
+          + '<span style="color:#10b981;font-size:0.8rem;font-weight:700;">SUBI ONLINE SERVICE</span><br/>'
+          + '<span style="color:#64748b;font-size:0.7rem;">Official E-Receipt</span>'
           + '</div>'
           + '<table style="width:100%;font-size:0.85rem;border-collapse:collapse;">'
           + '<tr><td style="color:#64748b;padding:6px 0;">Receipt ID:</td><td style="font-weight:700;color:#10b981;text-align:right;">' + subId + '</td></tr>'
@@ -935,7 +959,7 @@ function submitFormResponseAction(payload) {
           + '<tr><td style="color:#64748b;padding:6px 0;">Service Fee:</td><td style="font-weight:800;font-size:1rem;text-align:right;">Rs. ' + fee + '</td></tr>'
           + '<tr><td style="color:#64748b;padding:6px 0;">Payment Status:</td><td style="text-align:right;"><span style="background:#fef2f2;color:#ef4444;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">UNPAID</span></td></tr>'
           + '</table>'
-          + '<p style="text-align:center;color:#94a3b8;font-size:0.75rem;margin-top:16px;">Thank you for using TN Sevai E-Service Portal.</p>'
+          + '<p style="text-align:center;color:#94a3b8;font-size:0.75rem;margin-top:16px;">Thank you for using SUBI Online Service Portal.</p>'
           + '</div>'
       });
     } catch (emailErr) {
@@ -1058,10 +1082,10 @@ function adminUpdateSubmissionAction(id, updateData) {
         
         MailApp.sendEmail({
           to: userEmail,
-          subject: "TN Sevai - Application Status Update (" + formTitle + ")",
+          subject: "SUBI Online Service - Application Status Update (" + formTitle + ")",
           htmlBody: '<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">'
             + '<div style="text-align:center;margin-bottom:16px;">'
-            + '<h2 style="color:#047857;margin:0;">TN Sevai E-Service</h2>'
+            + '<h2 style="color:#047857;margin:0;">SUBI Online Service</h2>'
             + '<p style="color:#64748b;font-size:0.8rem;">Application Status Update</p>'
             + '</div>'
             + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:16px;">'
@@ -1075,7 +1099,7 @@ function adminUpdateSubmissionAction(id, updateData) {
             + '<div style="background:#f0fdf4;border-left:4px solid #10b981;padding:12px;border-radius:0 8px 8px 0;">'
             + '<p style="margin:0;font-size:0.85rem;color:#1e293b;"><strong>Update:</strong> ' + progressDesc + '</p>'
             + '</div>'
-            + '<p style="text-align:center;color:#94a3b8;font-size:0.75rem;margin-top:16px;">Login to TN Sevai to view full details.</p>'
+            + '<p style="text-align:center;color:#94a3b8;font-size:0.75rem;margin-top:16px;">Login to SUBI Online Service to view full details.</p>'
             + '</div>'
         });
       } catch (emailErr) {
@@ -1495,6 +1519,7 @@ function initSpreadsheet() {
   var settingsSheet = ensureSheetExists("Settings", ["key", "value"]);
   if (settingsSheet.getLastRow() <= 1) {
     appendObjectToSheet(settingsSheet, { key: "admin_email", value: "" });
+    appendObjectToSheet(settingsSheet, { key: "admin_whatsapp_number", value: "9385497906" });
   }
 
   // 7. SYSTEM ERROR/LOG SHEET
@@ -1505,6 +1530,16 @@ function initSpreadsheet() {
   // 8. ANNOUNCEMENTS SHEET
   ensureSheetExists("Announcements", [
     "id", "title", "description", "content", "button_name", "button_url", "enabled", "created_at"
+  ]);
+  
+  // 9. PRODUCTS SHEET
+  ensureSheetExists("Products", [
+    "ProductID", "Category", "CoverType", "Brand", "CustomBrand", "ModelName", "ProductName", "Type", "Price", "TagNumber", "ImageURL", "CreatedDate"
+  ]);
+
+  // 10. TEMPERED GLASS SHEET
+  ensureSheetExists("TemperedGlass", [
+    "BoxNumber", "ModelList"
   ]);
   
   // Add initial mockup posts if Posts sheet is empty
@@ -1560,7 +1595,14 @@ function initSpreadsheet() {
 
 function ensureSheetExists(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(name);
+  var sheets = ss.getSheets();
+  var sheet = null;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getName().toLowerCase() === name.toLowerCase()) {
+      sheet = sheets[i];
+      break;
+    }
+  }
   if (!sheet) {
     sheet = ss.insertSheet(name);
     // Write headers
@@ -1572,9 +1614,13 @@ function ensureSheetExists(name, headers) {
 
 function getSheet(name) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(name);
-  if (!sheet) throw new Error("Database Table Sheet not found: " + name);
-  return sheet;
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getName().toLowerCase() === name.toLowerCase()) {
+      return sheets[i];
+    }
+  }
+  throw new Error("Database Table Sheet not found: " + name);
 }
 
 function getRowsFromSheet(sheetName) {
@@ -1740,4 +1786,127 @@ function jsonResponse(data, statusCode) {
   var outputString = JSON.stringify(data);
   return ContentService.createTextOutput(outputString)
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- 6. PRODUCTS & TEMPERED GLASS ACTIONS ---
+
+function findRowIndexByColumn(sheet, columnName, val) {
+  var values = sheet.getDataRange().getDisplayValues();
+  var headers = values[0];
+  var colIndex = headers.indexOf(columnName);
+  if (colIndex === -1) return -1;
+  
+  var valStr = val.toString().trim();
+  for (var r = 1; r < values.length; r++) {
+    var cellVal = values[r][colIndex];
+    if (cellVal !== undefined && cellVal !== null && cellVal.toString().trim() === valStr) {
+      return r + 1; // 1-indexed row number
+    }
+  }
+  return -1;
+}
+
+function getProductsAction() {
+  return getRowsFromSheet("Products");
+}
+
+function createProductAction(productData) {
+  var sheet = getSheet("Products");
+  var id = "prod-" + Date.now() + Math.random().toString(36).substring(2, 6);
+  var newProduct = {
+    ProductID: id,
+    Category: productData.Category || "",
+    CoverType: productData.CoverType || "",
+    Brand: productData.Brand || "",
+    CustomBrand: productData.CustomBrand || "",
+    ModelName: productData.ModelName || "",
+    ProductName: productData.ProductName || "",
+    Type: productData.Type || "",
+    Price: productData.Price || "",
+    TagNumber: productData.TagNumber || "",
+    ImageURL: productData.ImageURL || "",
+    CreatedDate: new Date().toISOString()
+  };
+  
+  appendObjectToSheet(sheet, newProduct);
+  return newProduct;
+}
+
+function updateProductAction(id, productData) {
+  var sheet = getSheet("Products");
+  var rowIndex = findRowIndexByColumn(sheet, "ProductID", id);
+  if (rowIndex === -1) throw new Error("Product not found.");
+  
+  var existingRow = getRowObject(sheet, rowIndex);
+  if (productData.Category !== undefined) existingRow.Category = productData.Category;
+  if (productData.CoverType !== undefined) existingRow.CoverType = productData.CoverType;
+  if (productData.Brand !== undefined) existingRow.Brand = productData.Brand;
+  if (productData.CustomBrand !== undefined) existingRow.CustomBrand = productData.CustomBrand;
+  if (productData.ModelName !== undefined) existingRow.ModelName = productData.ModelName;
+  if (productData.ProductName !== undefined) existingRow.ProductName = productData.ProductName;
+  if (productData.Type !== undefined) existingRow.Type = productData.Type;
+  if (productData.Price !== undefined) existingRow.Price = productData.Price;
+  if (productData.TagNumber !== undefined) existingRow.TagNumber = productData.TagNumber;
+  if (productData.ImageURL !== undefined) existingRow.ImageURL = productData.ImageURL;
+  
+  updateRowObject(sheet, rowIndex, existingRow);
+  return existingRow;
+}
+
+function deleteProductAction(id) {
+  var sheet = getSheet("Products");
+  var rowIndex = findRowIndexByColumn(sheet, "ProductID", id);
+  if (rowIndex === -1) throw new Error("Product not found.");
+  sheet.deleteRow(rowIndex);
+  return { ProductID: id, success: true };
+}
+
+function getTemperedGlassAction() {
+  return getRowsFromSheet("TemperedGlass");
+}
+
+function createTemperedGlassAction(tgData) {
+  var sheet = getSheet("TemperedGlass");
+  var boxNumber = (tgData.BoxNumber || "").toString().trim();
+  if (!boxNumber) throw new Error("Box Number is required.");
+  
+  // Check duplicates
+  var rowIndex = findRowIndexByColumn(sheet, "BoxNumber", boxNumber);
+  if (rowIndex !== -1) {
+    throw new Error("Box Number '" + boxNumber + "' already exists.");
+  }
+  
+  var newTG = {
+    BoxNumber: boxNumber,
+    ModelList: tgData.ModelList || ""
+  };
+  
+  appendObjectToSheet(sheet, newTG);
+  return newTG;
+}
+
+function updateTemperedGlassAction(boxNumber, tgData) {
+  var sheet = getSheet("TemperedGlass");
+  var rowIndex = findRowIndexByColumn(sheet, "BoxNumber", boxNumber);
+  if (rowIndex === -1) throw new Error("Tempered Glass entry not found.");
+  
+  var existingRow = getRowObject(sheet, rowIndex);
+  if (tgData.ModelList !== undefined) existingRow.ModelList = tgData.ModelList;
+  if (tgData.BoxNumber !== undefined && tgData.BoxNumber.toString().trim() !== boxNumber) {
+    var newBox = tgData.BoxNumber.toString().trim();
+    var dupIndex = findRowIndexByColumn(sheet, "BoxNumber", newBox);
+    if (dupIndex !== -1) throw new Error("Box Number '" + newBox + "' already exists.");
+    existingRow.BoxNumber = newBox;
+  }
+  
+  updateRowObject(sheet, rowIndex, existingRow);
+  return existingRow;
+}
+
+function deleteTemperedGlassAction(boxNumber) {
+  var sheet = getSheet("TemperedGlass");
+  var rowIndex = findRowIndexByColumn(sheet, "BoxNumber", boxNumber);
+  if (rowIndex === -1) throw new Error("Tempered Glass entry not found.");
+  sheet.deleteRow(rowIndex);
+  return { BoxNumber: boxNumber, success: true };
 }

@@ -87,7 +87,7 @@ export default async function handler(req, res) {
   const sharedUrl = `${baseUrl}/${type}/${id}`;
 
   let redirectPath = '/user';
-  let title = 'TN Sevai Portal';
+  let title = 'SUBI Online Service Portal';
   let description = 'Apply for E-Sevai services, view job alerts, and stay updated.';
   let imageUrl = `${baseUrl}/income_og_preview.jpg`;
   let item = null;
@@ -195,7 +195,7 @@ export default async function handler(req, res) {
   <meta property="og:description" content="${description}" />
   <meta property="og:image" content="${imageUrl}" />
   <meta property="og:url" content="${sharedUrl}" />
-  <meta property="og:site_name" content="TN Sevai" />
+  <meta property="og:site_name" content="SUBI Online Service" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   

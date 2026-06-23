@@ -143,7 +143,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
           }} 
         />
         <div>
-          <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>TN sevai</div>
+          <div className="brand-name" style={{ fontSize: '1.4rem', lineHeight: '1.2' }}>SUBI Online Service</div>
           <div className="brand-subtitle" style={{ fontSize: '0.8rem' }}>Online Service Portal</div>
         </div>
       </div>

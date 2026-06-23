@@ -4,7 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import UserPortal from './pages/UserPortal';
 import AdminPortal from './pages/AdminPortal';
-import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase, MessageSquare } from 'lucide-react';
+import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase, MessageSquare, ShoppingBag, Package } from 'lucide-react';
 import { registerUser, loginUser, sendOtp, verifyOtp, getSettings } from './services/db';
 
 function TrollPage() {
@@ -152,8 +152,8 @@ function PortalLayout() {
   // Read active tab, default based on portal type with automatic bounds verification
   const rawTab = searchParams.get('tab');
   const activeTab = isAdmin
-    ? (['posts', 'forms', 'users', 'jobs'].includes(rawTab) ? rawTab : 'posts')
-    : (['home', 'apply', 'status', 'jobs'].includes(rawTab) ? rawTab : 'home');
+    ? (['posts', 'forms', 'users', 'jobs', 'products'].includes(rawTab) ? rawTab : 'posts')
+    : (['home', 'apply', 'jobs', 'accessories'].includes(rawTab) ? rawTab : 'home');
 
   const handleTabChange = (tabName) => {
     setSearchParams({ tab: tabName });
@@ -341,6 +341,13 @@ function PortalLayout() {
               <Briefcase className="bottom-nav-icon" size={20} />
               <span>Jobs</span>
             </button>
+            <button 
+              onClick={() => handleTabChange('products')}
+              className={`bottom-nav-item ${activeTab === 'products' ? 'active' : ''}`}
+            >
+              <Package className="bottom-nav-icon" size={20} />
+              <span>Products</span>
+            </button>
           </div>
         ) : (
           <div className="bottom-nav-bar">
@@ -359,18 +366,18 @@ function PortalLayout() {
               <span>Application</span>
             </button>
             <button 
-              onClick={() => handleTabChange('status')}
-              className={`bottom-nav-item ${activeTab === 'status' ? 'active' : ''}`}
-            >
-              <CheckCircle className="bottom-nav-icon" size={20} />
-              <span>Check Status</span>
-            </button>
-            <button 
               onClick={() => handleTabChange('jobs')}
               className={`bottom-nav-item ${activeTab === 'jobs' ? 'active' : ''}`}
             >
               <Briefcase className="bottom-nav-icon" size={20} />
               <span>Job alerts</span>
+            </button>
+            <button 
+              onClick={() => handleTabChange('accessories')}
+              className={`bottom-nav-item ${activeTab === 'accessories' ? 'active' : ''}`}
+            >
+              <ShoppingBag className="bottom-nav-icon" size={20} />
+              <span>Accessories</span>
             </button>
           </div>
         )}
@@ -763,7 +770,7 @@ export default function App() {
             margin: 0,
             letterSpacing: '-1px'
           }}>
-            TN sevai
+            SUBI Online Service
           </h1>
           <p style={{ color: '#64748b', fontSize: '1rem', fontWeight: '600', margin: 0 }}>
             Online Service Portal

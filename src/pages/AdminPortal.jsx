@@ -35,7 +35,16 @@ import {
   getAnnouncements,
   createAnnouncement,
   updateAnnouncement,
-  deleteAnnouncement
+  deleteAnnouncement,
+  getProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  uploadProductImage,
+  getTemperedGlass,
+  createTemperedGlass,
+  updateTemperedGlass,
+  deleteTemperedGlass
 } from '../services/db';
 import { 
   Plus, 
@@ -61,7 +70,9 @@ import {
   Briefcase,
   MessageSquare,
   Star,
-  Megaphone
+  Megaphone,
+  Package,
+  ShoppingBag
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -326,6 +337,42 @@ export default function AdminPortal() {
     button_url: '',
     enabled: 'true'
   });
+
+  // Accessories & Tempered Glass States
+  const [products, setProducts] = useState([]);
+  const [temperedGlassList, setTemperedGlassList] = useState([]);
+  const [adminProductsLoading, setAdminProductsLoading] = useState(false);
+  const [tgListLoading, setTgListLoading] = useState(false);
+  
+  // Dynamic toggle in Product Management
+  const [productSubTab, setProductSubTab] = useState('accessories'); // 'accessories' | 'tempered_glass'
+  
+  // Accessories state & forms
+  const [accessorySearch, setAccessorySearch] = useState('');
+  const [accessoryCategoryFilter, setAccessoryCategoryFilter] = useState('All');
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [uploadingProductImg, setUploadingProductImg] = useState(false);
+  
+  const [productForm, setProductForm] = useState({
+    Category: 'Phone Cover',
+    CoverType: 'Normal Case',
+    Brand: 'Samsung',
+    CustomBrand: '',
+    ModelName: '',
+    ProductName: '',
+    Type: '',
+    Price: '',
+    TagNumber: '',
+    ImageURL: ''
+  });
+  
+  // Tempered Glass state & forms
+  const [tgSearch, setTgSearch] = useState('');
+  const [editingTgBoxNumber, setEditingTgBoxNumber] = useState(null);
+  const [tgForm, setTgForm] = useState({
+    BoxNumber: '',
+    ModelList: ''
+  });
   const [feedbackList, setFeedbackList] = useState([]);
   const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
   const [feedbackSearchTerm, setFeedbackSearchTerm] = useState('');
@@ -335,6 +382,7 @@ export default function AdminPortal() {
   // Settings
   const [settings, setSettings] = useState({ 
     admin_email: '', 
+    admin_whatsapp_number: '',
     payment_number: '', 
     qr_code_url: '',
     notification_title: '',
@@ -419,8 +467,8 @@ export default function AdminPortal() {
     if (!isAuth) return;
     const loadAllData = async () => {
       try {
-        const [postsData, formsData, usersData, jobsData, feedbackData, settingsData, announcementsData] = await Promise.all([
-          getPosts(), getForms(), getUsersList(), getJobs(), getFeedback(), getSettings(), getAnnouncements()
+        const [postsData, formsData, usersData, jobsData, feedbackData, settingsData, announcementsData, productsData, tgData] = await Promise.all([
+          getPosts(), getForms(), getUsersList(), getJobs(), getFeedback(), getSettings(), getAnnouncements(), getProducts(), getTemperedGlass()
         ]);
         setPosts(postsData);
         setForms(formsData);
@@ -429,6 +477,8 @@ export default function AdminPortal() {
         setFeedbackList(feedbackData);
         if (settingsData) setSettings(settingsData);
         if (announcementsData) setAnnouncements(announcementsData);
+        setProducts(productsData || []);
+        setTemperedGlassList(tgData || []);
       } catch (err) {
         console.error("Initial data load error:", err);
       }
@@ -610,6 +660,172 @@ export default function AdminPortal() {
       }
     } catch (e) {
       console.error("Failed to reorder", e);
+    }
+  };
+
+  // --- ACCESSORIES PRODUCTS CRUD ---
+  const handleProductSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingProductId) {
+        await updateProduct(editingProductId, productForm);
+        alert('Product updated successfully!');
+      } else {
+        await createProduct(productForm);
+        alert('New product added successfully!');
+      }
+      setProductForm({
+        Category: 'Phone Cover',
+        CoverType: 'Normal Case',
+        Brand: 'Samsung',
+        CustomBrand: '',
+        ModelName: '',
+        ProductName: '',
+        Type: '',
+        Price: '',
+        TagNumber: '',
+        ImageURL: ''
+      });
+      setEditingProductId(null);
+      handleRefreshProducts();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save product.');
+    }
+  };
+
+  const startEditProduct = (product) => {
+    setEditingProductId(product.ProductID);
+    setProductForm({
+      Category: product.Category || 'Phone Cover',
+      CoverType: product.CoverType || 'Normal Case',
+      Brand: product.Brand || 'Samsung',
+      CustomBrand: product.CustomBrand || '',
+      ModelName: product.ModelName || '',
+      ProductName: product.ProductName || '',
+      Type: product.Type || '',
+      Price: product.Price || '',
+      TagNumber: product.TagNumber || '',
+      ImageURL: product.ImageURL || ''
+    });
+    document.getElementById('product-editor-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      await deleteProduct(id);
+      alert('Product deleted successfully.');
+      if (editingProductId === id) {
+        setEditingProductId(null);
+        setProductForm({
+          Category: 'Phone Cover',
+          CoverType: 'Normal Case',
+          Brand: 'Samsung',
+          CustomBrand: '',
+          ModelName: '',
+          ProductName: '',
+          Type: '',
+          Price: '',
+          TagNumber: '',
+          ImageURL: ''
+        });
+      }
+      handleRefreshProducts();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete product.');
+    }
+  };
+
+  const handleProductImageUpload = async (file) => {
+    if (!file) return;
+    setUploadingProductImg(true);
+    try {
+      const res = await uploadProductImage(file);
+      if (res && res.img_url) {
+        setProductForm(prev => ({ ...prev, ImageURL: res.img_url }));
+        alert('Product image uploaded to Google Drive successfully!');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload product image to Google Drive.');
+    } finally {
+      setUploadingProductImg(false);
+    }
+  };
+
+  const handleRefreshProducts = async () => {
+    setAdminProductsLoading(true);
+    try {
+      const data = await getProducts();
+      setProducts(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAdminProductsLoading(false);
+    }
+  };
+
+  // --- TEMPERED GLASS CRUD ---
+  const handleTgSubmit = async (e) => {
+    e.preventDefault();
+    const box = tgForm.BoxNumber.trim();
+    if (!box) {
+      alert('Box Number is required.', 'warning');
+      return;
+    }
+    try {
+      if (editingTgBoxNumber) {
+        await updateTemperedGlass(editingTgBoxNumber, tgForm);
+        alert('Tempered Glass entry updated!');
+      } else {
+        await createTemperedGlass(tgForm);
+        alert('New Tempered Glass entry created!');
+      }
+      setTgForm({ BoxNumber: '', ModelList: '' });
+      setEditingTgBoxNumber(null);
+      handleRefreshTemperedGlass();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Failed to save Tempered Glass.');
+    }
+  };
+
+  const startEditTg = (item) => {
+    setEditingTgBoxNumber(item.BoxNumber);
+    setTgForm({
+      BoxNumber: item.BoxNumber,
+      ModelList: item.ModelList || ''
+    });
+    document.getElementById('tg-editor-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleDeleteTg = async (boxNumber) => {
+    if (!window.confirm(`Are you sure you want to delete box ${boxNumber}?`)) return;
+    try {
+      await deleteTemperedGlass(boxNumber);
+      alert('Tempered Glass entry deleted.');
+      if (editingTgBoxNumber === boxNumber) {
+        setEditingTgBoxNumber(null);
+        setTgForm({ BoxNumber: '', ModelList: '' });
+      }
+      handleRefreshTemperedGlass();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete Tempered Glass.');
+    }
+  };
+
+  const handleRefreshTemperedGlass = async () => {
+    setTgListLoading(true);
+    try {
+      const data = await getTemperedGlass();
+      setTemperedGlassList(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTgListLoading(false);
     }
   };
 
@@ -1058,7 +1274,7 @@ export default function AdminPortal() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#0f172a', color: 'white', borderRadius: '12px', margin: '16px 16px 0 16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>TN sevai Admin Terminal</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>SUBI Online Service Admin Terminal</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
@@ -1214,6 +1430,20 @@ export default function AdminPortal() {
             }}
           >
             Settings
+          </button>
+
+          <button
+            onClick={() => setActiveTab('products')}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: activeTab === 'products' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
+              background: activeTab === 'products' ? 'rgba(16,185,129,0.06)' : 'white',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'products' ? 800 : 600
+            }}
+          >
+            Products
           </button>
         </div>
         {/* --- TAB 1: MANAGE POSTS --- */}
@@ -2187,6 +2417,37 @@ export default function AdminPortal() {
                   </span>
                 </form>
 
+                {/* Admin WhatsApp Number */}
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const phoneNum = (settings.admin_whatsapp_number || '').trim();
+                  if (!phoneNum) {
+                    alert('Please enter a WhatsApp number.');
+                    return;
+                  }
+                  try {
+                    await updateSettings({ admin_whatsapp_number: phoneNum });
+                    alert('Admin WhatsApp Number saved successfully!');
+                  } catch (err) {
+                    alert('Failed to save WhatsApp number.');
+                  }
+                }} className="premium-input-group" style={{ margin: 0 }}>
+                  <label className="premium-label">Admin WhatsApp Number (for orders & submissions)</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="text" 
+                      value={settings.admin_whatsapp_number || ''} 
+                      onChange={(e) => setSettings({ ...settings, admin_whatsapp_number: e.target.value })} 
+                      placeholder="e.g. 919876543210 or 9876543210"
+                      className="premium-input" 
+                    />
+                    <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '0 16px' }}>Update</button>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', marginTop: '4px', display: 'block' }}>
+                    Orders and form submissions will be routed to this WhatsApp number. Include country code (e.g., 91 for India).
+                  </span>
+                </form>
+
                 {/* Admin Login Code */}
                 <form onSubmit={async (e) => {
                   e.preventDefault();
@@ -2241,7 +2502,7 @@ export default function AdminPortal() {
                     </button>
                   </div>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', marginTop: '4px', display: 'block' }}>
-                    If ON, users will see a prompt suggesting they "Add TN sevai to Home Screen".
+                    If ON, users will see a prompt suggesting they "Add SUBI Online Service to Home Screen".
                   </span>
                 </form>
 
@@ -2636,6 +2897,588 @@ export default function AdminPortal() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* --- TAB 6: ACCESSORIES & TEMPERED GLASS PRODUCT MANAGEMENT --- */}
+        {activeTab === 'products' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
+            {/* Sub-tabs toggles */}
+            <div style={{ display: 'flex', gap: '10px', background: '#f1f5f9', padding: '6px', borderRadius: '12px', margin: '0 0 10px 0' }}>
+              <button
+                type="button"
+                onClick={() => setProductSubTab('accessories')}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  backgroundColor: productSubTab === 'accessories' ? '#ffffff' : 'transparent',
+                  color: productSubTab === 'accessories' ? 'var(--primary)' : '#64748b',
+                  boxShadow: productSubTab === 'accessories' ? 'var(--shadow-sm)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🛍️ Accessories Catalog
+              </button>
+              <button
+                type="button"
+                onClick={() => setProductSubTab('tempered_glass')}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  backgroundColor: productSubTab === 'tempered_glass' ? '#ffffff' : 'transparent',
+                  color: productSubTab === 'tempered_glass' ? 'var(--primary)' : '#64748b',
+                  boxShadow: productSubTab === 'tempered_glass' ? 'var(--shadow-sm)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📱 Tempered Glass Box list
+              </button>
+            </div>
+
+            {productSubTab === 'accessories' ? (
+              <div className="desktop-grid-2">
+                
+                {/* 1. ADD / EDIT ACCESSORY FORM PANEL */}
+                <div className="premium-card" id="product-editor-form" style={{ borderTop: '6px solid var(--primary)', alignSelf: 'flex-start', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>
+                    {editingProductId ? '📝 Edit Accessory Product' : '➕ Add New Accessory'}
+                  </h3>
+                  
+                  <form onSubmit={handleProductSubmit}>
+                    
+                    <div className="premium-input-group">
+                      <label className="premium-label">Accessory Category *</label>
+                      <select
+                        value={productForm.Category}
+                        onChange={(e) => {
+                          const cat = e.target.value;
+                          setProductForm(prev => ({
+                            ...prev,
+                            Category: cat,
+                            CoverType: cat === 'Phone Cover' ? 'Normal Case' : '',
+                            Brand: cat === 'Phone Cover' ? 'Samsung' : '',
+                            CustomBrand: '',
+                            ModelName: '',
+                            ProductName: '',
+                            Type: ''
+                          }));
+                        }}
+                        className="premium-input"
+                        required
+                      >
+                        {['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable', 'Other Accessories'].map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* DYNAMIC FIELD RENDERING */}
+                    
+                    {/* Category = Phone Cover */}
+                    {productForm.Category === 'Phone Cover' && (
+                      <>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Cover Type *</label>
+                          <select
+                            value={productForm.CoverType}
+                            onChange={(e) => setProductForm({ ...productForm, CoverType: e.target.value })}
+                            className="premium-input"
+                            required
+                          >
+                            <option value="Normal Case">Normal Case</option>
+                            <option value="Flip Case">Flip Case</option>
+                            <option value="Button Case">Button Case</option>
+                          </select>
+                        </div>
+
+                        <div className="premium-input-group">
+                          <label className="premium-label">Brand *</label>
+                          <select
+                            value={productForm.Brand}
+                            onChange={(e) => setProductForm({ ...productForm, Brand: e.target.value, CustomBrand: e.target.value === 'Other' ? '' : productForm.CustomBrand })}
+                            className="premium-input"
+                            required
+                          >
+                            {['Samsung', 'Apple', 'Xiaomi (Redmi)', 'Vivo', 'OPPO', 'realme', 'OnePlus', 'POCO', 'Motorola', 'Nokia', 'Google Pixel', 'Huawei', 'Honor', 'Infinix', 'Tecno', 'iQOO', 'Sony', 'ASUS', 'Nothing', 'Lenovo', 'Micromax', 'Lava', 'Karbonn', 'Itel', 'HTC', 'Other'].map(b => (
+                              <option key={b} value={b}>{b}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {productForm.Brand === 'Other' && (
+                          <div className="premium-input-group">
+                            <label className="premium-label">Custom Brand Name *</label>
+                            <input
+                              type="text"
+                              value={productForm.CustomBrand}
+                              onChange={(e) => setProductForm({ ...productForm, CustomBrand: e.target.value })}
+                              placeholder="Enter brand name"
+                              className="premium-input"
+                              required
+                            />
+                          </div>
+                        )}
+
+                        <div className="premium-input-group">
+                          <label className="premium-label">Model Name *</label>
+                          <input
+                            type="text"
+                            value={productForm.ModelName}
+                            onChange={(e) => {
+                              const model = e.target.value;
+                              const displayBrand = productForm.Brand === 'Other' ? productForm.CustomBrand : productForm.Brand;
+                              setProductForm(prev => ({
+                                ...prev,
+                                ModelName: model,
+                                ProductName: `${displayBrand} ${model} ${prev.CoverType}`
+                              }));
+                            }}
+                            placeholder="e.g. S24 Ultra, iPhone 15 Pro"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Category = Headphone / Speaker */}
+                    {(productForm.Category === 'Headphone' || productForm.Category === 'Speaker') && (
+                      <div className="premium-input-group">
+                        <label className="premium-label">Product Name *</label>
+                        <input
+                          type="text"
+                          value={productForm.ProductName}
+                          onChange={(e) => setProductForm({ ...productForm, ProductName: e.target.value })}
+                          placeholder="e.g. BassBoost Wireless Headphone"
+                          className="premium-input"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    {/* Category = Charger */}
+                    {productForm.Category === 'Charger' && (
+                      <>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Charger Type *</label>
+                          <input
+                            type="text"
+                            value={productForm.Type}
+                            onChange={(e) => setProductForm({ ...productForm, Type: e.target.value })}
+                            placeholder="e.g. 33W Fast Charger, Dual Port USB-C"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Product Name *</label>
+                          <input
+                            type="text"
+                            value={productForm.ProductName}
+                            onChange={(e) => setProductForm({ ...productForm, ProductName: e.target.value })}
+                            placeholder="e.g. SuperCharge Adapter"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Category = Charger Cable */}
+                    {productForm.Category === 'Charger Cable' && (
+                      <>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Cable Type *</label>
+                          <input
+                            type="text"
+                            value={productForm.Type}
+                            onChange={(e) => setProductForm({ ...productForm, Type: e.target.value })}
+                            placeholder="e.g. Type-C to Lightning, Braided USB-C"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Product Name *</label>
+                          <input
+                            type="text"
+                            value={productForm.ProductName}
+                            onChange={(e) => setProductForm({ ...productForm, ProductName: e.target.value })}
+                            placeholder="e.g. SuperSpeed Cable 1.5m"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Category = Other Accessories */}
+                    {productForm.Category === 'Other Accessories' && (
+                      <>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Custom Category Name *</label>
+                          <input
+                            type="text"
+                            value={productForm.Category}
+                            onChange={(e) => setProductForm({ ...productForm, Category: e.target.value })}
+                            placeholder="e.g. Car Mount, OTG Adapter"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Type / Sub-category *</label>
+                          <input
+                            type="text"
+                            value={productForm.Type}
+                            onChange={(e) => setProductForm({ ...productForm, Type: e.target.value })}
+                            placeholder="e.g. Magnetic Stand, Type-C OTG"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                        <div className="premium-input-group">
+                          <label className="premium-label">Product Name *</label>
+                          <input
+                            type="text"
+                            value={productForm.ProductName}
+                            onChange={(e) => setProductForm({ ...productForm, ProductName: e.target.value })}
+                            placeholder="e.g. Magnetic Car Vent Mount"
+                            className="premium-input"
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* GENERAL OPTIONAL FIELDS */}
+                    <div className="premium-input-group">
+                      <label className="premium-label">Price (INR, Optional)</label>
+                      <input
+                        type="number"
+                        value={productForm.Price}
+                        onChange={(e) => setProductForm({ ...productForm, Price: e.target.value })}
+                        placeholder="e.g. 299"
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div className="premium-input-group">
+                      <label className="premium-label">Tag Number (Internal Shop ID, Optional)</label>
+                      <input
+                        type="text"
+                        value={productForm.TagNumber}
+                        onChange={(e) => setProductForm({ ...productForm, TagNumber: e.target.value })}
+                        placeholder="e.g. TAG-COVER-12"
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div className="premium-input-group">
+                      <label className="premium-label">Product Image (Optional)</label>
+                      
+                      {productForm.ImageURL && (
+                        <div style={{ marginBottom: '10px', position: 'relative', width: '120px', height: '120px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                          <img 
+                            src={getImageUrl(productForm.ImageURL)} 
+                            alt="Preview" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#f8fafc' }} 
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => setProductForm(prev => ({ ...prev, ImageURL: '' }))} 
+                            className="premium-btn premium-btn-danger"
+                            style={{ position: 'absolute', right: '4px', bottom: '4px', width: 'auto', padding: '2px 6px', fontSize: '0.65rem' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+
+                      <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1.5px dashed var(--primary)' }}>
+                        <Upload size={14} style={{ color: 'var(--primary)' }} /> 
+                        {uploadingProductImg ? 'Uploading to Drive...' : productForm.ImageURL ? 'Change Image' : 'Select Image File'}
+                        <input 
+                          type="file" 
+                          disabled={uploadingProductImg}
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleProductImageUpload(e.target.files[0])}
+                        />
+                      </label>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
+                        Images are stored inside WhatsBroTNService_Uploads / Accessories_Images folder in Google Drive.
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                      <button type="submit" className="premium-btn premium-btn-primary" style={{ flex: 2 }} disabled={uploadingProductImg}>
+                        {editingProductId ? 'Update Product' : 'Create Product'}
+                      </button>
+                      {editingProductId && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setEditingProductId(null);
+                            setProductForm({
+                              Category: 'Phone Cover',
+                              CoverType: 'Normal Case',
+                              Brand: 'Samsung',
+                              CustomBrand: '',
+                              ModelName: '',
+                              ProductName: '',
+                              Type: '',
+                              Price: '',
+                              TagNumber: '',
+                              ImageURL: ''
+                            });
+                          }} 
+                          className="premium-btn premium-btn-secondary"
+                          style={{ flex: 1 }}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+
+                  </form>
+                </div>
+
+                {/* 2. ACCESSORIES LIST VIEW */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  
+                  <div className="premium-card" style={{ margin: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <h4 style={{ fontSize: '0.9rem', margin: 0 }}>View & Search Products ({products.length})</h4>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input 
+                        type="text" 
+                        value={accessorySearch}
+                        onChange={(e) => setAccessorySearch(e.target.value)}
+                        placeholder="Search by name, brand, model, tag..."
+                        className="premium-input"
+                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0 }}
+                      />
+                      <select
+                        value={accessoryCategoryFilter}
+                        onChange={(e) => setAccessoryCategoryFilter(e.target.value)}
+                        className="premium-input"
+                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, width: '130px' }}
+                      >
+                        <option value="All">All Categories</option>
+                        {['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                        <option value="Other">Other Accessories</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {adminProductsLoading ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Loading products...</div>
+                  ) : (() => {
+                    const filtered = products.filter(p => {
+                      if (accessoryCategoryFilter !== 'All') {
+                        const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
+                        if (accessoryCategoryFilter === 'Other') {
+                          if (standardCats.includes(p.Category)) return false;
+                        } else {
+                          if (p.Category !== accessoryCategoryFilter) return false;
+                        }
+                      }
+                      if (accessorySearch.trim() !== '') {
+                        const q = accessorySearch.toLowerCase();
+                        const name = (p.ProductName || '').toLowerCase();
+                        const brand = (p.Brand || '').toLowerCase();
+                        const customBrand = (p.CustomBrand || '').toLowerCase();
+                        const model = (p.ModelName || '').toLowerCase();
+                        const tag = (p.TagNumber || '').toLowerCase();
+                        const cat = (p.Category || '').toLowerCase();
+                        
+                        return name.includes(q) || brand.includes(q) || customBrand.includes(q) || model.includes(q) || tag.includes(q) || cat.includes(q);
+                      }
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return <div style={{ textAlign: 'center', padding: '20px', background: 'white', borderRadius: '12px', color: '#94a3b8' }}>No items found.</div>;
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
+                        {filtered.map(item => (
+                          <div key={item.ProductID} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '42px', height: '42px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              {item.ImageURL ? (
+                                <img src={getImageUrl(item.ImageURL)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <span style={{ fontSize: '1rem' }}>📦</span>
+                              )}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase' }}>{item.Category}</span>
+                              <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e293b' }}>
+                                {item.ProductName || `${item.Brand} Case`}
+                              </h4>
+                              <div style={{ display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#64748b' }}>
+                                {item.Price && <span>Price: ₹{item.Price}</span>}
+                                {item.TagNumber && <span style={{ color: '#0284c7', background: '#e0f2fe', padding: '0 4px', borderRadius: '3px', fontWeight: 'bold' }}>Tag: {item.TagNumber}</span>}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button onClick={() => startEditProduct(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Product">
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={() => handleDeleteProduct(item.ProductID)} className="premium-btn premium-btn-danger" style={{ width: '32px', height: '32px', padding: 0 }} title="Delete Product">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+              </div>
+            ) : (
+              <div className="desktop-grid-2">
+                
+                {/* 1. ADD / EDIT TEMPERED GLASS BOX FORM PANEL */}
+                <div className="premium-card" id="tg-editor-form" style={{ borderTop: '6px solid var(--primary)', alignSelf: 'flex-start', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>
+                    {editingTgBoxNumber ? `📝 Edit TG Box: ${editingTgBoxNumber}` : '➕ Add New TG Box'}
+                  </h3>
+                  
+                  <form onSubmit={handleTgSubmit}>
+                    
+                    <div className="premium-input-group">
+                      <label className="premium-label">Box Number *</label>
+                      <input
+                        type="text"
+                        value={tgForm.BoxNumber}
+                        onChange={(e) => setTgForm({ ...tgForm, BoxNumber: e.target.value })}
+                        placeholder="e.g. B12, A05..."
+                        className="premium-input"
+                        required
+                        disabled={!!editingTgBoxNumber}
+                      />
+                      {editingTgBoxNumber && <span style={{ fontSize: '0.65rem', color: '#ef4444' }}>Box Number cannot be changed during editing. Delete and re-create if needed.</span>}
+                    </div>
+
+                    <div className="premium-input-group">
+                      <label className="premium-label">Model List (Comma-separated values) *</label>
+                      <textarea
+                        rows={6}
+                        value={tgForm.ModelList}
+                        onChange={(e) => setTgForm({ ...tgForm, ModelList: e.target.value })}
+                        placeholder="Samsung A15, Samsung A16, Vivo T3, Redmi Note 13..."
+                        className="premium-input"
+                        required
+                        style={{ fontFamily: 'inherit', resize: 'vertical' }}
+                      />
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
+                        Provide a clean, comma-separated list of models. E.g. "Samsung A15, Vivo T3". Substring check is performed when user searches.
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                      <button type="submit" className="premium-btn premium-btn-primary" style={{ flex: 2 }}>
+                        {editingTgBoxNumber ? 'Update Box Models' : 'Create Box'}
+                      </button>
+                      {editingTgBoxNumber && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setEditingTgBoxNumber(null);
+                            setTgForm({ BoxNumber: '', ModelList: '' });
+                          }} 
+                          className="premium-btn premium-btn-secondary"
+                          style={{ flex: 1 }}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+
+                  </form>
+                </div>
+
+                {/* 2. TEMPERED GLASS LIST VIEW */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  
+                  <div className="premium-card" style={{ margin: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <h4 style={{ fontSize: '0.9rem', margin: 0 }}>View Box Inventory ({temperedGlassList.length})</h4>
+                    <input 
+                      type="text" 
+                      value={tgSearch}
+                      onChange={(e) => setTgSearch(e.target.value)}
+                      placeholder="Search Box Number or Model..."
+                      className="premium-input"
+                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0 }}
+                    />
+                  </div>
+
+                  {tgListLoading ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Loading tempered glass box list...</div>
+                  ) : (() => {
+                    const filtered = temperedGlassList.filter(t => {
+                      if (tgSearch.trim() !== '') {
+                        const q = tgSearch.toLowerCase();
+                        const box = t.BoxNumber.toLowerCase();
+                        const models = (t.ModelList || '').toLowerCase();
+                        return box.includes(q) || models.includes(q);
+                      }
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return <div style={{ textAlign: 'center', padding: '20px', background: 'white', borderRadius: '12px', color: '#94a3b8' }}>No entries found.</div>;
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
+                        {filtered.map(item => (
+                          <div key={item.BoxNumber} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#f0fdf4', border: '1.5px solid #22c55e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#15803d', textTransform: 'uppercase', lineHeight: '1' }}>BOX</span>
+                              <strong style={{ fontSize: '1rem', color: '#166534', fontWeight: '900', marginTop: '2px' }}>{item.BoxNumber}</strong>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0', color: '#1e293b', fontWeight: '800' }}>
+                                Models ({ (item.ModelList || '').split(',').filter(Boolean).length })
+                              </h4>
+                              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.ModelList}
+                              </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button onClick={() => startEditTg(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Box">
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={() => handleDeleteTg(item.BoxNumber)} className="premium-btn premium-btn-danger" style={{ width: '32px', height: '32px', padding: 0 }} title="Delete Box">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+              </div>
+            )}
+
           </div>
         )}
 
