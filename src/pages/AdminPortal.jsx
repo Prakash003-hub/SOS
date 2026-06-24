@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import defaultCoverImg from '../assets/default-cover.jpg';
 import { useSearchParams } from 'react-router-dom';
 import { 
   getPosts, 
@@ -355,7 +356,7 @@ export default function AdminPortal() {
   
   const [productForm, setProductForm] = useState({
     Category: 'Phone Cover',
-    CoverType: 'Normal Case',
+    CoverType: 'Case',
     Brand: 'Samsung',
     CustomBrand: '',
     ModelName: '',
@@ -676,7 +677,7 @@ export default function AdminPortal() {
       }
       setProductForm({
         Category: 'Phone Cover',
-        CoverType: 'Normal Case',
+        CoverType: 'Case',
         Brand: 'Samsung',
         CustomBrand: '',
         ModelName: '',
@@ -698,7 +699,7 @@ export default function AdminPortal() {
     setEditingProductId(product.ProductID);
     setProductForm({
       Category: product.Category || 'Phone Cover',
-      CoverType: product.CoverType || 'Normal Case',
+      CoverType: product.CoverType || 'Case',
       Brand: product.Brand || 'Samsung',
       CustomBrand: product.CustomBrand || '',
       ModelName: product.ModelName || '',
@@ -720,7 +721,7 @@ export default function AdminPortal() {
         setEditingProductId(null);
         setProductForm({
           Category: 'Phone Cover',
-          CoverType: 'Normal Case',
+          CoverType: 'Case',
           Brand: 'Samsung',
           CustomBrand: '',
           ModelName: '',
@@ -2966,7 +2967,7 @@ export default function AdminPortal() {
                           setProductForm(prev => ({
                             ...prev,
                             Category: cat,
-                            CoverType: cat === 'Phone Cover' ? 'Normal Case' : '',
+                            CoverType: cat === 'Phone Cover' ? 'Case' : '',
                             Brand: cat === 'Phone Cover' ? 'Samsung' : '',
                             CustomBrand: '',
                             ModelName: '',
@@ -2996,7 +2997,7 @@ export default function AdminPortal() {
                             className="premium-input"
                             required
                           >
-                            <option value="Normal Case">Normal Case</option>
+                            <option value="Case">Case</option>
                             <option value="Flip Case">Flip Case</option>
                             <option value="Button Case">Button Case</option>
                           </select>
@@ -3232,7 +3233,7 @@ export default function AdminPortal() {
                             setEditingProductId(null);
                             setProductForm({
                               Category: 'Phone Cover',
-                              CoverType: 'Normal Case',
+                              CoverType: 'Case',
                               Brand: 'Samsung',
                               CustomBrand: '',
                               ModelName: '',
@@ -3320,6 +3321,8 @@ export default function AdminPortal() {
                             <div style={{ width: '42px', height: '42px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               {item.ImageURL ? (
                                 <img src={getImageUrl(item.ImageURL)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : item.Category === 'Phone Cover' ? (
+                                <img src={defaultCoverImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               ) : (
                                 <span style={{ fontSize: '1rem' }}>📦</span>
                               )}

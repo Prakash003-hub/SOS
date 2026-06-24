@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import defaultCoverImg from '../assets/default-cover.jpg';
 import { useSearchParams } from 'react-router-dom';
 import { 
   getPosts, 
@@ -189,6 +190,7 @@ const cleanPhone = (phone) => {
   }
   return cleaned;
 };
+
 
 export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigger }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -3351,45 +3353,32 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 4px' }}>
                 <h3 style={{ fontSize: '1.15rem', color: '#0f172a', fontWeight: '800' }}>🛍️ Accessories Catalog</h3>
                 {products.length > 0 && (
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>{products.length} Items Available</span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>Available All Items</span>
                 )}
               </div>
+
 
               {/* Filters Panel */}
               <div className="premium-card" style={{ margin: 0, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 
-                {/* Category chips */}
-                <div>
-                  <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>Categories</span>
-                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', whiteSpace: 'nowrap' }} className="no-scrollbar">
-                    {['All', 'Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable', 'Other Accessories'].map(cat => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setSelectedAccessoryCategory(cat)}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: '20px',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          border: selectedAccessoryCategory === cat ? 'none' : '1px solid #cbd5e1',
-                          backgroundColor: selectedAccessoryCategory === cat ? 'var(--primary)' : '#ffffff',
-                          color: selectedAccessoryCategory === cat ? '#ffffff' : '#475569',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          boxShadow: selectedAccessoryCategory === cat ? '0 2px 6px rgba(30, 168, 103, 0.2)' : 'none'
-                        }}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Grid Filters */}
+                {/* Category & Brand Filters */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>Brand</label>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Category</label>
+                    <select
+                      value={selectedAccessoryCategory}
+                      onChange={(e) => setSelectedAccessoryCategory(e.target.value)}
+                      className="premium-input"
+                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                    >
+                      {['All', 'Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable', 'Other Accessories'].map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Brand</label>
                     <select
                       value={selectedBrand}
                       onChange={(e) => setSelectedBrand(e.target.value)}
@@ -3402,9 +3391,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       ))}
                     </select>
                   </div>
+                </div>
 
+                {/* Model & Keyword Filters */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>Model Name</label>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Model Name</label>
                     <input
                       type="text"
                       value={selectedModel}
@@ -3414,19 +3406,18 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
                     />
                   </div>
-                </div>
 
-                {/* Keyword Search */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>Search Keyword</label>
-                  <input
-                    type="text"
-                    value={accessorySearchKeyword}
-                    onChange={(e) => setAccessorySearchKeyword(e.target.value)}
-                    placeholder="Search product name, brand, model..."
-                    className="premium-input"
-                    style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Search Keyword</label>
+                    <input
+                      type="text"
+                      value={accessorySearchKeyword}
+                      onChange={(e) => setAccessorySearchKeyword(e.target.value)}
+                      placeholder="Search product name, brand..."
+                      className="premium-input"
+                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                    />
+                  </div>
                 </div>
 
               </div>
@@ -3533,6 +3524,25 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 onError={(e) => { e.target.style.display = 'none'; }}
                               />
                             </div>
+                          ) : product.Category === 'Phone Cover' ? (
+                            <div style={{
+                              width: '100%',
+                              height: '110px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid #f1f5f9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              position: 'relative'
+                            }}>
+                              <img 
+                                src={defaultCoverImg} 
+                                alt="Default Cover" 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            </div>
                           ) : (
                             <div style={{
                               width: '100%',
@@ -3575,10 +3585,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               overflow: 'hidden',
                               minHeight: '2.5em'
                             }}>
-                              {product.ProductName || `${product.Brand} Case`}
+                              {product.Category === 'Phone Cover' 
+                                ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName}` 
+                                : (product.ProductName || `${product.Brand} Case`)}
                             </h4>
 
-                            {(product.Brand || product.ModelName) && (
+                            {product.Category !== 'Phone Cover' && (product.Brand || product.ModelName) && (
                               <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: '600' }}>
                                 {product.Brand === 'Other' ? product.CustomBrand : product.Brand} {product.ModelName}
                               </span>
@@ -3598,6 +3610,69 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 <span style={{ fontSize: '0.6rem', color: '#22c55e', background: '#f0fdf4', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>In Stock</span>
                               </div>
                             )}
+
+                            {/* Buy & Share Buttons */}
+                            <div 
+                              style={{ 
+                                marginTop: hasPrice ? '8px' : 'auto', 
+                                display: 'flex', 
+                                gap: '6px', 
+                                width: '100%' 
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Avoid triggering any double handler
+                                  setSelectedProductDetails(product);
+                                }}
+                                className="premium-btn premium-btn-primary"
+                                style={{ 
+                                  flex: 1, 
+                                  padding: '5px 0', 
+                                  fontSize: '0.7rem', 
+                                  fontWeight: 'bold',
+                                  margin: 0,
+                                  borderRadius: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '4px',
+                                  border: 'none',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Buy
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent opening modal
+                                  const title = product.Category === 'Phone Cover' 
+                                    ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName} Cover`
+                                    : (product.ProductName || `${product.Brand} Case`);
+                                  const text = `Category: ${product.Category}${product.Price ? `\nPrice: ₹${product.Price}` : ''}\nBuy high-quality mobile accessories at SUBI Online Service.`;
+                                  handleWhatsAppShare(title, text, '/user?tab=accessories');
+                                }}
+                                className="premium-btn premium-btn-secondary"
+                                style={{ 
+                                  flex: 1, 
+                                  padding: '5px 0', 
+                                  fontSize: '0.7rem', 
+                                  fontWeight: 'bold',
+                                  margin: 0,
+                                  borderRadius: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '4px',
+                                  cursor: 'pointer'
+                                }}
+                                title="Share on WhatsApp"
+                              >
+                                <Share2 size={12} /> Share
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -3813,6 +3888,19 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                     />
                   </div>
+                ) : product.Category === 'Phone Cover' ? (
+                  <div style={{
+                    width: '100%', height: '200px',
+                    borderRadius: '12px', overflow: 'hidden',
+                    border: '1px solid #e2e8f0', background: '#f8fafc',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <img 
+                      src={defaultCoverImg} 
+                      alt="Default Cover" 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
                 ) : (
                   <div style={{
                     width: '100%', height: '140px',
@@ -3832,7 +3920,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {product.Category}
                     </span>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', margin: 0, lineHeight: '1.3' }}>
-                      {product.ProductName || `${product.Brand} Cover Case`}
+                      {product.Category === 'Phone Cover'
+                        ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName}`
+                        : (product.ProductName || `${product.Brand} Cover Case`)}
                     </h3>
                   </div>
 

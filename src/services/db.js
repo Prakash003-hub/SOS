@@ -656,7 +656,7 @@ const callMockFallback = (action, payload) => {
       {
         ProductID: "prod-1",
         Category: "Phone Cover",
-        CoverType: "Normal Case",
+        CoverType: "Case",
         Brand: "Samsung",
         CustomBrand: "",
         ModelName: "Samsung S24 Ultra",
