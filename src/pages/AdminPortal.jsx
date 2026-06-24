@@ -364,7 +364,8 @@ export default function AdminPortal() {
     Type: '',
     Price: '',
     TagNumber: '',
-    ImageURL: ''
+    ImageURL: '',
+    Count: '0'
   });
   
   // Tempered Glass state & forms
@@ -685,7 +686,8 @@ export default function AdminPortal() {
         Type: '',
         Price: '',
         TagNumber: '',
-        ImageURL: ''
+        ImageURL: '',
+        Count: '0'
       });
       setEditingProductId(null);
       handleRefreshProducts();
@@ -707,9 +709,29 @@ export default function AdminPortal() {
       Type: product.Type || '',
       Price: product.Price || '',
       TagNumber: product.TagNumber || '',
-      ImageURL: product.ImageURL || ''
+      ImageURL: product.ImageURL || '',
+      Count: product.Count || '0'
     });
     document.getElementById('product-editor-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleUpdateProductCount = async (product, change) => {
+    const currentCount = Number(product.Count || 0);
+    const newCount = Math.max(0, currentCount + change);
+    if (newCount === currentCount) return;
+    
+    try {
+      // Optimistic UI update
+      setProducts(prev => prev.map(p => p.ProductID === product.ProductID ? { ...p, Count: String(newCount) } : p));
+      
+      // Send backend request
+      await updateProduct(product.ProductID, { Count: String(newCount) });
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update product stock count.');
+      // Revert state
+      setProducts(prev => prev.map(p => p.ProductID === product.ProductID ? { ...p, Count: String(currentCount) } : p));
+    }
   };
 
   const handleDeleteProduct = async (id) => {
@@ -729,7 +751,8 @@ export default function AdminPortal() {
           Type: '',
           Price: '',
           TagNumber: '',
-          ImageURL: ''
+          ImageURL: '',
+          Count: '0'
         });
       }
       handleRefreshProducts();
@@ -3165,6 +3188,19 @@ export default function AdminPortal() {
 
                     {/* GENERAL OPTIONAL FIELDS */}
                     <div className="premium-input-group">
+                      <label className="premium-label">Stock Count (Admin Reference) *</label>
+                      <input
+                        type="number"
+                        value={productForm.Count}
+                        onChange={(e) => setProductForm({ ...productForm, Count: e.target.value })}
+                        placeholder="e.g. 10"
+                        className="premium-input"
+                        min="0"
+                        required
+                      />
+                    </div>
+
+                    <div className="premium-input-group">
                       <label className="premium-label">Price (INR, Optional)</label>
                       <input
                         type="number"
@@ -3241,7 +3277,8 @@ export default function AdminPortal() {
                               Type: '',
                               Price: '',
                               TagNumber: '',
-                              ImageURL: ''
+                              ImageURL: '',
+                              Count: '0'
                             });
                           }} 
                           className="premium-btn premium-btn-secondary"
@@ -3332,18 +3369,69 @@ export default function AdminPortal() {
                               <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e293b' }}>
                                 {item.ProductName || `${item.Brand} Case`}
                               </h4>
-                              <div style={{ display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#64748b' }}>
+                              <div style={{ display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#64748b', alignItems: 'center' }}>
                                 {item.Price && <span>Price: ₹{item.Price}</span>}
                                 {item.TagNumber && <span style={{ color: '#0284c7', background: '#e0f2fe', padding: '0 4px', borderRadius: '3px', fontWeight: 'bold' }}>Tag: {item.TagNumber}</span>}
+                                <span style={{ 
+                                  color: Number(item.Count || 0) > 0 ? '#16a34a' : '#dc2626', 
+                                  background: Number(item.Count || 0) > 0 ? '#f0fdf4' : '#fef2f2', 
+                                  padding: '0 4px', 
+                                  borderRadius: '3px', 
+                                  fontWeight: 'bold' 
+                                }}>
+                                  Stock: {item.Count || 0}
+                                </span>
                               </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <button onClick={() => startEditProduct(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Product">
                                 <Edit size={14} />
                               </button>
-                              <button onClick={() => handleDeleteProduct(item.ProductID)} className="premium-btn premium-btn-danger" style={{ width: '32px', height: '32px', padding: 0 }} title="Delete Product">
-                                <Trash2 size={14} />
-                              </button>
+
+                              {Number(item.Count || 0) > 0 ? (
+                                /* Count Controller (Full) when count > 0 */
+                                <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '6px', padding: '2px', border: '1px solid #e2e8f0', gap: '4px' }}>
+                                  <button 
+                                    onClick={() => handleUpdateProductCount(item, -1)} 
+                                    className="premium-btn premium-btn-secondary" 
+                                    style={{ width: '22px', height: '22px', padding: 0, fontSize: '0.9rem', minWidth: 'auto', background: 'white' }}
+                                    title="Decrease Count"
+                                  >
+                                    -
+                                  </button>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '16px', textAlign: 'center', color: '#334155' }}>
+                                    {item.Count || 0}
+                                  </span>
+                                  <button 
+                                    onClick={() => handleUpdateProductCount(item, 1)} 
+                                    className="premium-btn premium-btn-secondary" 
+                                    style={{ width: '22px', height: '22px', padding: 0, fontSize: '0.9rem', minWidth: 'auto', background: 'white' }}
+                                    title="Increase Count"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              ) : (
+                                /* When count === 0, show Delete button and optionally Increase button */
+                                <>
+                                  <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '6px', padding: '2px', border: '1px solid #e2e8f0', gap: '4px' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '16px', textAlign: 'center', color: '#94a3b8', padding: '0 4px' }}>
+                                      0
+                                    </span>
+                                    <button 
+                                      onClick={() => handleUpdateProductCount(item, 1)} 
+                                      className="premium-btn premium-btn-secondary" 
+                                      style={{ width: '22px', height: '22px', padding: 0, fontSize: '0.9rem', minWidth: 'auto', background: 'white' }}
+                                      title="Increase Count"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                  <button onClick={() => handleDeleteProduct(item.ProductID)} className="premium-btn premium-btn-danger" style={{ width: '32px', height: '32px', padding: 0 }} title="Delete Product">
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))}

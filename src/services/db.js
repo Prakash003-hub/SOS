@@ -665,6 +665,7 @@ const callMockFallback = (action, payload) => {
         Price: "299",
         TagNumber: "TAG-S24U-01",
         ImageURL: "",
+        Count: "5",
         CreatedDate: new Date().toISOString()
       },
       {
@@ -679,6 +680,7 @@ const callMockFallback = (action, payload) => {
         Price: "499",
         TagNumber: "TAG-IP15P-02",
         ImageURL: "",
+        Count: "0",
         CreatedDate: new Date().toISOString()
       },
       {
@@ -693,6 +695,7 @@ const callMockFallback = (action, payload) => {
         Price: "999",
         TagNumber: "TAG-HP-03",
         ImageURL: "",
+        Count: "3",
         CreatedDate: new Date().toISOString()
       },
       {
@@ -707,6 +710,7 @@ const callMockFallback = (action, payload) => {
         Price: "1499",
         TagNumber: "TAG-SPK-04",
         ImageURL: "",
+        Count: "0",
         CreatedDate: new Date().toISOString()
       },
       {
@@ -721,6 +725,7 @@ const callMockFallback = (action, payload) => {
         Price: "350",
         TagNumber: "TAG-CHG-05",
         ImageURL: "",
+        Count: "10",
         CreatedDate: new Date().toISOString()
       }
     ];

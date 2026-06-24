@@ -1533,9 +1533,10 @@ function initSpreadsheet() {
   ]);
   
   // 9. PRODUCTS SHEET
-  ensureSheetExists("Products", [
-    "ProductID", "Category", "CoverType", "Brand", "CustomBrand", "ModelName", "ProductName", "Type", "Price", "TagNumber", "ImageURL", "CreatedDate"
+  var productsSheet = ensureSheetExists("Products", [
+    "ProductID", "Category", "CoverType", "Brand", "CustomBrand", "ModelName", "ProductName", "Type", "Price", "TagNumber", "ImageURL", "CreatedDate", "Count"
   ]);
+  ensureColumnExists(productsSheet, "Count");
 
   // 10. TEMPERED GLASS SHEET
   ensureSheetExists("TemperedGlass", [
@@ -1825,6 +1826,7 @@ function createProductAction(productData) {
     Price: productData.Price || "",
     TagNumber: productData.TagNumber || "",
     ImageURL: productData.ImageURL || "",
+    Count: productData.Count !== undefined ? String(productData.Count) : "0",
     CreatedDate: new Date().toISOString()
   };
   
@@ -1848,6 +1850,7 @@ function updateProductAction(id, productData) {
   if (productData.Price !== undefined) existingRow.Price = productData.Price;
   if (productData.TagNumber !== undefined) existingRow.TagNumber = productData.TagNumber;
   if (productData.ImageURL !== undefined) existingRow.ImageURL = productData.ImageURL;
+  if (productData.Count !== undefined) existingRow.Count = String(productData.Count);
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
