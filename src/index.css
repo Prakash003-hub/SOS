@@ -1025,3 +1025,120 @@ select.premium-input:focus {
   user-select: text !important;
 }
 
+/* Product Showcase Marquee Styles */
+.showcase-marquee-container {
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 0;
+  background: radial-gradient(circle at center, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.showcase-marquee-row {
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  position: relative;
+  /* Premium side fade effects */
+  mask-image: linear-gradient(to right, transparent, white 8%, white 92%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, white 8%, white 92%, transparent);
+  padding: 4px 0;
+}
+
+.showcase-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 12px;
+  animation: marquee-ltr linear infinite;
+}
+
+/* Speed multiplier variations for parallax scrolling */
+.marquee-row-1 .showcase-marquee-track {
+  animation-duration: 26s;
+}
+.marquee-row-2 .showcase-marquee-track {
+  animation-duration: 34s;
+}
+.marquee-row-3 .showcase-marquee-track {
+  animation-duration: 20s;
+}
+.marquee-row-4 .showcase-marquee-track {
+  animation-duration: 30s;
+}
+.marquee-row-5 .showcase-marquee-track {
+  animation-duration: 42s;
+}
+
+
+/* Interactive hover controls */
+.showcase-marquee-row:hover .showcase-marquee-track {
+  animation-play-state: paused;
+}
+
+.showcase-product-card {
+  flex-shrink: 0;
+  width: 110px;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.showcase-product-card:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05), 0 0 0 1px var(--primary);
+  border-color: transparent;
+}
+
+.showcase-image-wrapper {
+  width: 100%;
+  height: 74px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #f1f5f9;
+}
+
+.showcase-image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+@keyframes marquee-ltr {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.hide-scrollbar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
+
+

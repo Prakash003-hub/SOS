@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import defaultCoverImg from '../assets/default-cover.jpg';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  getPosts, 
-  getForms, 
-  submitFormResponse, 
-  getUserStatus, 
+import {
+  getPosts,
+  getForms,
+  submitFormResponse,
+  getUserStatus,
   uploadPaymentScreenshot,
   registerUser,
   updateUserProfile,
@@ -24,14 +24,14 @@ import {
   getProducts,
   getTemperedGlass
 } from '../services/db';
-import { 
-  CheckCircle, 
-  Download, 
-  UploadCloud, 
-  Filter, 
-  Calendar, 
-  Phone, 
-  User, 
+import {
+  CheckCircle,
+  Download,
+  UploadCloud,
+  Filter,
+  Calendar,
+  Phone,
+  User,
   CreditCard,
   ChevronRight,
   ArrowLeft,
@@ -102,7 +102,7 @@ const checkIfPdf = (url) => {
 const getFileExtension = (url) => {
   if (!url) return '';
   if (checkIfPdf(url) || url.toLowerCase().includes('pdf') || url.toLowerCase().includes('application/pdf')) return 'PDF';
-  
+
   const cleanUrl = url.split('?')[0];
   const parts = cleanUrl.split('.');
   if (parts.length > 1) {
@@ -112,11 +112,11 @@ const getFileExtension = (url) => {
     }
     if (ext === 'pdf') return 'PDF';
   }
-  
+
   if (url.includes('drive.google.com')) {
     return 'IMAGE/PDF';
   }
-  
+
   return 'FILE';
 };
 
@@ -174,7 +174,7 @@ const STANDARD_FIELDS = {
   door_no: { label: 'Door no', type: 'text', required: false },
   pincode: { label: 'Pin Code', type: 'number', required: false },
   address: { label: 'Address', type: 'textarea', required: false },
-  
+
   photo: { label: 'Photo Upload (image < 10MB)' },
   aadhar_doc: { label: 'Aadhaar Upload (img/pdf < 10MB)' },
   smart_card: { label: 'Smart Card Upload (img/pdf < 10MB)' },
@@ -191,39 +191,430 @@ const cleanPhone = (phone) => {
   return cleaned;
 };
 
+const MarqueeRow = ({
+  rowItems,
+  speedRowIndex,
+  setSelectedProductDetails,
+  handleWhatsAppShare
+}) => {
+  const containerRef = useRef(null);
+  const isInteractingRef = useRef(false);
+  const animationFrameRef = useRef(null);
+  const interactionTimeoutRef = useRef(null);
+  const hasInitializedRef = useRef(false);
+  const ignoreScrollRef = useRef(false);
+
+  // Dragging state
+  const isDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const draggedRef = useRef(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let lastTime = performance.now();
+
+    const step = (time) => {
+      if (!container) return;
+
+      const deltaTime = time - lastTime;
+      lastTime = time;
+
+      const singleSetWidth = container.scrollWidth / 3;
+
+      // Initialize scrollLeft to the middle copy (copy 1) if not done yet
+      if (!hasInitializedRef.current && singleSetWidth > 0) {
+        const prevScroll = container.scrollLeft;
+        container.scrollLeft = singleSetWidth;
+        if (container.scrollLeft !== prevScroll) {
+          ignoreScrollRef.current = true;
+        }
+        hasInitializedRef.current = true;
+      }
+
+      if (!isInteractingRef.current) {
+        // Map speedRowIndex (1-5) to scrolling speeds (pixels per second)
+        const speedMap = {
+          1: 25,
+          2: 18,
+          3: 32,
+          4: 22,
+          5: 15
+        };
+        const pxPerSec = speedMap[speedRowIndex] || 20;
+        const deltaScroll = (pxPerSec * deltaTime) / 1000;
+
+        const prevScroll = container.scrollLeft;
+        container.scrollLeft += deltaScroll;
+        if (container.scrollLeft !== prevScroll) {
+          ignoreScrollRef.current = true;
+        }
+
+        // Wrap around seamlessly
+        if (singleSetWidth > 0) {
+          if (container.scrollLeft >= singleSetWidth * 2) {
+            const beforeWrap = container.scrollLeft;
+            container.scrollLeft -= singleSetWidth;
+            if (container.scrollLeft !== beforeWrap) {
+              ignoreScrollRef.current = true;
+            }
+          } else if (container.scrollLeft <= 0) {
+            const beforeWrap = container.scrollLeft;
+            container.scrollLeft += singleSetWidth;
+            if (container.scrollLeft !== beforeWrap) {
+              ignoreScrollRef.current = true;
+            }
+          }
+        }
+      }
+
+      animationFrameRef.current = requestAnimationFrame(step);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (interactionTimeoutRef.current) {
+        clearTimeout(interactionTimeoutRef.current);
+      }
+    };
+  }, [speedRowIndex, rowItems]);
+
+  const startInteraction = () => {
+    isInteractingRef.current = true;
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+  };
+
+  const endInteraction = () => {
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+    interactionTimeoutRef.current = setTimeout(() => {
+      isInteractingRef.current = false;
+    }, 1000);
+  };
+
+  // Scroll event listener detects all manual scrolls (touch momentum, wheels, drags)
+  const handleScroll = () => {
+    if (ignoreScrollRef.current) {
+      ignoreScrollRef.current = false;
+      return;
+    }
+
+    isInteractingRef.current = true;
+
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+
+    // Resume auto-scroll after 1000ms of inactivity
+    interactionTimeoutRef.current = setTimeout(() => {
+      isInteractingRef.current = false;
+    }, 1000);
+  };
+
+  const handleMouseDown = (e) => {
+    isDownRef.current = true;
+    draggedRef.current = false;
+    startInteraction();
+    startXRef.current = e.pageX - containerRef.current.offsetLeft;
+    scrollLeftRef.current = containerRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDownRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - containerRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.2;
+    if (Math.abs(walk) > 5) {
+      draggedRef.current = true;
+    }
+    containerRef.current.scrollLeft = scrollLeftRef.current - walk;
+
+    // Wrap around while dragging
+    const container = containerRef.current;
+    const singleSetWidth = container.scrollWidth / 3;
+    if (singleSetWidth > 0) {
+      if (container.scrollLeft >= singleSetWidth * 2) {
+        const beforeWrap = container.scrollLeft;
+        container.scrollLeft -= singleSetWidth;
+        if (container.scrollLeft !== beforeWrap) {
+          ignoreScrollRef.current = true;
+        }
+        startXRef.current = x;
+        scrollLeftRef.current = container.scrollLeft;
+      } else if (container.scrollLeft <= 0) {
+        const beforeWrap = container.scrollLeft;
+        container.scrollLeft += singleSetWidth;
+        if (container.scrollLeft !== beforeWrap) {
+          ignoreScrollRef.current = true;
+        }
+        startXRef.current = x;
+        scrollLeftRef.current = container.scrollLeft;
+      }
+    }
+  };
+
+  const handleMouseUpLeave = () => {
+    isDownRef.current = false;
+    endInteraction();
+  };
+
+  const handleTouchStart = () => {
+    startInteraction();
+  };
+
+  const handleTouchEnd = () => {
+    endInteraction();
+  };
+
+  const handleWheel = () => {
+    startInteraction();
+    endInteraction();
+  };
+
+  // Repeat list if too short for a seamless marquee loop
+  let repeatedItems = [...rowItems];
+  while (repeatedItems.length < 8) {
+    repeatedItems = [...repeatedItems, ...rowItems];
+  }
+
+  // Triple items for seamless scroll wrap-around
+  const tripleItems = [...repeatedItems, ...repeatedItems, ...repeatedItems];
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUpLeave}
+      onMouseLeave={handleMouseUpLeave}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onWheel={handleWheel}
+      className="showcase-marquee-row hide-scrollbar"
+      style={{
+        overflowX: 'auto',
+        display: 'flex',
+        gap: '12px',
+        cursor: isDownRef.current ? 'grabbing' : 'grab',
+        userSelect: 'none',
+        WebkitOverflowScrolling: 'touch',
+        padding: '6px 0',
+        width: '100%',
+        position: 'relative'
+      }}
+    >
+      {tripleItems.map((product, idx) => {
+        const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
+        const hasPrice = product.Price && product.Price.trim() !== '';
+
+        return (
+          <div
+            key={`${product.ProductID}-${idx}`}
+            onClick={(e) => {
+              if (draggedRef.current) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+              setSelectedProductDetails(product);
+            }}
+            className="showcase-product-card"
+            style={{
+              width: '130px',
+              height: '210px',
+              padding: '10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            {/* Image Wrapper */}
+            <div className="showcase-image-wrapper" style={{ height: '90px' }}>
+              {hasImage ? (
+                <img
+                  src={getImageUrl(product.ImageURL)}
+                  alt={product.ProductName || 'Accessory'}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : product.Category === 'Phone Cover' ? (
+                <img
+                  src={defaultCoverImg}
+                  alt="Default Cover"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '4px' }}>
+                  <span style={{ fontSize: '1.4rem' }}>📦</span>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 'bold', textTransform: 'uppercase' }}>No Image</span>
+                </div>
+              )}
+            </div>
+
+            {/* Card Info */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }}>
+              <span style={{
+                fontSize: '0.6rem',
+                fontWeight: '800',
+                color: 'var(--primary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {product.Category}
+              </span>
+
+              <h5 style={{
+                fontSize: '0.72rem',
+                fontWeight: '700',
+                color: '#1e293b',
+                margin: 0,
+                lineHeight: '1.25',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {product.Category === 'Phone Cover'
+                  ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName}`
+                  : (product.ProductName || `${product.Brand} Case`)}
+              </h5>
+
+              {product.Category !== 'Phone Cover' && (product.Brand || product.ModelName) && (
+                <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {product.Brand === 'Other' ? product.CustomBrand : product.Brand} {product.ModelName}
+                </span>
+              )}
+
+              {product.Category === 'Phone Cover' && product.CoverType && (
+                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {product.CoverType}
+                </span>
+              )}
+
+              {hasPrice && (
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <strong style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: '800' }}>
+                    ₹{product.Price}
+                  </strong>
+                  <span style={{ fontSize: '0.55rem', color: '#22c55e', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold' }}>In Stock</span>
+                </div>
+              )}
+
+              {/* Buy & Share Buttons */}
+              <div
+                style={{
+                  marginTop: hasPrice ? '6px' : 'auto',
+                  display: 'flex',
+                  gap: '4px',
+                  width: '100%'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (draggedRef.current) return;
+                    setSelectedProductDetails(product);
+                  }}
+                  className="premium-btn premium-btn-primary"
+                  style={{
+                    flex: 1,
+                    padding: '4px 0',
+                    fontSize: '0.65rem',
+                    fontWeight: 'bold',
+                    margin: 0,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Buy
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (draggedRef.current) return;
+                    const title = product.Category === 'Phone Cover'
+                      ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName} Cover`
+                      : (product.ProductName || `${product.Brand} Case`);
+                    const text = `Category: ${product.Category}${product.Price ? `\nPrice: ₹${product.Price}` : ''}\nBuy high-quality mobile accessories at SUBI Online Service.`;
+                    handleWhatsAppShare(title, text, '/user?tab=accessories');
+                  }}
+                  className="premium-btn premium-btn-secondary"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.65rem',
+                    fontWeight: 'bold',
+                    margin: 0,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="Share on WhatsApp"
+                >
+                  <Share2 size={10} />
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigger }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // Tab states: 'home' | 'apply' | 'status' | 'accessories'
   const activeTab = searchParams.get('tab') || 'home';
   const initialCategory = searchParams.get('category') || '';
-  
+
   const [posts, setPosts] = useState([]);
   const [forms, setForms] = useState([]);
   const [jobs, setJobs] = useState([]);
-  
+
   // Accessories & Tempered Glass states
   const [products, setProducts] = useState([]);
   const [temperedGlassList, setTemperedGlassList] = useState([]);
-  
+
   // Search Tempered Glass states
   const [tgSearchQuery, setTgSearchQuery] = useState('');
   const [tgSearchResult, setTgSearchResult] = useState(null);
-  
+
   // Catalog Filters
   const [selectedAccessoryCategory, setSelectedAccessoryCategory] = useState('All');
   const [selectedBrand, setSelectedBrand] = useState('All');
   const [selectedModel, setSelectedModel] = useState('');
   const [accessorySearchKeyword, setAccessorySearchKeyword] = useState('');
-  
+
   // Accessory Details Modal
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
-  
+
   const [selectedJobDetails, setSelectedJobDetails] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'all');
   const [systemSettings, setSystemSettings] = useState({});
-  
+
   // Loading & error states
   const [loading, setLoading] = useState(false);
   const [searchingStatus, setSearchingStatus] = useState(false);
@@ -236,7 +627,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab, selectedJobDetails]);
   const [error, setError] = useState('');
-  
+
   // Install Prompt State
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -246,12 +637,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   // Wizard States
   const [selectedForm, setSelectedForm] = useState(null);
-  const [wizardStep, setWizardStep] = useState(1); 
+  const [wizardStep, setWizardStep] = useState(1);
   // 1: Instructions, 2: Fill/Verify, 3: Preview, 4: Upload Docs, 5: Receipt
-  
+
   const [formData, setFormData] = useState({}); // Dynamic and standard values
   const [agreeCheckbox, setAgreeCheckbox] = useState(false);
-  
+
   // Document upload state
   // Stores file selections: { [docKey]: { type: 'pdf' | 'images', file1, file2 } }
   const [uploadedFiles, setUploadedFiles] = useState({});
@@ -261,7 +652,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [submissionResult, setSubmissionResult] = useState(null);
   const [lastResponsesPack, setLastResponsesPack] = useState(null);
   const [lastDocReferencesPack, setLastDocReferencesPack] = useState(null);
-  
+
   // Status Lookup States
   const [lookupType, setLookupType] = useState('phone'); // 'phone' or 'aadhar'
   const [lookupPhone, setLookupPhone] = useState('');
@@ -303,18 +694,18 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const sendSubmissionToWhatsApp = (submission, formInfo, responsesPack, docReferencesPack) => {
     const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
     const formattedAdminWhatsApp = cleanPhone(adminWhatsApp);
-    
+
     let msg = `*NEW FORM SUBMISSION*\n`;
     msg += `----------------------------------\n`;
     msg += `*Service:* ${(formInfo && formInfo.title) ? formInfo.title : (selectedForm && selectedForm.title) ? selectedForm.title : 'Service'}\n`;
     msg += `*Receipt ID:* ${submission.id}\n`;
     msg += `*Submitted At:* ${new Date(submission.submitted_at).toLocaleString('en-IN')}\n\n`;
-    
+
     msg += `*APPLICANT PROFILE:*\n\`\`\`\n`;
     msg += `${"Phone".padEnd(12, ' ')} : ${submission.phone}\n`;
     msg += `${"Aadhaar".padEnd(12, ' ')} : ${submission.aadhar}\n`;
     msg += `\`\`\`\n`;
-    
+
     msg += `*FORM DETAILS:*\n`;
     if (responsesPack && Object.keys(responsesPack).length > 0) {
       msg += `\`\`\`\n`;
@@ -328,7 +719,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       msg += `No form details.\n`;
     }
     msg += `\n`;
-    
+
     if (docReferencesPack && Object.keys(docReferencesPack).length > 0) {
       msg += `*UPLOADED DOCUMENTS:*\n`;
       Object.keys(docReferencesPack).forEach(docKey => {
@@ -338,10 +729,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         }
       });
     }
-    
+
     msg += `\n----------------------------------\n`;
     msg += `Please process this application. Thank you!`;
-    
+
     const encoded = encodeURIComponent(msg);
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(formattedAdminWhatsApp)}&text=${encoded}`;
     window.open(whatsappUrl, '_blank');
@@ -355,7 +746,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     if (toastTimeoutId) {
       clearTimeout(toastTimeoutId);
     }
-    
+
     let alertType = type;
     const lowerMessage = message.toLowerCase();
     if (lowerMessage.includes('fail') || lowerMessage.includes('error') || lowerMessage.includes('exceed') || lowerMessage.includes('not permitted') || lowerMessage.includes('exceeds')) {
@@ -363,9 +754,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     } else if (lowerMessage.includes('please') || lowerMessage.includes('check') || lowerMessage.includes('enter') || lowerMessage.includes('already applied') || lowerMessage.includes('required')) {
       alertType = 'warning';
     }
-    
+
     setToast({ message, type: alertType });
-    
+
     const id = setTimeout(() => {
       setToast(null);
       setToastTimeoutId(null);
@@ -392,7 +783,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         await submitInfoRequestResponse(appId, text, false);
       }
       alert('Information submitted successfully! Thank you.');
-      
+
       // Refresh list
       const phoneVal = currentUser?.phone || lookupPhone;
       const dobVal = lookupDob || '';
@@ -504,7 +895,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     const formIdParam = searchParams.get('formId');
     const jobIdParam = searchParams.get('jobId');
     const postIdParam = searchParams.get('postId');
-    
+
     if (formIdParam && activeTab !== 'apply') {
       setSearchParams({ tab: 'apply', formId: formIdParam });
     } else if (jobIdParam && activeTab !== 'home') {
@@ -553,10 +944,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   // WhatsApp share utility
   const handleWhatsAppShare = (title, text, url) => {
-    const absoluteUrl = url.startsWith('http') 
-      ? url 
+    const absoluteUrl = url.startsWith('http')
+      ? url
       : `${window.location.protocol}//${window.location.host}${url}`;
-    
+
     const message = `*${title}*\n${text}\n\nApply/View here: ${absoluteUrl}`;
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank');
@@ -579,14 +970,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     if (systemSettings && String(systemSettings.install_notification_enabled).toLowerCase() === 'true') {
       const dismissedAt = sessionStorage.getItem('install_prompt_dismissed_at');
       const lastReset = localStorage.getItem('install_prompt_last_reset');
-      
+
       let shouldShow = true;
       if (dismissedAt) {
         if (!lastReset || Number(dismissedAt) >= Number(lastReset)) {
           shouldShow = false;
         }
       }
-      
+
       console.log('[Install Check] shouldShow:', shouldShow, '| dismissedAt:', dismissedAt, '| lastReset:', lastReset);
       if (shouldShow) {
         console.log('[Install Check] Triggering installation prompt in 2 seconds...');
@@ -610,9 +1001,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     if (selectedForm && wizardStep === 2) {
       const initialFields = {};
       let fieldsConfig = safeJsonParse(selectedForm.required_fields, []);
-      
+
       const isCase2 = currentUser && !!(currentUser.district || currentUser.religion || currentUser.state || currentUser.father_name);
-      
+
       if (selectedForm.category && selectedForm.category.toLowerCase() === 'e sevai' && !isCase2) {
         const canFields = [
           'aadhar', 'phone', 'name', 'name_tamil', 'gender', 'marital_status', 'dob',
@@ -622,7 +1013,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         ];
         fieldsConfig = Array.from(new Set([...canFields, ...fieldsConfig]));
       }
-      
+
       // If user is logged in, prefill standard fields from profile
       if (currentUser) {
         fieldsConfig.forEach(fieldId => {
@@ -637,10 +1028,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       // Prefill custom fields from user profile custom_fields
       if (currentUser && currentUser.custom_fields) {
         try {
-          const parsedCustom = typeof currentUser.custom_fields === 'string' 
-            ? JSON.parse(currentUser.custom_fields) 
+          const parsedCustom = typeof currentUser.custom_fields === 'string'
+            ? JSON.parse(currentUser.custom_fields)
             : currentUser.custom_fields;
-          
+
           if (parsedCustom && typeof parsedCustom === 'object') {
             const customFields = safeJsonParse(selectedForm.fields, []);
             customFields.forEach(f => {
@@ -672,7 +1063,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           console.error("Error parsing profile custom fields for autofill:", e);
         }
       }
-      
+
       setFormData(prev => ({ ...initialFields, ...prev }));
     }
   }, [selectedForm, wizardStep, currentUser]);
@@ -729,7 +1120,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   const handleFieldChange = (fieldId, val) => {
     setFormData(prev => ({ ...prev, [fieldId]: val }));
-    
+
     // Early duplicate check when Aadhaar is entered (12 digits)
     if (fieldId === 'aadhar' && val && val.match(/^\d{12}$/) && selectedForm) {
       checkDuplicateSubmission(val);
@@ -830,8 +1221,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       const res = await verifyOtp(guestEmail, guestOtp);
       if (res && res.verified) {
         alert("Verification successful!");
-        setFormData(prev => ({ 
-          ...prev, 
+        setFormData(prev => ({
+          ...prev,
           aadhar: guestAadhar,
           email: guestEmail
         }));
@@ -851,17 +1242,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   // Proceed from Step 2 (Form details) to Step 3 (Preview)
   const handleValidateForm = async (e) => {
     e.preventDefault();
-    
+
     // Block if duplicate submission detected
     if (duplicateSubmissionError) {
       alert(duplicateSubmissionError);
       return;
     }
-    
+
     // Check validation of standard required fields
     let reqFields = safeJsonParse(selectedForm.required_fields, []);
     const isCase2 = currentUser && !!(currentUser.district || currentUser.religion || currentUser.state || currentUser.father_name);
-    
+
     if (selectedForm.category && selectedForm.category.toLowerCase() === 'e sevai' && !isCase2) {
       const canFields = [
         'aadhar', 'phone', 'name', 'name_tamil', 'gender', 'marital_status', 'dob',
@@ -872,7 +1263,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       reqFields = Array.from(new Set([...canFields, ...reqFields]));
     }
     const missing = [];
-    
+
     reqFields.forEach(fieldId => {
       const isFieldRequired = STANDARD_FIELDS[fieldId]?.required || (selectedForm.category && selectedForm.category.toLowerCase() === 'e sevai');
       if (isFieldRequired && !formData[fieldId]) {
@@ -1017,9 +1408,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       if (currentUser) {
         folderPath = ['TN_Sevai_App', 'Users', currentUser.phone || 'Unknown', 'Documents'];
       }
-      
+
       const fileUrl = await uploadFileToDrive(file, folderPath);
-      
+
       setUploadedUrls(prev => {
         const current = prev[docKey] || { maxFiles };
         let nextUrls;
@@ -1028,7 +1419,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         } else {
           nextUrls = { ...current, maxFiles, [`url${fileInputIdx}`]: fileUrl, [`name${fileInputIdx}`]: file.name };
         }
-        
+
         // Determine if upload is fully complete
         let isComplete = false;
         if (maxFiles === 1) {
@@ -1038,9 +1429,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         } else if (maxFiles === 3) {
           isComplete = !!(nextUrls.url1 && nextUrls.url2 && nextUrls.url3);
         }
-        
+
         setUploadStatuses(statusPrev => ({ ...statusPrev, [docKey]: isComplete ? 'uploaded' : 'partial' }));
-        
+
         return { ...prev, [docKey]: nextUrls };
       });
     } catch (err) {
@@ -1058,7 +1449,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       if (docKeyOrLabel === 'signature') return currentUser.signature_url_1;
       return currentUser[`${docKeyOrLabel}_url_1`] || currentUser[`${docKeyOrLabel}_url` || ''];
     };
-    
+
     const savedUrl = getSavedDocUrl();
     const hasSavedDoc = !!savedUrl && !deletedSavedDocs[docKeyOrLabel];
 
@@ -1074,21 +1465,21 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               </div>
             ) : (
               <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img 
-                  src={getImageUrl(savedUrl)} 
-                  alt="Preview" 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                <img
+                  src={getImageUrl(savedUrl)}
+                  alt="Preview"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
             )}
-            
+
             <div>
               <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize', display: 'block' }}>
                 {STANDARD_FIELDS[docKeyOrLabel]?.label || docKeyOrLabel} <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold' }}>[Saved]</span>
               </span>
-              <a 
-                href={getImageUrl(savedUrl)} 
-                target="_blank" 
+              <a
+                href={getImageUrl(savedUrl)}
+                target="_blank"
                 rel="noreferrer"
                 style={{ fontSize: '0.75rem', color: '#047857', textDecoration: 'underline', fontWeight: '700' }}
               >
@@ -1143,17 +1534,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         {isUploaded && freshlyUploaded ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: '#f0fdf4', border: '1px solid #10b981', borderRadius: '6px' }}>
             <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', flex: 1, marginRight: '8px', wordBreak: 'break-all' }}>
-              {maxFiles === 1 
-                ? freshlyUploaded.name1 
-                : maxFiles === 2 
+              {maxFiles === 1
+                ? freshlyUploaded.name1
+                : maxFiles === 2
                   ? `${freshlyUploaded.name1} & ${freshlyUploaded.name2}`
                   : `${freshlyUploaded.name1}, ${freshlyUploaded.name2} & ${freshlyUploaded.name3}`
               }
             </div>
             <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-              <a 
-                href={getImageUrl(freshlyUploaded.url1)} 
-                target="_blank" 
+              <a
+                href={getImageUrl(freshlyUploaded.url1)}
+                target="_blank"
                 rel="noreferrer"
                 className="premium-btn premium-btn-secondary"
                 style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
@@ -1161,9 +1552,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 {maxFiles === 1 ? 'View' : 'View Front'}
               </a>
               {maxFiles >= 2 && freshlyUploaded.url2 && (
-                <a 
-                  href={getImageUrl(freshlyUploaded.url2)} 
-                  target="_blank" 
+                <a
+                  href={getImageUrl(freshlyUploaded.url2)}
+                  target="_blank"
                   rel="noreferrer"
                   className="premium-btn premium-btn-secondary"
                   style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
@@ -1172,9 +1563,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 </a>
               )}
               {maxFiles >= 3 && freshlyUploaded.url3 && (
-                <a 
-                  href={getImageUrl(freshlyUploaded.url3)} 
-                  target="_blank" 
+                <a
+                  href={getImageUrl(freshlyUploaded.url3)}
+                  target="_blank"
                   rel="noreferrer"
                   className="premium-btn premium-btn-secondary"
                   style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
@@ -1222,21 +1613,21 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     <span>Uploading...</span>
                   </div>
                 ) : (
-                  <label className="premium-btn premium-btn-secondary" style={{ 
-                    padding: '8px', 
-                    fontSize: '0.75rem', 
-                    display: 'flex', 
-                    gap: '4px', 
+                  <label className="premium-btn premium-btn-secondary" style={{
+                    padding: '8px',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    gap: '4px',
                     justifyContent: 'center',
-                    cursor: 'pointer', 
-                    background: freshlyUploaded?.url1 ? '#f0fdf4' : 'white', 
+                    cursor: 'pointer',
+                    background: freshlyUploaded?.url1 ? '#f0fdf4' : 'white',
                     border: freshlyUploaded?.url1 ? '1px solid #10b981' : '1px dashed var(--primary)',
                     color: freshlyUploaded?.url1 ? '#166534' : 'inherit'
                   }}>
                     <Upload size={14} style={{ color: freshlyUploaded?.url1 ? '#10b981' : 'var(--primary)' }} />
                     <span>{freshlyUploaded?.url1 ? 'Replace File' : 'Upload File'}</span>
-                    <input 
-                      type="file" 
+                    <input
+                      type="file"
                       accept={maxFiles === 1 && !['photo', 'signature'].includes(docKeyOrLabel) ? 'application/pdf,image/*' : 'image/*'}
                       onChange={(e) => handleImmediateUpload(docKeyOrLabel, maxFiles, 1, e.target.files[0])}
                       style={{ display: 'none' }}
@@ -1260,21 +1651,21 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <span>Uploading...</span>
                     </div>
                   ) : (
-                    <label className="premium-btn premium-btn-secondary" style={{ 
-                      padding: '8px', 
-                      fontSize: '0.75rem', 
-                      display: 'flex', 
-                      gap: '4px', 
+                    <label className="premium-btn premium-btn-secondary" style={{
+                      padding: '8px',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      gap: '4px',
                       justifyContent: 'center',
-                      cursor: 'pointer', 
-                      background: freshlyUploaded?.url2 ? '#f0fdf4' : 'white', 
+                      cursor: 'pointer',
+                      background: freshlyUploaded?.url2 ? '#f0fdf4' : 'white',
                       border: freshlyUploaded?.url2 ? '1px solid #10b981' : '1px dashed var(--primary)',
                       color: freshlyUploaded?.url2 ? '#166534' : 'inherit'
                     }}>
                       <Upload size={14} style={{ color: freshlyUploaded?.url2 ? '#10b981' : 'var(--primary)' }} />
                       <span>{freshlyUploaded?.url2 ? 'Replace Back' : 'Upload Back'}</span>
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/*"
                         onChange={(e) => handleImmediateUpload(docKeyOrLabel, maxFiles, 2, e.target.files[0])}
                         style={{ display: 'none' }}
@@ -1299,21 +1690,21 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <span>Uploading...</span>
                     </div>
                   ) : (
-                    <label className="premium-btn premium-btn-secondary" style={{ 
-                      padding: '8px', 
-                      fontSize: '0.75rem', 
-                      display: 'flex', 
-                      gap: '4px', 
+                    <label className="premium-btn premium-btn-secondary" style={{
+                      padding: '8px',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      gap: '4px',
                       justifyContent: 'center',
-                      cursor: 'pointer', 
-                      background: freshlyUploaded?.url3 ? '#f0fdf4' : 'white', 
+                      cursor: 'pointer',
+                      background: freshlyUploaded?.url3 ? '#f0fdf4' : 'white',
                       border: freshlyUploaded?.url3 ? '1px solid #10b981' : '1px dashed var(--primary)',
                       color: freshlyUploaded?.url3 ? '#166534' : 'inherit'
                     }}>
                       <Upload size={14} style={{ color: freshlyUploaded?.url3 ? '#10b981' : 'var(--primary)' }} />
                       <span>{freshlyUploaded?.url3 ? 'Replace Extra' : 'Upload Extra'}</span>
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/*"
                         onChange={(e) => handleImmediateUpload(docKeyOrLabel, maxFiles, 3, e.target.files[0])}
                         style={{ display: 'none' }}
@@ -1333,7 +1724,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const handleFinalWizardSubmit = async () => {
     const rawRequiredDocs = safeJsonParse(selectedForm.required_docs, []);
     const rawCustomDocs = safeJsonParse(selectedForm.custom_docs, []);
-    
+
     const requiredDocsList = normalizeRequiredDocs(rawRequiredDocs).map(d => d.id);
     const customDocsList = normalizeCustomDocs(rawCustomDocs).map(d => d.label);
     const missing = [];
@@ -1347,7 +1738,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         currentUser[`${docKey}_url`]
       );
       const isSelectedLocal = uploadedUrls[docKey] && (uploadedUrls[docKey].url1 || uploadedUrls[docKey].url2 || uploadedUrls[docKey].url3);
-      
+
       if (!isAlreadyUploaded && !isSelectedLocal) {
         missing.push(STANDARD_FIELDS[docKey]?.label || docKey);
       }
@@ -1373,7 +1764,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       const targetAadhar = formData.aadhar || currentUser?.aadhar || '';
       const targetPhone = formData.phone || currentUser?.phone || '';
       const targetDob = '';
-      
+
       if (targetAadhar) {
         const userSubs = await getUserStatus(targetPhone, targetDob, targetAadhar);
         if (Array.isArray(userSubs) && userSubs.some(s => s.form_id === selectedForm.id && s.payment_status !== 'draft')) {
@@ -1388,11 +1779,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       const reqFieldsKeys = safeJsonParse(selectedForm.required_fields, []);
       const customFields = safeJsonParse(selectedForm.fields, []);
       const responsesPack = {};
-      
+
       reqFieldsKeys.forEach(fieldId => {
         responsesPack[STANDARD_FIELDS[fieldId]?.label || fieldId] = formData[fieldId] || '';
       });
-      
+
       customFields.forEach(f => {
         if (f.type === 'repeated') {
           const count = parseInt(formData[f.id]) || 0;
@@ -1408,35 +1799,35 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           responsesPack[f.label] = formData[f.id] || '';
         }
       });
-      
+
       // 2. Prepare documents payload using uploadedUrls and currentUser saved docs
       const docReferencesPack = {};
       requiredDocsList.forEach(docKey => {
         if (deletedSavedDocs[docKey]) return; // Skip if deleted/replaced!
-        
+
         const hasSavedUrl1 = currentUser && currentUser[`${docKey}_url_1` || ''];
         const hasSavedUrl2 = currentUser && currentUser[`${docKey}_url_2` || ''];
         const isPhotoSavedUrl = docKey === 'photo' && currentUser && currentUser.photo_url;
         const isSignatureSavedUrl = docKey === 'signature' && currentUser && currentUser.signature_url_1;
-        
+
         const freshlyUploaded = uploadedUrls[docKey];
-        
+
         if (freshlyUploaded) {
-           docReferencesPack[docKey] = [freshlyUploaded.url1, freshlyUploaded.url2, freshlyUploaded.url3].filter(Boolean);
+          docReferencesPack[docKey] = [freshlyUploaded.url1, freshlyUploaded.url2, freshlyUploaded.url3].filter(Boolean);
         } else if (isPhotoSavedUrl) {
-           docReferencesPack['photo'] = [currentUser.photo_url];
+          docReferencesPack['photo'] = [currentUser.photo_url];
         } else if (isSignatureSavedUrl) {
-           docReferencesPack['signature'] = [currentUser.signature_url_1];
+          docReferencesPack['signature'] = [currentUser.signature_url_1];
         } else if (hasSavedUrl1) {
-           docReferencesPack[docKey] = [hasSavedUrl1];
-           if (hasSavedUrl2) docReferencesPack[docKey].push(hasSavedUrl2);
+          docReferencesPack[docKey] = [hasSavedUrl1];
+          if (hasSavedUrl2) docReferencesPack[docKey].push(hasSavedUrl2);
         }
       });
 
       customDocsList.forEach(docLabel => {
         const freshlyUploaded = uploadedUrls[docLabel];
         if (freshlyUploaded) {
-           docReferencesPack[docLabel] = [freshlyUploaded.url1, freshlyUploaded.url2, freshlyUploaded.url3].filter(Boolean);
+          docReferencesPack[docLabel] = [freshlyUploaded.url1, freshlyUploaded.url2, freshlyUploaded.url3].filter(Boolean);
         }
       });
 
@@ -1460,14 +1851,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         let currentCustom = {};
         if (currentUser.custom_fields) {
           try {
-            currentCustom = typeof currentUser.custom_fields === 'string' 
-              ? JSON.parse(currentUser.custom_fields) 
+            currentCustom = typeof currentUser.custom_fields === 'string'
+              ? JSON.parse(currentUser.custom_fields)
               : currentUser.custom_fields;
-          } catch(e) {
+          } catch (e) {
             console.error("Error parsing user custom fields:", e);
           }
         }
-        
+
         // Merge custom field responses from this submission
         const customFields = safeJsonParse(selectedForm.fields, []);
         customFields.forEach(f => {
@@ -1489,7 +1880,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
             }
           }
         });
-        
+
         // Save back to user profile
         try {
           await updateUserProfile(currentUser.id, {
@@ -1568,7 +1959,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     try {
       await uploadPaymentScreenshot(subId, file);
       alert('Payment proof uploaded successfully! Admin will verify your payment details.');
-      
+
       // Refresh list
       const phoneVal = currentUser?.phone || lookupPhone;
       const dobVal = lookupDob || '';
@@ -1586,17 +1977,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const handleUpiPay = (fee, submissionId, paymentNo, method) => {
     const pa = formatUpiVpa(paymentNo, method);
     const am = fee;
-    
+
     let targetUrl = `upi://pay?pa=${pa}&am=${am}&cu=INR`;
     if (method === 'phonepe') {
       targetUrl = `phonepe://pay?pa=${pa}&am=${am}&cu=INR`;
     } else if (method === 'gpay') {
       targetUrl = `gpay://upi/pay?pa=${pa}&am=${am}&cu=INR`;
     }
-    
+
     // Attempt to open the specific payment application
     window.location.href = targetUrl;
-    
+
     // Smart Fallback: If the target app is not installed, the browser remains in focus.
     // After 1.5 seconds, we fall back to the generic upi:// scheme to trigger the system chooser.
     const fallbackUrl = `upi://pay?pa=${pa}&am=${am}&cu=INR`;
@@ -1614,8 +2005,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     const fee = selectedForm.fee || 0;
     const status = (submissionResult.payment_status || 'unpaid').toUpperCase();
     const receiptId = submissionResult.id || 'N/A';
-    const submittedDate = submissionResult.submitted_at 
-      ? new Date(submissionResult.submitted_at) 
+    const submittedDate = submissionResult.submitted_at
+      ? new Date(submissionResult.submitted_at)
       : new Date();
     const dateStr = submittedDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const timeStr = submittedDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1689,10 +2080,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       alert("Form template for this draft is no longer available.");
       return;
     }
-    
+
     const draftResponses = typeof app.responses === 'string' ? safeJsonParse(app.responses, {}) : (app.responses || {});
     const newFormData = {};
-    
+
     // 1. Map standard fields
     const reqFieldsKeys = safeJsonParse(targetForm.required_fields, []);
     reqFieldsKeys.forEach(fieldId => {
@@ -1701,7 +2092,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         newFormData[fieldId] = draftResponses[label];
       }
     });
-    
+
     // 2. Map custom fields
     const customFields = safeJsonParse(targetForm.fields, []);
     customFields.forEach(f => {
@@ -1726,7 +2117,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         }
       }
     });
-    
+
     // Load into wizard
     setSelectedForm(targetForm);
     setFormData(newFormData);
@@ -1736,13 +2127,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   const renderMintGreenLoader = (label = "LOADING...") => {
     return (
-      <div 
-        style={{ 
-          padding: '24px', 
-          gridColumn: 'span 2', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
+      <div
+        style={{
+          padding: '24px',
+          gridColumn: 'span 2',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
           justifyContent: 'center',
           gap: '8px',
           width: '100%',
@@ -1781,7 +2172,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       const orderA = a.order_index === undefined || a.order_index === null ? 0 : Number(a.order_index);
       const orderB = b.order_index === undefined || b.order_index === null ? 0 : Number(b.order_index);
       if (orderA !== orderB) return orderA - orderB;
-      
+
       const idA = isNaN(a.id) ? a.id : Number(a.id);
       const idB = isNaN(b.id) ? b.id : Number(b.id);
       if (typeof idA === 'number' && typeof idB === 'number') {
@@ -1800,7 +2191,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     try {
       const saved = localStorage.getItem('whatsbro_server_config');
       return saved ? JSON.parse(saved) : { active: true, message: 'Server issues, so pls wait...' };
-    } catch(e) {
+    } catch (e) {
       return { active: true, message: 'Server issues, so pls wait...' };
     }
   })();
@@ -1823,7 +2214,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      
+
       {/* Premium custom Toast Alerts */}
       {toast && (
         <div style={{
@@ -1855,15 +2246,15 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           <span style={{ fontSize: '0.85rem', fontWeight: '700', lineHeight: '1.4', flex: 1, textAlign: 'left' }}>
             {toast.message}
           </span>
-          <button 
-            onClick={() => setToast(null)} 
+          <button
+            onClick={() => setToast(null)}
             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', color: 'inherit', opacity: 0.6 }}
           >
             <X size={16} />
           </button>
         </div>
       )}
-      
+
       <div style={{ flex: 1 }}>
 
         {error && (
@@ -1892,10 +2283,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     {post.img_url && post.img_url.trim() !== '' && (
                       <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <img 
-                          src={getImageUrl(post.img_url)} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          alt={post.title} 
+                        <img
+                          src={getImageUrl(post.img_url)}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          alt={post.title}
                         />
                       </div>
                     )}
@@ -1914,7 +2305,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     ) : (
                       <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
                         {post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' && (
-                          <button 
+                          <button
                             onClick={() => {
                               if (post.apply_url.startsWith('/user')) {
                                 const urlParams = new URLSearchParams(post.apply_url.split('?')[1]);
@@ -1933,12 +2324,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           type="button"
                           onClick={() => handleWhatsAppShare(post.title, post.description, `/post/${post.id}`)}
                           className="premium-btn premium-btn-primary"
-                          style={{ 
-                            width: post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' ? '42px' : '100%', 
-                            padding: '11px 0', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
+                          style={{
+                            width: post.apply_url && post.apply_url.trim() !== '' && post.apply_url.trim().toLowerCase() !== 'none' ? '42px' : '100%',
+                            padding: '11px 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             gap: '6px',
                             fontWeight: 'bold'
                           }}
@@ -1963,9 +2354,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               (selectedJobDetails.coming_soon === true || String(selectedJobDetails.coming_soon).toLowerCase() === 'true') ? (
                 <div style={{ gridColumn: 'span 2', minHeight: 'calc(100vh - 270px)', display: 'flex', flexDirection: 'column' }}>
                   <div className="premium-card text-center" style={{ flex: 1, padding: '32px 24px', borderTop: '6px solid #f59e0b', background: 'white', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
-                    <button 
-                      onClick={() => setSelectedJobDetails(null)} 
-                      className="premium-btn premium-btn-secondary" 
+                    <button
+                      onClick={() => setSelectedJobDetails(null)}
+                      className="premium-btn premium-btn-secondary"
                       style={{ width: 'fit-content', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start' }}
                     >
                       <ArrowLeft size={16} /> Back to Jobs
@@ -1985,11 +2376,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               ) : (
                 <div style={{ gridColumn: 'span 2' }}>
                   <div className="premium-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '6px solid var(--primary)', background: 'white', borderRadius: '16px' }}>
-                    
+
                     {/* Nested Details Back Button */}
-                    <button 
-                      onClick={() => setSelectedJobDetails(null)} 
-                      className="premium-btn premium-btn-secondary" 
+                    <button
+                      onClick={() => setSelectedJobDetails(null)}
+                      className="premium-btn premium-btn-secondary"
                       style={{ width: 'fit-content', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}
                     >
                       <ArrowLeft size={16} /> Back to Jobs
@@ -2001,10 +2392,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
                       <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' }}>
-                        <img 
-                          src={getImageUrl(selectedJobDetails.img_url)} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          alt={selectedJobDetails.title} 
+                        <img
+                          src={getImageUrl(selectedJobDetails.img_url)}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          alt={selectedJobDetails.title}
                         />
                       </div>
                     )}
@@ -2019,7 +2410,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     {selectedJobDetails.apply_url && selectedJobDetails.apply_url.trim() !== '' && selectedJobDetails.apply_url.trim().toLowerCase() !== 'none' ? (
                       <div style={{ marginTop: '24px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '24px', display: 'flex', gap: '10px' }}>
-                        <button 
+                        <button
                           onClick={() => {
                             const url = selectedJobDetails.apply_url;
                             setSelectedJobDetails(null);
@@ -2081,10 +2472,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     {job.img_url && job.img_url.trim() !== '' && (
                       <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <img 
-                          src={getImageUrl(job.img_url)} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          alt={job.title} 
+                        <img
+                          src={getImageUrl(job.img_url)}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          alt={job.title}
                         />
                       </div>
                     )}
@@ -2095,7 +2486,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     {((job.apply_url && job.apply_url.trim() !== '' && job.apply_url.trim().toLowerCase() !== 'none') || (job.details_doc && job.details_doc.trim() !== '')) && (
                       <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
-                        <button 
+                        <button
                           onClick={() => setSelectedJobDetails(job)}
                           className="premium-btn premium-btn-primary"
                           style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
@@ -2130,9 +2521,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   <Filter size={16} className="text-muted" />
                   <span className="premium-label" style={{ margin: 0 }}>Service Category Filter</span>
                 </div>
-                
-                <select 
-                  value={selectedCategory} 
+
+                <select
+                  value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="premium-input"
                   style={{ marginBottom: '16px', background: 'white' }}
@@ -2143,7 +2534,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   <option value="voter id">Voter ID</option>
                   <option value="others">Others</option>
                 </select>
- 
+
                 {formsLoading ? (
                   renderMintGreenLoader("LOADING...")
                 ) : filteredForms.length === 0 ? (
@@ -2171,22 +2562,22 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             )}
                           </div>
                           <h3 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>{form.title}</h3>
-                          
+
                           {form.img_url && (
                             <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
                               <img src={getImageUrl(form.img_url)} alt={form.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             </div>
                           )}
-                          
+
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                             <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px' }}>
                               Rs ₹{form.fee || 0}
                             </span>
                           </div>
-                          
+
                           <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '16px' }}>{form.description}</p>
                           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                            <button 
+                            <button
                               onClick={() => !isUpcoming && selectFormToFill(form)}
                               className={`premium-btn ${isUpcoming ? 'premium-btn-secondary' : 'premium-btn-primary'}`}
                               style={{ flex: 1, padding: '10px', opacity: isUpcoming ? 0.7 : 1, cursor: isUpcoming ? 'not-allowed' : 'pointer' }}
@@ -2222,7 +2613,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>{selectedForm.title}</h3>
                   </div>
                 </div>
-                
+
                 <div style={{ padding: '32px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <div className="premium-card text-center" style={{ flex: 1, borderTop: '6px solid #f59e0b', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
                     <Clock size={48} style={{ color: '#f59e0b', margin: '0 auto', animation: 'pulse-text 2s ease-in-out infinite' }} />
@@ -2249,14 +2640,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 {/* Highly refined HSL-themed 5 Step progress path */}
                 <div className="step-wizard" style={{ marginTop: '16px' }}>
                   <div className="step-wizard-line" style={{ height: '3px', background: '#cbd5e1' }}></div>
-                  <div className="step-wizard-progress" style={{ 
+                  <div className="step-wizard-progress" style={{
                     height: '3px',
                     background: 'var(--primary)',
-                    width: `${((wizardStep - 1) / 4) * 100}%` 
+                    width: `${((wizardStep - 1) / 4) * 100}%`
                   }}></div>
                   {[1, 2, 3, 4, 5].map(step => (
-                    <div 
-                      key={step} 
+                    <div
+                      key={step}
                       className={`step-node ${wizardStep >= step ? 'completed' : ''}`}
                       style={{
                         width: '30px',
@@ -2293,7 +2684,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             This application form is currently being updated and will be available soon. Please check back later.
                           </p>
                         </div>
-                        <button 
+                        <button
                           disabled
                           className="premium-btn premium-btn-secondary"
                           style={{ marginBottom: '20px', cursor: 'not-allowed', opacity: 0.6 }}
@@ -2306,7 +2697,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         <h4 style={{ fontSize: '1.1rem', marginBottom: '12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           🔑 Identity Verification
                         </h4>
-                        
+
                         {guestVerifyError && (
                           <div style={{ color: 'var(--error)', fontSize: '0.8rem', fontWeight: 'bold', background: '#fee2e2', padding: '10px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #fca5a5' }}>
                             ⚠️ {guestVerifyError}
@@ -2320,7 +2711,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             </p>
                             <div className="premium-input-group">
                               <label className="premium-label">Aadhaar Card Number</label>
-                              <input 
+                              <input
                                 type="text"
                                 maxLength={12}
                                 value={guestAadhar}
@@ -2332,17 +2723,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               />
                             </div>
                             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                              <button 
-                                type="button" 
-                                onClick={() => setShowGuestVerification(false)} 
+                              <button
+                                type="button"
+                                onClick={() => setShowGuestVerification(false)}
                                 className="premium-btn premium-btn-secondary"
                                 style={{ flex: 1 }}
                               >
                                 Back
                               </button>
-                              <button 
-                                type="submit" 
-                                className="premium-btn premium-btn-primary" 
+                              <button
+                                type="submit"
+                                className="premium-btn premium-btn-primary"
                                 style={{ flex: 1.5 }}
                                 disabled={verifyingAadhar}
                               >
@@ -2355,26 +2746,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         {lookupAadharStatus === 'existing_user' && (
                           <div>
                             <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '14px' }}>
-                              A citizen profile already exists with this Aadhaar number for <strong>{matchedUserPrefills?.name || 'Citizen User'}</strong>. 
+                              A citizen profile already exists with this Aadhaar number for <strong>{matchedUserPrefills?.name || 'Citizen User'}</strong>.
                               <br /><br />
                               Please log in using your Phone number and first 4 digits of Aadhaar to view your pre-filled data.
                             </p>
                             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                              <button 
-                                type="button" 
-                                onClick={() => setLookupAadharStatus(null)} 
+                              <button
+                                type="button"
+                                onClick={() => setLookupAadharStatus(null)}
                                 className="premium-btn premium-btn-secondary"
                                 style={{ flex: 1 }}
                               >
                                 Back
                               </button>
-                              <button 
-                                type="button" 
+                              <button
+                                type="button"
                                 onClick={() => {
                                   setShowGuestVerification(false);
                                   onLoginTrigger(matchedUserPrefills?.phone, matchedUserPrefills?.aadhar_prefix);
-                                }} 
-                                className="premium-btn premium-btn-primary" 
+                                }}
+                                className="premium-btn premium-btn-primary"
                                 style={{ flex: 1.5 }}
                               >
                                 Login to Proceed
@@ -2388,10 +2779,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '14px' }}>
                               No registered profile found. Enter your Email ID to receive a verification OTP. Once verified, you can fill and submit the form, and your account will be registered automatically.
                             </p>
-                            
+
                             <div className="premium-input-group" style={{ marginBottom: '14px' }}>
                               <label className="premium-label">Email ID</label>
-                              <input 
+                              <input
                                 type="email"
                                 value={guestEmail}
                                 onChange={(e) => setGuestEmail(e.target.value)}
@@ -2404,18 +2795,18 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                             {!showOtpInput ? (
                               <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                                <button 
-                                  type="button" 
-                                  onClick={() => setLookupAadharStatus(null)} 
+                                <button
+                                  type="button"
+                                  onClick={() => setLookupAadharStatus(null)}
                                   className="premium-btn premium-btn-secondary"
                                   style={{ flex: 1 }}
                                 >
                                   Back
                                 </button>
-                                <button 
-                                  type="button" 
-                                  onClick={handleSendGuestOtp} 
-                                  className="premium-btn premium-btn-primary" 
+                                <button
+                                  type="button"
+                                  onClick={handleSendGuestOtp}
+                                  className="premium-btn premium-btn-primary"
                                   style={{ flex: 1.5 }}
                                   disabled={sendingOtp}
                                 >
@@ -2426,7 +2817,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               <form onSubmit={handleVerifyGuestOtp}>
                                 <div className="premium-input-group">
                                   <label className="premium-label">Enter 6-digit OTP Code</label>
-                                  <input 
+                                  <input
                                     type="text"
                                     maxLength={6}
                                     value={guestOtp}
@@ -2438,17 +2829,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   />
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                                  <button 
-                                    type="button" 
-                                    onClick={() => setShowOtpInput(false)} 
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowOtpInput(false)}
                                     className="premium-btn premium-btn-secondary"
                                     style={{ flex: 1 }}
                                   >
                                     Change Email
                                   </button>
-                                  <button 
-                                    type="submit" 
-                                    className="premium-btn premium-btn-primary" 
+                                  <button
+                                    type="submit"
+                                    className="premium-btn premium-btn-primary"
                                     style={{ flex: 1.5 }}
                                     disabled={verifyingOtp}
                                   >
@@ -2492,7 +2883,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           </div>
                         </div>
 
-                        <button 
+                        <button
                           onClick={handleProceedToForm}
                           className="premium-btn premium-btn-primary"
                           style={{ marginBottom: '20px' }}
@@ -2566,34 +2957,34 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       )
                     )}
 
-                {duplicateSubmissionError && (
-                  <div style={{
-                    background: 'linear-gradient(135deg, #fef2f2, #fff1f2)',
-                    border: '2px solid #fca5a5',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
-                    animation: 'fadeIn 0.3s ease'
-                  }}>
-                    <ShieldAlert size={24} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '700', color: '#991b1b' }}>Duplicate Application Detected</p>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#b91c1c', lineHeight: '1.5' }}>{duplicateSubmissionError}</p>
-                    </div>
-                  </div>
-                )}
+                    {duplicateSubmissionError && (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #fef2f2, #fff1f2)',
+                        border: '2px solid #fca5a5',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        animation: 'fadeIn 0.3s ease'
+                      }}>
+                        <ShieldAlert size={24} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
+                        <div>
+                          <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '700', color: '#991b1b' }}>Duplicate Application Detected</p>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#b91c1c', lineHeight: '1.5' }}>{duplicateSubmissionError}</p>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '0 0 20px 0' }}>
                       <h4 style={{ fontSize: '0.95rem', marginBottom: '16px', color: '#1e293b' }}>Application Data Form</h4>
-                      
+
                       {/* Render checklist fields chosen by Admin */}
                       {(() => {
                         let fieldsConfig = safeJsonParse(selectedForm.required_fields, []);
                         const isCase2 = currentUser && !!(currentUser.district || currentUser.religion || currentUser.state || currentUser.father_name);
-                        
+
                         if (selectedForm.category && selectedForm.category.toLowerCase() === 'e sevai' && !isCase2) {
                           const canFields = [
                             'aadhar', 'phone', 'name', 'name_tamil', 'gender', 'marital_status', 'dob',
@@ -2603,7 +2994,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           ];
                           fieldsConfig = Array.from(new Set([...canFields, ...fieldsConfig]));
                         }
-                        
+
                         return fieldsConfig.map(fieldId => {
                           const fieldConfig = STANDARD_FIELDS[fieldId];
                           if (!fieldConfig) return null;
@@ -2614,7 +3005,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               <label className="premium-label">
                                 {fieldConfig.label} {isRequired && <span style={{ color: 'var(--error)' }}>*</span>}
                               </label>
-                              
+
                               {fieldConfig.type === 'select' ? (
                                 <select
                                   value={formData[fieldId] || ''}
@@ -2680,7 +3071,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {safeJsonParse(selectedForm.fields, []).map(f => {
                         if (f.type === 'repeated') {
                           const countValue = parseInt(formData[f.id]) || 0;
-                          
+
                           return (
                             <div key={f.id} style={{ padding: '16px', background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '12px', marginBottom: '16px' }}>
                               <div className="premium-input-group" style={{ marginBottom: '12px' }}>
@@ -2710,7 +3101,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                     <div style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary)', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
                                       #{i} {f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} Details
                                     </div>
-                                    
+
                                     {(f.subFields || []).map(sub => {
                                       const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
                                       return (
@@ -2828,8 +3219,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       })}
                     </div>
 
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="premium-btn premium-btn-primary"
                       style={{ marginBottom: '20px' }}
                     >
@@ -2853,7 +3244,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           const reqFieldsKeys = safeJsonParse(selectedForm.required_fields, []);
                           const customFields = safeJsonParse(selectedForm.fields, []);
                           const previewItems = [];
-                          
+
                           reqFieldsKeys.forEach(fieldId => {
                             previewItems.push({
                               key: fieldId,
@@ -2861,7 +3252,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               value: formData[fieldId] || '—'
                             });
                           });
-                          
+
                           customFields.forEach(f => {
                             if (f.type === 'repeated') {
                               const count = parseInt(formData[f.id]) || 0;
@@ -2889,7 +3280,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               });
                             }
                           });
-                          
+
                           return previewItems.map(item => (
                             <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '4px 0', borderBottom: '1px solid #f8fafc' }}>
                               <span className="text-muted">{item.label}:</span>
@@ -2902,7 +3293,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     <div className="premium-card" style={{ margin: '0 0 20px 0' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', cursor: 'pointer', color: '#1e293b' }}>
-                        <input 
+                        <input
                           type="checkbox"
                           checked={agreeCheckbox}
                           onChange={(e) => setAgreeCheckbox(e.target.checked)}
@@ -2913,18 +3304,18 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
                       <button onClick={() => setWizardStep(2)} className="premium-btn premium-btn-secondary" style={{ flex: 1 }}>Previous</button>
-                      <button 
+                      <button
                         onClick={async () => {
                           setLoading(true);
                           try {
                             const reqFieldsKeys = safeJsonParse(selectedForm.required_fields, []);
                             const customFields = safeJsonParse(selectedForm.fields, []);
                             const responsesPack = {};
-                            
+
                             reqFieldsKeys.forEach(fieldId => {
                               responsesPack[STANDARD_FIELDS[fieldId]?.label || fieldId] = formData[fieldId] || '';
                             });
-                            
+
                             customFields.forEach(f => {
                               if (f.type === 'repeated') {
                                 const count = parseInt(formData[f.id]) || 0;
@@ -2948,7 +3339,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               responsesPack,
                               "draft"
                             );
-                            
+
                             console.log('[Upload Success] Draft saved successfully.');
 
                             // Wait briefly for Google Sheets propagation
@@ -2973,7 +3364,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                             // Increment refresh key to force status useEffect re-fetch
                             setStatusRefreshKey(prev => prev + 1);
-                            
+
                             alert('Draft saved successfully! You can search/resume your draft using your phone/aadhar in the status tab.');
                           } catch (err) {
                             console.error(err);
@@ -2981,8 +3372,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           } finally {
                             setLoading(false);
                           }
-                        }} 
-                        className="premium-btn premium-btn-success" 
+                        }}
+                        className="premium-btn premium-btn-success"
                         style={{ flex: 1.5 }}
                       >
                         Save Draft
@@ -3019,10 +3410,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
                       <button onClick={() => setWizardStep(3)} className="premium-btn premium-btn-secondary" style={{ flex: 1 }}>Previous</button>
-                      <button 
-                        onClick={handleFinalWizardSubmit} 
+                      <button
+                        onClick={handleFinalWizardSubmit}
                         disabled={loading}
-                        className="premium-btn premium-btn-primary" 
+                        className="premium-btn premium-btn-primary"
                         style={{ flex: 2 }}
                       >
                         {loading ? 'Submitting Application...' : 'Submit Application'}
@@ -3047,7 +3438,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: '700', display: 'block', marginBottom: '4px' }}>SUBI ONLINE SERVICE</span>
                         <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>Official SUBI Online Service E-Receipt</span>
                       </div>
-                      
+
                       <div className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '8px' }}>
                         <span className="receipt-item-label" style={{ color: '#64748b' }}>Receipt ID:</span>
                         <span className="receipt-item-val" style={{ color: '#10b981', fontWeight: '700' }}>{submissionResult.id}</span>
@@ -3068,25 +3459,25 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         <span className="receipt-item-label" style={{ color: '#64748b' }}>Submission Date:</span>
                         <span className="receipt-item-val" style={{ fontWeight: '700' }}>{new Date(submissionResult.submitted_at).toLocaleDateString()}</span>
                       </div>
- 
+
                       <div style={{ borderTop: '1px dashed #cbd5e1', margin: '14px 0', paddingTop: '10px' }}>
                         <div className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '8px', alignItems: 'center' }}>
-                           <span className="receipt-item-label" style={{ color: '#64748b' }}>Service Fee (INR):</span>
-                           <span className="receipt-item-val" style={{ fontSize: '1rem', fontWeight: '800', color: '#1e293b' }}>Rs. {selectedForm.fee || 0}</span>
+                          <span className="receipt-item-label" style={{ color: '#64748b' }}>Service Fee (INR):</span>
+                          <span className="receipt-item-val" style={{ fontSize: '1rem', fontWeight: '800', color: '#1e293b' }}>Rs. {selectedForm.fee || 0}</span>
                         </div>
                         <div className="receipt-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
-                           <span className="receipt-item-label" style={{ color: '#64748b' }}>Verification Status:</span>
-                           <span className={`receipt-item-val badge ${submissionResult.payment_status === 'paid' ? 'badge-success' : submissionResult.payment_screenshot ? 'badge-warning' : 'badge-danger'}`} style={{ padding: '2px 8px', fontSize: '0.7rem' }}>
+                          <span className="receipt-item-label" style={{ color: '#64748b' }}>Verification Status:</span>
+                          <span className={`receipt-item-val badge ${submissionResult.payment_status === 'paid' ? 'badge-success' : submissionResult.payment_screenshot ? 'badge-warning' : 'badge-danger'}`} style={{ padding: '2px 8px', fontSize: '0.7rem' }}>
                             {(submissionResult.payment_status || 'unpaid').toUpperCase()}
-                           </span>
+                          </span>
                         </div>
                       </div>
- 
+
                       {/* Instant screenshot upload direct link in Receipt */}
                       {submissionResult.payment_status !== 'paid' && (() => {
                         const fee = Number(selectedForm.fee) || 0;
                         if (!fee || fee <= 0) return null;
-                        
+
                         const paymentNo = systemSettings.payment_number || '';
                         const formattedVpa = formatUpiVpa(paymentNo);
                         // Keep UPI URL simple: just pa (payment address) and am (amount)
@@ -3098,7 +3489,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             <h4 style={{ fontSize: '0.85rem', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800' }}>
                               <CreditCard size={15} style={{ color: 'var(--primary)' }} /> UPI Payment Transfer
                             </h4>
-                            
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: '#ffffff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '12px' }}>
                               {/* Amount Display */}
                               <div style={{ textAlign: 'center' }}>
@@ -3109,10 +3500,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               {/* QR Code */}
                               {qrCodeUrl && (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '6px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                                  <img 
-                                    src={getImageUrl(qrCodeUrl)} 
-                                    alt="UPI Payment QR Code" 
-                                    style={{ width: '120px', height: '120px', objectFit: 'contain' }} 
+                                  <img
+                                    src={getImageUrl(qrCodeUrl)}
+                                    alt="UPI Payment QR Code"
+                                    style={{ width: '120px', height: '120px', objectFit: 'contain' }}
                                   />
                                   <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 'bold' }}>Scan to Pay using GPAY / any UPI</span>
                                 </div>
@@ -3120,17 +3511,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                               {/* Intent pay buttons */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '240px', justifyContent: 'center', alignItems: 'center' }}>
-                                <button 
+                                <button
                                   onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo, 'phonepe')}
                                   className="premium-btn"
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    gap: '8px', 
-                                    padding: '10px 16px', 
-                                    width: '100%', 
-                                    fontSize: '0.8rem', 
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    padding: '10px 16px',
+                                    width: '100%',
+                                    fontSize: '0.8rem',
                                     fontWeight: '800',
                                     borderRadius: '8px',
                                     background: '#5f259f',
@@ -3150,24 +3541,24 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   }}
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}>
-                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff"/>
-                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5"/>
-                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5"/>
+                                    <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="#ffffff" stroke="#ffffff" />
+                                    <path d="M9 17V8h4.5a2.5 2.5 0 1 1 0 5H9.5" stroke="#5f259f" strokeWidth="2.5" />
+                                    <path d="M12 13v4" stroke="#5f259f" strokeWidth="2.5" />
                                   </svg>
                                   Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>PhonePe</span>
                                 </button>
 
-                                <button 
+                                <button
                                   onClick={() => handleUpiPay(fee, submissionResult.id, paymentNo, 'gpay')}
                                   className="premium-btn"
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    gap: '8px', 
-                                    padding: '10px 16px', 
-                                    width: '100%', 
-                                    fontSize: '0.8rem', 
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    padding: '10px 16px',
+                                    width: '100%',
+                                    fontSize: '0.8rem',
                                     fontWeight: '800',
                                     borderRadius: '8px',
                                     background: '#000000',
@@ -3187,10 +3578,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   }}
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" style={{ marginRight: '2px' }}>
-                                    <path fill="#4285F4" d="M24 12.27c0-.81-.07-1.59-.2-2.34H12v4.42h6.08c-.26 1.39-1.04 2.57-2.21 3.34v2.73h3.64c2.13-1.96 3.36-4.85 3.36-8.15z"/>
-                                    <path fill="#34A853" d="M12 24c3.04 0 5.58-1.01 7.44-2.73l-3.64-2.73c-1.01.68-2.3 1.08-3.8 1.08-2.92 0-5.39-1.97-6.27-4.62H2.04v2.81C3.88 21.05 7.55 24 12 24z"/>
-                                    <path fill="#FBBC05" d="M5.73 15.02c-.22-.68-.35-1.41-.35-2.18s.13-1.5.35-2.18V7.85H2.04c-.7 1.4-1.1 2.97-1.1 4.63s.4 3.23 1.1 4.63l3.69-2.87z"/>
-                                    <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z"/>
+                                    <path fill="#4285F4" d="M24 12.27c0-.81-.07-1.59-.2-2.34H12v4.42h6.08c-.26 1.39-1.04 2.57-2.21 3.34v2.73h3.64c2.13-1.96 3.36-4.85 3.36-8.15z" />
+                                    <path fill="#34A853" d="M12 24c3.04 0 5.58-1.01 7.44-2.73l-3.64-2.73c-1.01.68-2.3 1.08-3.8 1.08-2.92 0-5.39-1.97-6.27-4.62H2.04v2.81C3.88 21.05 7.55 24 12 24z" />
+                                    <path fill="#FBBC05" d="M5.73 15.02c-.22-.68-.35-1.41-.35-2.18s.13-1.5.35-2.18V7.85H2.04c-.7 1.4-1.1 2.97-1.1 4.63s.4 3.23 1.1 4.63l3.69-2.87z" />
+                                    <path fill="#EA4335" d="M12 4.8c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.58 1.44 15.04 0 12 0 7.55 0 3.88 2.95 2.04 7.02l3.69 2.87c.88-2.65 3.35-4.62 6.27-4.62z" />
                                   </svg>
                                   Pay with <span style={{ fontWeight: '800', letterSpacing: '-0.2px', marginLeft: '4px' }}>GPay</span>
                                 </button>
@@ -3198,10 +3589,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             </div>
 
                             <label className="premium-btn premium-btn-success" style={{ padding: '8px 12px', fontSize: '0.75rem', display: 'flex', gap: '8px', cursor: 'pointer', justifyContent: 'center' }}>
-                              <UploadCloud size={16} /> 
+                              <UploadCloud size={16} />
                               {uploadingScreenshotId === submissionResult.id ? 'Uploading proof...' : 'Select Payment Proof (Image or PDF File)'}
-                              <input 
-                                type="file" 
+                              <input
+                                type="file"
                                 accept="image/*,application/pdf"
                                 style={{ display: 'none' }}
                                 disabled={uploadingScreenshotId !== null}
@@ -3211,21 +3602,21 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           </div>
                         );
                       })()}
- 
+
                       <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.7rem', color: '#94a3b8' }}>
                         Thank you for using SUBI Online Service! Save this receipt for your records.
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
-                      <button 
-                        onClick={printReceipt} 
+                      <button
+                        onClick={printReceipt}
                         className="premium-btn premium-btn-success"
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
                         <Printer size={18} /> Download PDF Receipt
                       </button>
-                      <button 
+                      <button
                         onClick={() => sendSubmissionToWhatsApp(submissionResult, selectedForm, lastResponsesPack, lastDocReferencesPack)}
                         className="premium-btn premium-btn-success"
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#22c55e', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)' }}
@@ -3338,663 +3729,552 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 Please wait a moment
               </span>
             </div>
-            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* --- TAB 4: ACCESSORIES SHOP CATALOG & TEMPERED GLASS LOOKUP --- */}
-        {activeTab === 'accessories' && (
-          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* 1. SEARCH TEMPERED GLASS BOX LOOKUP REMOVED FROM TOP */}
+      {/* --- TAB 4: ACCESSORIES SHOP CATALOG & TEMPERED GLASS LOOKUP --- */}
+      {activeTab === 'accessories' && (
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-            {/* 2. ACCESSORIES CATALOG */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 4px' }}>
-                <h3 style={{ fontSize: '1.15rem', color: '#0f172a', fontWeight: '800' }}>🛍️ Accessories Catalog</h3>
-                {products.length > 0 && (
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>Available All Items</span>
-                )}
-              </div>
+          {/* 1. SEARCH TEMPERED GLASS BOX LOOKUP REMOVED FROM TOP */}
 
-
-              {/* Filters Panel */}
-              <div className="premium-card" style={{ margin: 0, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                
-                {/* Category & Brand Filters */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Category</label>
-                    <select
-                      value={selectedAccessoryCategory}
-                      onChange={(e) => setSelectedAccessoryCategory(e.target.value)}
-                      className="premium-input"
-                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
-                    >
-                      {['All', 'Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable', 'Other Accessories'].map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Brand</label>
-                    <select
-                      value={selectedBrand}
-                      onChange={(e) => setSelectedBrand(e.target.value)}
-                      className="premium-input"
-                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
-                    >
-                      <option value="All">All Brands</option>
-                      {['Samsung', 'Apple', 'Xiaomi (Redmi)', 'Vivo', 'OPPO', 'realme', 'OnePlus', 'POCO', 'Motorola', 'Nokia', 'Google Pixel', 'Huawei', 'Honor', 'Infinix', 'Tecno', 'iQOO', 'Sony', 'ASUS', 'Nothing', 'Lenovo', 'Micromax', 'Lava', 'Karbonn', 'Itel', 'HTC', 'Other'].map(b => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Model & Keyword Filters */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Model Name</label>
-                    <input
-                      type="text"
-                      value={selectedModel}
-                      onChange={(e) => setSelectedModel(e.target.value)}
-                      placeholder="e.g. S24, iPhone 15..."
-                      className="premium-input"
-                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Search Keyword</label>
-                    <input
-                      type="text"
-                      value={accessorySearchKeyword}
-                      onChange={(e) => setAccessorySearchKeyword(e.target.value)}
-                      placeholder="Search product name, brand..."
-                      className="premium-input"
-                      style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
-                    />
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Products Listing Grid */}
-              {accessoryProductsLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                  Loading products...
-                </div>
-              ) : (() => {
-                const filtered = products.filter(item => {
-                  if (selectedAccessoryCategory !== 'All') {
-                    if (selectedAccessoryCategory === 'Other Accessories') {
-                      const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
-                      if (standardCats.includes(item.Category)) return false;
-                    } else {
-                      if (item.Category !== selectedAccessoryCategory) return false;
-                    }
-                  }
-
-                  if (selectedBrand !== 'All') {
-                    if (item.Brand !== selectedBrand) return false;
-                  }
-
-                  if (selectedModel.trim() !== '') {
-                    const mQuery = selectedModel.toLowerCase();
-                    const modelName = (item.ModelName || '').toLowerCase();
-                    if (!modelName.includes(mQuery)) return false;
-                  }
-
-                  if (accessorySearchKeyword.trim() !== '') {
-                    const query = accessorySearchKeyword.toLowerCase();
-                    const name = (item.ProductName || '').toLowerCase();
-                    const brand = (item.Brand || '').toLowerCase();
-                    const customBrand = (item.CustomBrand || '').toLowerCase();
-                    const model = (item.ModelName || '').toLowerCase();
-                    const type = (item.Type || '').toLowerCase();
-                    const category = (item.Category || '').toLowerCase();
-                    
-                    const match = name.includes(query) || 
-                                  brand.includes(query) || 
-                                  customBrand.includes(query) || 
-                                  model.includes(query) || 
-                                  type.includes(query) || 
-                                  category.includes(query);
-                                  
-                    if (!match) return false;
-                  }
-
-                  return true;
-                });
-
-                if (filtered.length === 0) {
-                  return (
-                    <div style={{ textAlign: 'center', padding: '40px 20px', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
-                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 'bold' }}>No accessories match your filters.</p>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>Try choosing another category or clearing search keywords.</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', padding: '0 4px 20px 4px' }}>
-                    {filtered.map(product => {
-                      const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
-                      const hasPrice = product.Price && product.Price.trim() !== '';
-                      
-                      return (
-                        <div 
-                          key={product.ProductID}
-                          onClick={() => setSelectedProductDetails(product)}
-                          className="premium-card cursor-pointer"
-                          style={{
-                            margin: 0,
-                            padding: '10px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(0,0,0,0.06)',
-                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
-                            background: '#ffffff',
-                            cursor: 'pointer',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          {hasImage ? (
-                            <div style={{
-                              width: '100%',
-                              height: '110px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              backgroundColor: '#f8fafc',
-                              border: '1px solid #f1f5f9',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              position: 'relative'
-                            }}>
-                              <img 
-                                src={getImageUrl(product.ImageURL)} 
-                                alt={product.ProductName || 'Accessory'} 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                            </div>
-                          ) : product.Category === 'Phone Cover' ? (
-                            <div style={{
-                              width: '100%',
-                              height: '110px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              backgroundColor: '#f8fafc',
-                              border: '1px solid #f1f5f9',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              position: 'relative'
-                            }}>
-                              <img 
-                                src={defaultCoverImg} 
-                                alt="Default Cover" 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            </div>
-                          ) : (
-                            <div style={{
-                              width: '100%',
-                              height: '110px',
-                              borderRadius: '8px',
-                              backgroundColor: '#f1f5f9',
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#94a3b8',
-                              gap: '4px'
-                            }}>
-                              <span style={{ fontSize: '1.4rem' }}>📦</span>
-                              <span style={{ fontSize: '0.6rem', fontWeight: 'bold', textTransform: 'uppercase' }}>No Image</span>
-                            </div>
-                          )}
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
-                            <span style={{
-                              fontSize: '0.65rem',
-                              fontWeight: '800',
-                              color: 'var(--primary)',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.02em'
-                            }}>
-                              {product.Category}
-                            </span>
-                            
-                            <h4 style={{
-                              fontSize: '0.8rem',
-                              fontWeight: '700',
-                              color: '#1e293b',
-                              margin: 0,
-                              lineHeight: '1.25',
-                              WebkitLineClamp: 2,
-                              display: '-webkit-box',
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              minHeight: '2.5em'
-                            }}>
-                              {product.Category === 'Phone Cover' 
-                                ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName}` 
-                                : (product.ProductName || `${product.Brand} Case`)}
-                            </h4>
-
-                            {product.Category !== 'Phone Cover' && (product.Brand || product.ModelName) && (
-                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: '600' }}>
-                                {product.Brand === 'Other' ? product.CustomBrand : product.Brand} {product.ModelName}
-                              </span>
-                            )}
-
-                            {product.Category === 'Phone Cover' && product.CoverType && (
-                              <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                {product.CoverType}
-                              </span>
-                            )}
-
-                            {hasPrice && (
-                              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <strong style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: '800' }}>
-                                  ₹{product.Price}
-                                </strong>
-                                <span style={{ fontSize: '0.6rem', color: '#22c55e', background: '#f0fdf4', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>In Stock</span>
-                              </div>
-                            )}
-
-                            {/* Buy & Share Buttons */}
-                            <div 
-                              style={{ 
-                                marginTop: hasPrice ? '8px' : 'auto', 
-                                display: 'flex', 
-                                gap: '6px', 
-                                width: '100%' 
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Avoid triggering any double handler
-                                  setSelectedProductDetails(product);
-                                }}
-                                className="premium-btn premium-btn-primary"
-                                style={{ 
-                                  flex: 1, 
-                                  padding: '5px 0', 
-                                  fontSize: '0.7rem', 
-                                  fontWeight: 'bold',
-                                  margin: 0,
-                                  borderRadius: '6px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '4px',
-                                  border: 'none',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Buy
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevent opening modal
-                                  const title = product.Category === 'Phone Cover' 
-                                    ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName} Cover`
-                                    : (product.ProductName || `${product.Brand} Case`);
-                                  const text = `Category: ${product.Category}${product.Price ? `\nPrice: ₹${product.Price}` : ''}\nBuy high-quality mobile accessories at SUBI Online Service.`;
-                                  handleWhatsAppShare(title, text, '/user?tab=accessories');
-                                }}
-                                className="premium-btn premium-btn-secondary"
-                                style={{ 
-                                  flex: 1, 
-                                  padding: '5px 0', 
-                                  fontSize: '0.7rem', 
-                                  fontWeight: 'bold',
-                                  margin: 0,
-                                  borderRadius: '6px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '4px',
-                                  cursor: 'pointer'
-                                }}
-                                title="Share on WhatsApp"
-                              >
-                                <Share2 size={12} /> Share
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* 3. SEARCH TEMPERED GLASS BOX LOOKUP */}
-            <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '20px 0 16px 0' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                🔍 Search Tempered Glass Box
-              </h3>
-              <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '16px' }}>
-                Enter your mobile model name to find and enquire about tempered glass.
-              </p>
-              
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const query = tgSearchQuery.trim().toLowerCase();
-                if (!query) {
-                  alert('Please enter a model name.');
-                  return;
-                }
-                
-                // Search in temperedGlassList
-                const results = [];
-                for (const item of temperedGlassList) {
-                  const models = (item.ModelList || "").split(',').map(m => m.trim());
-                  for (const m of models) {
-                    if (m.toLowerCase().includes(query)) {
-                      results.push({
-                        modelName: m,
-                        boxNumber: item.BoxNumber
-                      });
-                    }
-                  }
-                }
-                
-                if (results.length > 0) {
-                  setTgSearchResult({ results, searched: tgSearchQuery });
-                } else {
-                  setTgSearchResult({ notFound: true, searched: tgSearchQuery });
-                }
-              }} style={{ display: 'flex', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  value={tgSearchQuery}
-                  onChange={(e) => setTgSearchQuery(e.target.value)}
-                  placeholder="e.g. Samsung A15, Vivo T3..."
-                  className="premium-input"
-                  style={{ flex: 1, margin: 0, padding: '10px 14px', fontSize: '0.85rem' }}
-                />
-                <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '10px 20px', whiteSpace: 'nowrap' }}>
-                  Search Box
-                </button>
-              </form>
-
-              {tgSearchResult && (
-                <div style={{
-                  marginTop: '16px',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  background: tgSearchResult.notFound ? '#fef2f2' : '#f0fdf4',
-                  border: tgSearchResult.notFound ? '1px solid #fca5a5' : '1px solid #bbf7d0',
-                  animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}>
-                  {tgSearchResult.notFound ? (
-                    <div style={{ textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: '#991b1b' }}>
-                        Model Not Found: "{tgSearchResult.searched}"
-                      </p>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#7f1d1d' }}>
-                        No tempered glass found for this model. Please ask the shop counter.
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#166534', fontWeight: '600', textAlign: 'center' }}>
-                        Matching models found. Click to enquire on WhatsApp:
-                      </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {tgSearchResult.results && tgSearchResult.results.map((res, index) => (
-                          <button
-                            key={index}
-                            onClick={() => {
-                              const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
-                              const cleanedAdminWhatsApp = cleanPhone(adminWhatsApp);
-                              
-                              let msg = `Hello SUBI Online Service,\n\nI would like to buy Tempered Glass.\n\n\`\`\`\n`;
-                              msg += `${"Product".padEnd(12, ' ')}: Tempered Glass\n`;
-                              msg += `${"Model".padEnd(12, ' ')}: ${res.modelName}\n`;
-                              msg += `${"Box Number".padEnd(12, ' ')}: ${res.boxNumber}\n`;
-                              msg += `\`\`\`\n\nPlease check availability and details.`;
-                              
-                              const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanedAdminWhatsApp)}&text=${encodeURIComponent(msg)}`;
-                              window.open(whatsappUrl, '_blank');
-                            }}
-                            className="premium-btn"
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '12px 16px',
-                              borderRadius: '10px',
-                              background: '#ffffff',
-                              border: '1px solid #bbf7d0',
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                              width: '100%'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.borderColor = 'var(--primary)';
-                              e.currentTarget.style.background = '#f0fdf4';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.borderColor = '#bbf7d0';
-                              e.currentTarget.style.background = '#ffffff';
-                            }}
-                          >
-                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#14532d' }}>
-                              📱 {res.modelName}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>
-                              Order ➜
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+          {/* 2. ACCESSORIES CATALOG */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 4px' }}>
+              <h3 style={{ fontSize: '1.15rem', color: '#0f172a', fontWeight: '800' }}>🛍️ Accessories Catalog</h3>
+              {products.length > 0 && (
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>Available All Items</span>
               )}
             </div>
+            {/* Filters Panel */}
+            <div className="premium-card" style={{ margin: 0, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-          </div>
-        )}
-
-        {/* Accessory Product Details Modal */}
-        {selectedProductDetails && (() => {
-          const product = selectedProductDetails;
-          const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
-          const hasPrice = product.Price && product.Price.trim() !== '';
-          
-          const handleWhatsAppEnquiry = () => {
-            const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
-            const cleanedAdminWhatsApp = cleanPhone(adminWhatsApp);
-            
-            let msg = `Hello SUBI Online Service,\n\nI would like to buy this product:\n\n\`\`\`\n`;
-            msg += `${"Product Name".padEnd(14, ' ')}: ${product.ProductName || `${product.Brand} Cover Case`}\n`;
-            msg += `${"Category".padEnd(14, ' ')}: ${product.Category}\n`;
-            if (product.Brand) {
-              msg += `${"Brand".padEnd(14, ' ')}: ${product.Brand === 'Other' ? product.CustomBrand : product.Brand}\n`;
-            }
-            if (product.ModelName) {
-              msg += `${"Model".padEnd(14, ' ')}: ${product.ModelName}\n`;
-            }
-            if (product.TagNumber) {
-              msg += `${"Tag Number".padEnd(14, ' ')}: ${product.TagNumber}\n`;
-            }
-            msg += `\`\`\`\n\nPlease provide availability and price details.`;
-            
-            const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanedAdminWhatsApp)}&text=${encodeURIComponent(msg)}`;
-            window.open(whatsappUrl, '_blank');
-          };
-
-          return (
-            <div style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(15, 23, 42, 0.4)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              zIndex: 99999,
-              padding: '16px'
-            }}>
-              <div style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '20px',
-                padding: '24px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                width: '100%', maxWidth: '360px',
-                display: 'flex', flexDirection: 'column', gap: '16px',
-                position: 'relative',
-                animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-              }}>
-                <button 
-                  onClick={() => setSelectedProductDetails(null)}
-                  style={{
-                    position: 'absolute',
-                    top: '16px', right: '16px',
-                    background: '#f1f5f9', border: 'none',
-                    color: '#64748b', cursor: 'pointer',
-                    width: '28px', height: '28px',
-                    borderRadius: '50%', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center'
-                  }}
-                >
-                  <X size={16} />
-                </button>
-
-                {hasImage ? (
-                  <div style={{
-                    width: '100%', height: '200px',
-                    borderRadius: '12px', overflow: 'hidden',
-                    border: '1px solid #e2e8f0', background: '#f8fafc',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
-                    <img 
-                      src={getImageUrl(product.ImageURL)} 
-                      alt={product.ProductName}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    />
-                  </div>
-                ) : product.Category === 'Phone Cover' ? (
-                  <div style={{
-                    width: '100%', height: '200px',
-                    borderRadius: '12px', overflow: 'hidden',
-                    border: '1px solid #e2e8f0', background: '#f8fafc',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
-                    <img 
-                      src={defaultCoverImg} 
-                      alt="Default Cover" 
-                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    />
-                  </div>
-                ) : (
-                  <div style={{
-                    width: '100%', height: '140px',
-                    borderRadius: '12px', border: '1px dashed #cbd5e1',
-                    background: '#f8fafc', display: 'flex',
-                    flexDirection: 'column', alignItems: 'center',
-                    justifyContent: 'center', color: '#94a3b8', gap: '6px'
-                  }}>
-                    <span style={{ fontSize: '2rem' }}>📦</span>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Product Image Not Available</span>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
-                      {product.Category}
-                    </span>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', margin: 0, lineHeight: '1.3' }}>
-                      {product.Category === 'Phone Cover'
-                        ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName}`
-                        : (product.ProductName || `${product.Brand} Cover Case`)}
-                    </h3>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                    <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
-                      <tbody>
-                        {product.Brand && (
-                          <tr>
-                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Brand:</td>
-                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>
-                              {product.Brand === 'Other' ? product.CustomBrand : product.Brand}
-                            </td>
-                          </tr>
-                        )}
-                        {product.ModelName && (
-                          <tr>
-                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Model Name:</td>
-                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.ModelName}</td>
-                          </tr>
-                        )}
-                        {product.Category === 'Phone Cover' && product.CoverType && (
-                          <tr>
-                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Case Type:</td>
-                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.CoverType}</td>
-                          </tr>
-                        )}
-                        {product.Type && (
-                          <tr>
-                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Type / Spec:</td>
-                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.Type}</td>
-                          </tr>
-                        )}
-                        {hasPrice && (
-                          <tr>
-                            <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600', fontSize: '0.85rem' }}>Price:</td>
-                            <td style={{ textAlign: 'right', fontWeight: '900', color: '#0f172a', fontSize: '1rem' }}>₹{product.Price}</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+              {/* Category & Brand Filters */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Category</label>
+                  <select
+                    value={selectedAccessoryCategory}
+                    onChange={(e) => setSelectedAccessoryCategory(e.target.value)}
+                    className="premium-input"
+                    style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                  >
+                    {['All', 'Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable', 'Other Accessories'].map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
 
-                <button 
-                  onClick={handleWhatsAppEnquiry}
-                  className="premium-btn premium-btn-primary"
-                  style={{
-                    padding: '12px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: '#22c55e',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.25)',
-                    marginTop: '8px'
-                  }}
-                >
-                  <span style={{ fontSize: '1.1rem' }}>💬</span> Buy on WhatsApp
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Brand</label>
+                  <select
+                    value={selectedBrand}
+                    onChange={(e) => setSelectedBrand(e.target.value)}
+                    className="premium-input"
+                    style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                  >
+                    <option value="All">All Brands</option>
+                    {['Samsung', 'Apple', 'Xiaomi (Redmi)', 'Vivo', 'OPPO', 'realme', 'OnePlus', 'POCO', 'Motorola', 'Nokia', 'Google Pixel', 'Huawei', 'Honor', 'Infinix', 'Tecno', 'iQOO', 'Sony', 'ASUS', 'Nothing', 'Lenovo', 'Micromax', 'Lava', 'Karbonn', 'Itel', 'HTC', 'Other'].map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
-          );
-        })()}
 
-    {/* App Install Notification Modal */}
-    {showInstallPrompt && (
+              {/* Model & Keyword Filters */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Model Name</label>
+                  <input
+                    type="text"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    placeholder="e.g. S24, iPhone 15..."
+                    className="premium-input"
+                    style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Search Keyword</label>
+                  <input
+                    type="text"
+                    value={accessorySearchKeyword}
+                    onChange={(e) => setAccessorySearchKeyword(e.target.value)}
+                    placeholder="Search product name, brand..."
+                    className="premium-input"
+                    style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, background: '#f8fafc' }}
+                  />
+                </div>
+              </div>
+
+            </div>
+
+            {/* Products Listing Grid */}
+            {accessoryProductsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                Loading products...
+              </div>
+            ) : (() => {
+              const filtered = products.filter(item => {
+                if (selectedAccessoryCategory !== 'All') {
+                  if (selectedAccessoryCategory === 'Other Accessories') {
+                    const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
+                    if (standardCats.includes(item.Category)) return false;
+                  } else {
+                    if (item.Category !== selectedAccessoryCategory) return false;
+                  }
+                }
+
+                if (selectedBrand !== 'All') {
+                  if (item.Brand !== selectedBrand) return false;
+                }
+
+                if (selectedModel.trim() !== '') {
+                  const mQuery = selectedModel.toLowerCase();
+                  const modelName = (item.ModelName || '').toLowerCase();
+                  if (!modelName.includes(mQuery)) return false;
+                }
+
+                if (accessorySearchKeyword.trim() !== '') {
+                  const query = accessorySearchKeyword.toLowerCase();
+                  const name = (item.ProductName || '').toLowerCase();
+                  const brand = (item.Brand || '').toLowerCase();
+                  const customBrand = (item.CustomBrand || '').toLowerCase();
+                  const model = (item.ModelName || '').toLowerCase();
+                  const type = (item.Type || '').toLowerCase();
+                  const category = (item.Category || '').toLowerCase();
+
+                  const match = name.includes(query) ||
+                    brand.includes(query) ||
+                    customBrand.includes(query) ||
+                    model.includes(query) ||
+                    type.includes(query) ||
+                    category.includes(query);
+
+                  if (!match) return false;
+                }
+
+                return true;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 'bold' }}>No accessories match your filters.</p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>Try choosing another category or clearing search keywords.</p>
+                  </div>
+                );
+              }
+
+              const categoriesToDisplay = [
+                { key: 'Phone Cover', label: 'Phone Covers', emoji: '📱' },
+                { key: 'Headphone', label: 'Headphones', emoji: '🎧' },
+                { key: 'Speaker', label: 'Speakers', emoji: '🔊' },
+                { key: 'Charger', label: 'Chargers', emoji: '🔌' },
+                { key: 'Charger Cable', label: 'Charger Cables', emoji: '⚡' },
+                { key: 'Other Accessories', label: 'Other Accessories', emoji: '📦' }
+              ];
+
+              const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
+
+              const grouped = categoriesToDisplay.reduce((acc, cat) => {
+                acc[cat.key] = filtered.filter(item => {
+                  if (cat.key === 'Other Accessories') {
+                    return !standardCats.includes(item.Category);
+                  }
+                  return item.Category === cat.key;
+                });
+                return acc;
+              }, {});
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', paddingBottom: '20px' }}>
+                  {categoriesToDisplay.map((cat, index) => {
+                    const items = grouped[cat.key] || [];
+                    if (items.length === 0) return null;
+
+                    // Partition items into up to 5 rows
+                    const numRows = Math.min(items.length, 5);
+                    const partitionedRows = Array.from({ length: numRows }, () => []);
+                    items.forEach((item, idx) => {
+                      partitionedRows[idx % numRows].push(item);
+                    });
+
+                    return (
+                      <div key={cat.key} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+                        {/* Category Section Header */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          paddingBottom: '8px',
+                          borderBottom: '2px solid #f1f5f9',
+                          margin: '8px 4px 0 4px'
+                        }}>
+                          <span style={{ fontSize: '1.25rem' }}>{cat.emoji}</span>
+                          <h4 style={{
+                            fontSize: '0.95rem',
+                            color: '#1e293b',
+                            fontWeight: '800',
+                            margin: 0,
+                            flex: 1
+                          }}>
+                            {cat.label}
+                          </h4>
+                          <span style={{
+                            fontSize: '0.7rem',
+                            color: 'var(--primary)',
+                            background: 'rgba(16,185,129,0.08)',
+                            padding: '2px 8px',
+                            borderRadius: '20px',
+                            fontWeight: '700'
+                          }}>
+                            {items.length} {items.length === 1 ? 'item' : 'items'}
+                          </span>
+                        </div>
+
+                        {/* Sub-rows marquee waterfall tracks */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {partitionedRows.map((rowItems, subIndex) => {
+                            // Cycle speeds 1 to 5, staggered with subIndex
+                            const speedRowIndex = ((index + subIndex) % 5) + 1;
+
+                            return (
+                              <MarqueeRow
+                                key={subIndex}
+                                rowItems={rowItems}
+                                speedRowIndex={speedRowIndex}
+                                setSelectedProductDetails={setSelectedProductDetails}
+                                handleWhatsAppShare={handleWhatsAppShare}
+                              />
+                            );
+                          })}
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* 3. SEARCH TEMPERED GLASS BOX LOOKUP */}
+          <div className="premium-card" style={{ borderTop: '6px solid var(--primary)', margin: '20px 0 16px 0' }}>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🔍 Search Tempered Glass Box
+            </h3>
+            <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '16px' }}>
+              Enter your mobile model name to find and enquire about tempered glass.
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const query = tgSearchQuery.trim().toLowerCase();
+              if (!query) {
+                alert('Please enter a model name.');
+                return;
+              }
+
+              // Search in temperedGlassList
+              const results = [];
+              for (const item of temperedGlassList) {
+                const models = (item.ModelList || "").split(',').map(m => m.trim());
+                for (const m of models) {
+                  if (m.toLowerCase().includes(query)) {
+                    results.push({
+                      modelName: m,
+                      boxNumber: item.BoxNumber
+                    });
+                  }
+                }
+              }
+
+              if (results.length > 0) {
+                setTgSearchResult({ results, searched: tgSearchQuery });
+              } else {
+                setTgSearchResult({ notFound: true, searched: tgSearchQuery });
+              }
+            }} style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                value={tgSearchQuery}
+                onChange={(e) => setTgSearchQuery(e.target.value)}
+                placeholder="e.g. Samsung A15, Vivo T3..."
+                className="premium-input"
+                style={{ flex: 1, margin: 0, padding: '10px 14px', fontSize: '0.85rem' }}
+              />
+              <button type="submit" className="premium-btn premium-btn-primary" style={{ width: 'auto', padding: '10px 20px', whiteSpace: 'nowrap' }}>
+                Search Box
+              </button>
+            </form>
+
+            {tgSearchResult && (
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
+                borderRadius: '12px',
+                background: tgSearchResult.notFound ? '#fef2f2' : '#f0fdf4',
+                border: tgSearchResult.notFound ? '1px solid #fca5a5' : '1px solid #bbf7d0',
+                animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}>
+                {tgSearchResult.notFound ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: '#991b1b' }}>
+                      Model Not Found: "{tgSearchResult.searched}"
+                    </p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#7f1d1d' }}>
+                      No tempered glass found for this model. Please ask the shop counter.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#166534', fontWeight: '600', textAlign: 'center' }}>
+                      Matching models found. Click to enquire on WhatsApp:
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {tgSearchResult.results && tgSearchResult.results.map((res, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
+                            const cleanedAdminWhatsApp = cleanPhone(adminWhatsApp);
+
+                            let msg = `Hello SUBI Online Service,\n\nI would like to buy Tempered Glass.\n\n\`\`\`\n`;
+                            msg += `${"Product".padEnd(12, ' ')}: Tempered Glass\n`;
+                            msg += `${"Model".padEnd(12, ' ')}: ${res.modelName}\n`;
+                            msg += `${"Box Number".padEnd(12, ' ')}: ${res.boxNumber}\n`;
+                            msg += `\`\`\`\n\nPlease check availability and details.`;
+
+                            const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanedAdminWhatsApp)}&text=${encodeURIComponent(msg)}`;
+                            window.open(whatsappUrl, '_blank');
+                          }}
+                          className="premium-btn"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '10px',
+                            background: '#ffffff',
+                            border: '1px solid #bbf7d0',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            width: '100%'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--primary)';
+                            e.currentTarget.style.background = '#f0fdf4';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = '#bbf7d0';
+                            e.currentTarget.style.background = '#ffffff';
+                          }}
+                        >
+                          <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#14532d' }}>
+                            📱 {res.modelName}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>
+                            Order ➜
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* Accessory Product Details Modal */}
+      {selectedProductDetails && (() => {
+        const product = selectedProductDetails;
+        const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
+        const hasPrice = product.Price && product.Price.trim() !== '';
+
+        const handleWhatsAppEnquiry = () => {
+          const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
+          const cleanedAdminWhatsApp = cleanPhone(adminWhatsApp);
+
+          let msg = `Hello SUBI Online Service,\n\nI would like to buy this product:\n\n\`\`\`\n`;
+          msg += `${"Product Name".padEnd(14, ' ')}: ${product.ProductName || `${product.Brand} Cover Case`}\n`;
+          msg += `${"Category".padEnd(14, ' ')}: ${product.Category}\n`;
+          if (product.Brand) {
+            msg += `${"Brand".padEnd(14, ' ')}: ${product.Brand === 'Other' ? product.CustomBrand : product.Brand}\n`;
+          }
+          if (product.ModelName) {
+            msg += `${"Model".padEnd(14, ' ')}: ${product.ModelName}\n`;
+          }
+          if (product.TagNumber) {
+            msg += `${"Tag Number".padEnd(14, ' ')}: ${product.TagNumber}\n`;
+          }
+          msg += `\`\`\`\n\nPlease provide availability and price details.`;
+
+          const whatsappUrl = `https://api.whatsapp.com/send?phone=${encodeURIComponent(cleanedAdminWhatsApp)}&text=${encodeURIComponent(msg)}`;
+          window.open(whatsappUrl, '_blank');
+        };
+
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}>
+            <div style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              padding: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              width: '100%', maxWidth: '360px',
+              display: 'flex', flexDirection: 'column', gap: '16px',
+              position: 'relative',
+              animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}>
+              <button
+                onClick={() => setSelectedProductDetails(null)}
+                style={{
+                  position: 'absolute',
+                  top: '16px', right: '16px',
+                  background: '#f1f5f9', border: 'none',
+                  color: '#64748b', cursor: 'pointer',
+                  width: '28px', height: '28px',
+                  borderRadius: '50%', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                <X size={16} />
+              </button>
+
+              {hasImage ? (
+                <div style={{
+                  width: '100%', height: '200px',
+                  borderRadius: '12px', overflow: 'hidden',
+                  border: '1px solid #e2e8f0', background: '#f8fafc',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <img
+                    src={getImageUrl(product.ImageURL)}
+                    alt={product.ProductName}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              ) : product.Category === 'Phone Cover' ? (
+                <div style={{
+                  width: '100%', height: '200px',
+                  borderRadius: '12px', overflow: 'hidden',
+                  border: '1px solid #e2e8f0', background: '#f8fafc',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <img
+                    src={defaultCoverImg}
+                    alt="Default Cover"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              ) : (
+                <div style={{
+                  width: '100%', height: '140px',
+                  borderRadius: '12px', border: '1px dashed #cbd5e1',
+                  background: '#f8fafc', display: 'flex',
+                  flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', color: '#94a3b8', gap: '6px'
+                }}>
+                  <span style={{ fontSize: '2rem' }}>📦</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Product Image Not Available</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                    {product.Category}
+                  </span>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', margin: 0, lineHeight: '1.3' }}>
+                    {product.Category === 'Phone Cover'
+                      ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName}`
+                      : (product.ProductName || `${product.Brand} Cover Case`)}
+                  </h3>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                  <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {product.Brand && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Brand:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>
+                            {product.Brand === 'Other' ? product.CustomBrand : product.Brand}
+                          </td>
+                        </tr>
+                      )}
+                      {product.ModelName && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Model Name:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.ModelName}</td>
+                        </tr>
+                      )}
+                      {product.Category === 'Phone Cover' && product.CoverType && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Case Type:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.CoverType}</td>
+                        </tr>
+                      )}
+                      {product.Type && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Type / Spec:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.Type}</td>
+                        </tr>
+                      )}
+                      {hasPrice && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600', fontSize: '0.85rem' }}>Price:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '900', color: '#0f172a', fontSize: '1rem' }}>₹{product.Price}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <button
+                onClick={handleWhatsAppEnquiry}
+                className="premium-btn premium-btn-primary"
+                style={{
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#22c55e',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.25)',
+                  marginTop: '8px'
+                }}
+              >
+                <span style={{ fontSize: '1.1rem' }}>💬</span> Buy on WhatsApp
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* App Install Notification Modal */}
+      {showInstallPrompt && (
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -4020,9 +4300,9 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', marginTop: '6px', lineHeight: '1.4' }}>Add our app to your home screen for quick and easy access!</p>
               </div>
             </div>
-            
+
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-              <button 
+              <button
                 onClick={() => {
                   setShowInstallPrompt(false);
                   sessionStorage.setItem('install_prompt_dismissed_at', Date.now().toString());
@@ -4031,7 +4311,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               >
                 Close
               </button>
-              <button 
+              <button
                 onClick={async () => {
                   setShowInstallPrompt(false);
                   sessionStorage.setItem('install_prompt_dismissed_at', Date.now().toString());
@@ -4085,7 +4365,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
                 <div style={{ textAlign: 'left' }}>
                   <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#1e293b', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Megaphone size={16} style={{ color: '#d97706', flexShrink: 0 }} /> 
+                    <Megaphone size={16} style={{ color: '#d97706', flexShrink: 0 }} />
                     {activeAnn.title || 'Announcement'}
                   </h4>
                   {announcements.length > 1 && (
@@ -4094,14 +4374,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     </span>
                   )}
                 </div>
-                <button 
+                <button
                   onClick={() => setShowAnnouncementModal(false)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 0 }}
                 >
                   <X size={18} />
                 </button>
               </div>
-              
+
               {/* Body */}
               <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
                 {activeAnn.content || activeAnn.description || 'No details provided.'}
@@ -4111,13 +4391,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               {announcements.length > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', margin: '4px 0' }}>
                   {announcements.map((_, idx) => (
-                    <span 
-                      key={idx} 
+                    <span
+                      key={idx}
                       onClick={() => setActiveAnnIndex(idx)}
-                      style={{ 
-                        width: '6px', 
-                        height: '6px', 
-                        borderRadius: '50%', 
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
                         background: idx === activeAnnIndex ? 'var(--primary)' : '#cbd5e1',
                         cursor: 'pointer',
                         transition: 'all 0.2s'
@@ -4129,11 +4409,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
               {/* Action Buttons Block */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-                
+
                 {/* Navigation (Prev/Next) */}
                 {announcements.length > 1 && (
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
+                    <button
                       onClick={() => setActiveAnnIndex(prev => Math.max(0, prev - 1))}
                       disabled={!hasPrev}
                       className="premium-btn premium-btn-secondary"
@@ -4141,7 +4421,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     >
                       Prev
                     </button>
-                    <button 
+                    <button
                       onClick={() => setActiveAnnIndex(prev => Math.min(announcements.length - 1, prev + 1))}
                       disabled={!hasNext}
                       className="premium-btn premium-btn-secondary"
@@ -4154,7 +4434,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                 {/* Close and Admin Action Buttons side-by-side */}
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button 
+                  <button
                     onClick={() => setShowAnnouncementModal(false)}
                     className="premium-btn premium-btn-secondary"
                     style={{ flex: 1, padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', background: '#f1f5f9', color: '#334155' }}
@@ -4163,7 +4443,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   </button>
 
                   {hasButton && (
-                    <button 
+                    <button
                       onClick={() => window.open(activeAnn.button_url, '_blank')}
                       className="premium-btn-primary"
                       style={{ flex: 1.5, padding: '12px', border: 'none', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
@@ -4197,7 +4477,7 @@ const parseDetailsDoc = (text) => {
     const currentHeaders = [...tableHeaders];
     const currentRows = [...tableRows];
     const currentKey = `table-${tableKey++}`;
-    
+
     // Reset table parser state
     tableHeaders = [];
     tableRows = [];
