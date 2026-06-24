@@ -1533,9 +1533,18 @@ function initSpreadsheet() {
   ]);
   
   // 9. PRODUCTS SHEET
-  ensureSheetExists("Products", [
-    "ProductID", "Category", "CoverType", "Brand", "CustomBrand", "ModelName", "ProductName", "Type", "Price", "TagNumber", "ImageURL", "CreatedDate"
+  var productsSheet = ensureSheetExists("Products", [
+    "ProductID", "Category", "CoverType", "Brand", "CustomBrand", "ModelName", "ProductName", "Type", "Price", "TagNumber", "ImageURL", "CreatedDate", "Count", "Sale"
   ]);
+  ensureColumnExists(productsSheet, "Count");
+  ensureColumnExists(productsSheet, "Sale");
+
+  // 9B. SALE DB SHEET
+  var saleDbSheet = ensureSheetExists("SaleDB", [
+    "ProductID", "Category", "CoverType", "Brand", "CustomBrand", "ModelName", "ProductName", "Type", "Price", "TagNumber", "ImageURL", "CreatedDate", "Count", "Sale"
+  ]);
+  ensureColumnExists(saleDbSheet, "Count");
+  ensureColumnExists(saleDbSheet, "Sale");
 
   // 10. TEMPERED GLASS SHEET
   ensureSheetExists("TemperedGlass", [
@@ -1807,11 +1816,26 @@ function findRowIndexByColumn(sheet, columnName, val) {
 }
 
 function getProductsAction() {
-  return getRowsFromSheet("Products");
+  var products = getRowsFromSheet("Products");
+  var saleProducts = getRowsFromSheet("SaleDB");
+  
+  products.forEach(function(p) {
+    p.Count = p.Count !== undefined ? String(p.Count) : "0";
+    p.Sale = "false";
+  });
+  
+  saleProducts.forEach(function(p) {
+    p.Count = p.Count !== undefined ? String(p.Count) : "0";
+    p.Sale = "true";
+  });
+  
+  return products.concat(saleProducts);
 }
 
 function createProductAction(productData) {
-  var sheet = getSheet("Products");
+  var isSale = String(productData.Sale) === "true" || productData.Sale === true;
+  var sheetName = isSale ? "SaleDB" : "Products";
+  var sheet = getSheet(sheetName);
   var id = "prod-" + Date.now() + Math.random().toString(36).substring(2, 6);
   var newProduct = {
     ProductID: id,
@@ -1825,6 +1849,8 @@ function createProductAction(productData) {
     Price: productData.Price || "",
     TagNumber: productData.TagNumber || "",
     ImageURL: productData.ImageURL || "",
+    Count: productData.Count !== undefined ? String(productData.Count) : "0",
+    Sale: String(isSale),
     CreatedDate: new Date().toISOString()
   };
   
@@ -1833,8 +1859,19 @@ function createProductAction(productData) {
 }
 
 function updateProductAction(id, productData) {
-  var sheet = getSheet("Products");
-  var rowIndex = findRowIndexByColumn(sheet, "ProductID", id);
+  var productsSheet = getSheet("Products");
+  var saleSheet = getSheet("SaleDB");
+  
+  var rowIndex = findRowIndexByColumn(productsSheet, "ProductID", id);
+  var currentSheetName = "Products";
+  var sheet = productsSheet;
+  
+  if (rowIndex === -1) {
+    rowIndex = findRowIndexByColumn(saleSheet, "ProductID", id);
+    currentSheetName = "SaleDB";
+    sheet = saleSheet;
+  }
+  
   if (rowIndex === -1) throw new Error("Product not found.");
   
   var existingRow = getRowObject(sheet, rowIndex);
@@ -1848,17 +1885,43 @@ function updateProductAction(id, productData) {
   if (productData.Price !== undefined) existingRow.Price = productData.Price;
   if (productData.TagNumber !== undefined) existingRow.TagNumber = productData.TagNumber;
   if (productData.ImageURL !== undefined) existingRow.ImageURL = productData.ImageURL;
+  if (productData.Count !== undefined) existingRow.Count = String(productData.Count);
   
-  updateRowObject(sheet, rowIndex, existingRow);
+  var oldSale = String(existingRow.Sale) === "true";
+  var newSale = oldSale;
+  if (productData.Sale !== undefined) {
+    newSale = String(productData.Sale) === "true" || productData.Sale === true;
+    existingRow.Sale = String(newSale);
+  }
+  
+  if (oldSale !== newSale) {
+    // Move between sheets
+    sheet.deleteRow(rowIndex);
+    var targetSheet = newSale ? saleSheet : productsSheet;
+    appendObjectToSheet(targetSheet, existingRow);
+  } else {
+    updateRowObject(sheet, rowIndex, existingRow);
+  }
+  
   return existingRow;
 }
 
 function deleteProductAction(id) {
-  var sheet = getSheet("Products");
-  var rowIndex = findRowIndexByColumn(sheet, "ProductID", id);
-  if (rowIndex === -1) throw new Error("Product not found.");
-  sheet.deleteRow(rowIndex);
-  return { ProductID: id, success: true };
+  var productsSheet = getSheet("Products");
+  var rowIndex = findRowIndexByColumn(productsSheet, "ProductID", id);
+  if (rowIndex !== -1) {
+    productsSheet.deleteRow(rowIndex);
+    return { ProductID: id, success: true };
+  }
+  
+  var saleSheet = getSheet("SaleDB");
+  rowIndex = findRowIndexByColumn(saleSheet, "ProductID", id);
+  if (rowIndex !== -1) {
+    saleSheet.deleteRow(rowIndex);
+    return { ProductID: id, success: true };
+  }
+  
+  throw new Error("Product not found.");
 }
 
 function getTemperedGlassAction() {

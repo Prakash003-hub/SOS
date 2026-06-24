@@ -21,7 +21,8 @@ import {
   verifyOtp,
   checkAadhar,
   getProducts,
-  getTemperedGlass
+  getTemperedGlass,
+  updateProduct
 } from '../services/db';
 import { 
   CheckCircle, 
@@ -3438,6 +3439,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 </div>
               ) : (() => {
                 const filtered = products.filter(item => {
+                  const isSale = item.Sale === true || String(item.Sale) === "true";
+                  const countVal = parseInt(item.Count) || 0;
+                  if (isSale && countVal <= 0) {
+                    return false;
+                  }
                   if (selectedAccessoryCategory !== 'All') {
                     if (selectedAccessoryCategory === 'Other Accessories') {
                       const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
@@ -3553,15 +3559,20 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                           )}
 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
-                            <span style={{
-                              fontSize: '0.65rem',
-                              fontWeight: '800',
-                              color: 'var(--primary)',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.02em'
-                            }}>
-                              {product.Category}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{
+                                fontSize: '0.65rem',
+                                fontWeight: '800',
+                                color: 'var(--primary)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.02em'
+                              }}>
+                                {product.Category}
+                              </span>
+                              {(product.Sale === true || String(product.Sale) === "true") && (
+                                <span style={{ fontSize: '0.6rem', color: '#ea580c', background: '#ffedd5', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold' }}>🔥 Sale</span>
+                              )}
+                            </div>
                             
                             <h4 style={{
                               fontSize: '0.8rem',
@@ -3590,14 +3601,27 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               </span>
                             )}
 
-                            {hasPrice && (
-                              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <strong style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: '800' }}>
-                                  ₹{product.Price}
-                                </strong>
-                                <span style={{ fontSize: '0.6rem', color: '#22c55e', background: '#f0fdf4', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>In Stock</span>
-                              </div>
-                            )}
+                            {hasPrice && (() => {
+                              const countVal = parseInt(product.Count) || 0;
+                              const isOutOfStock = countVal <= 0;
+                              return (
+                                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <strong style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: '800' }}>
+                                    ₹{product.Price}
+                                  </strong>
+                                  <span style={{ 
+                                    fontSize: '0.6rem', 
+                                    color: isOutOfStock ? '#ef4444' : '#22c55e', 
+                                    background: isOutOfStock ? '#fef2f2' : '#f0fdf4', 
+                                    padding: '1px 6px', 
+                                    borderRadius: '4px', 
+                                    fontWeight: 'bold' 
+                                  }}>
+                                    {isOutOfStock ? 'Out of Stock' : `Stock (${countVal})`}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
@@ -3743,7 +3767,27 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
           const hasPrice = product.Price && product.Price.trim() !== '';
           
-          const handleWhatsAppEnquiry = () => {
+          const handleWhatsAppEnquiry = async () => {
+            const isSale = product.Sale === true || String(product.Sale) === "true";
+            const currentCount = parseInt(product.Count) || 0;
+            
+            if (isSale) {
+              if (currentCount > 0) {
+                const newCount = currentCount - 1;
+                try {
+                  await updateProduct(product.ProductID, { Count: String(newCount) });
+                  setProducts(prev => prev.map(p => p.ProductID === product.ProductID ? { ...p, Count: String(newCount) } : p));
+                  setSelectedProductDetails(prev => prev ? { ...prev, Count: String(newCount) } : null);
+                  alert("Order initiated! Stock count updated.");
+                } catch (err) {
+                  console.error("Failed to update product stock:", err);
+                }
+              } else {
+                alert("Product is out of stock!");
+                return;
+              }
+            }
+
             const adminWhatsApp = systemSettings.admin_whatsapp_number || '9385497906';
             const cleanedAdminWhatsApp = cleanPhone(adminWhatsApp);
             
@@ -3871,6 +3915,16 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             <td style={{ textAlign: 'right', fontWeight: '900', color: '#0f172a', fontSize: '1rem' }}>₹{product.Price}</td>
                           </tr>
                         )}
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Stock Status:</td>
+                          <td style={{ 
+                            textAlign: 'right', 
+                            fontWeight: '700', 
+                            color: (parseInt(product.Count) || 0) <= 0 ? '#ef4444' : '#166534' 
+                          }}>
+                            {(parseInt(product.Count) || 0) <= 0 ? 'Out of Stock' : `${product.Count} items left`}
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -3878,25 +3932,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                 <button 
                   onClick={handleWhatsAppEnquiry}
+                  disabled={(parseInt(product.Count) || 0) <= 0}
                   className="premium-btn premium-btn-primary"
                   style={{
                     padding: '12px',
                     borderRadius: '10px',
                     border: 'none',
-                    background: '#22c55e',
+                    background: (parseInt(product.Count) || 0) <= 0 ? '#cbd5e1' : '#22c55e',
                     color: 'white',
                     fontWeight: 'bold',
                     fontSize: '0.85rem',
-                    cursor: 'pointer',
+                    cursor: (parseInt(product.Count) || 0) <= 0 ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.25)',
+                    boxShadow: (parseInt(product.Count) || 0) <= 0 ? 'none' : '0 4px 12px rgba(34, 197, 94, 0.25)',
                     marginTop: '8px'
                   }}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>💬</span> Buy on WhatsApp
+                  <span style={{ fontSize: '1.1rem' }}>💬</span> {(parseInt(product.Count) || 0) <= 0 ? 'Out of Stock' : 'Buy on WhatsApp'}
                 </button>
               </div>
             </div>

@@ -665,6 +665,8 @@ const callMockFallback = (action, payload) => {
         Price: "299",
         TagNumber: "TAG-S24U-01",
         ImageURL: "",
+        Count: "10",
+        Sale: false,
         CreatedDate: new Date().toISOString()
       },
       {
@@ -679,6 +681,8 @@ const callMockFallback = (action, payload) => {
         Price: "499",
         TagNumber: "TAG-IP15P-02",
         ImageURL: "",
+        Count: "10",
+        Sale: false,
         CreatedDate: new Date().toISOString()
       },
       {
@@ -693,6 +697,8 @@ const callMockFallback = (action, payload) => {
         Price: "999",
         TagNumber: "TAG-HP-03",
         ImageURL: "",
+        Count: "10",
+        Sale: false,
         CreatedDate: new Date().toISOString()
       },
       {
@@ -707,6 +713,8 @@ const callMockFallback = (action, payload) => {
         Price: "1499",
         TagNumber: "TAG-SPK-04",
         ImageURL: "",
+        Count: "10",
+        Sale: false,
         CreatedDate: new Date().toISOString()
       },
       {
@@ -721,10 +729,15 @@ const callMockFallback = (action, payload) => {
         Price: "350",
         TagNumber: "TAG-CHG-05",
         ImageURL: "",
+        Count: "10",
+        Sale: false,
         CreatedDate: new Date().toISOString()
       }
     ];
     localStorage.setItem('mock_products', JSON.stringify(defaultProducts));
+  }
+  if (!localStorage.getItem('mock_sale_db')) {
+    localStorage.setItem('mock_sale_db', JSON.stringify([]));
   }
   if (!localStorage.getItem('mock_tempered_glass')) {
     const defaultTG = [
@@ -1097,37 +1110,100 @@ const callMockFallback = (action, payload) => {
       if (payload.payload.code === "123456") return { success: true };
       throw new Error("Invalid Admin Code");
       
-    case "getProducts":
-      return getMockList('mock_products');
+    case "getProducts": {
+      const products = getMockList('mock_products') || [];
+      const saleProducts = getMockList('mock_sale_db') || [];
+      
+      products.forEach(p => {
+        p.Count = p.Count !== undefined ? String(p.Count) : "0";
+        p.Sale = false;
+      });
+      saleProducts.forEach(p => {
+        p.Count = p.Count !== undefined ? String(p.Count) : "0";
+        p.Sale = true;
+      });
+      
+      return [...products, ...saleProducts];
+    }
       
     case "createProduct": {
-      const list = getMockList('mock_products');
+      const isSale = !!payload.payload.Sale;
+      const listKey = isSale ? 'mock_sale_db' : 'mock_products';
+      const list = getMockList(listKey) || [];
       const newProd = {
         ProductID: "prod-" + Date.now(),
         CreatedDate: new Date().toISOString(),
-        ...payload.payload
+        ...payload.payload,
+        Count: payload.payload.Count !== undefined ? String(payload.payload.Count) : "0",
+        Sale: isSale
       };
       list.push(newProd);
-      saveMockList('mock_products', list);
+      saveMockList(listKey, list);
       return newProd;
     }
     
     case "updateProduct": {
-      const list = getMockList('mock_products');
-      const idx = list.findIndex(p => p.ProductID === payload.id);
+      const products = getMockList('mock_products') || [];
+      const saleProducts = getMockList('mock_sale_db') || [];
+      
+      let currentListKey = 'mock_products';
+      let list = products;
+      let idx = products.findIndex(p => p.ProductID === payload.id);
+      
+      if (idx === -1) {
+        idx = saleProducts.findIndex(p => p.ProductID === payload.id);
+        currentListKey = 'mock_sale_db';
+        list = saleProducts;
+      }
+      
       if (idx !== -1) {
-        list[idx] = { ...list[idx], ...payload.payload };
-        saveMockList('mock_products', list);
-        return list[idx];
+        const existingProduct = list[idx];
+        const updatedProduct = {
+          ...existingProduct,
+          ...payload.payload,
+          Count: payload.payload.Count !== undefined ? String(payload.payload.Count) : (existingProduct.Count !== undefined ? String(existingProduct.Count) : "0")
+        };
+        
+        const oldSale = !!existingProduct.Sale;
+        const newSale = payload.payload.Sale !== undefined ? !!payload.payload.Sale : oldSale;
+        updatedProduct.Sale = newSale;
+        
+        if (oldSale !== newSale) {
+          // Move from one list to another
+          list.splice(idx, 1);
+          saveMockList(currentListKey, list);
+          
+          const targetListKey = newSale ? 'mock_sale_db' : 'mock_products';
+          const targetList = getMockList(targetListKey) || [];
+          targetList.push(updatedProduct);
+          saveMockList(targetListKey, targetList);
+        } else {
+          list[idx] = updatedProduct;
+          saveMockList(currentListKey, list);
+        }
+        
+        return updatedProduct;
       }
       throw new Error("Product not found");
     }
     
     case "deleteProduct": {
-      let list = getMockList('mock_products');
-      list = list.filter(p => p.ProductID !== payload.id);
-      saveMockList('mock_products', list);
-      return { success: true };
+      let products = getMockList('mock_products') || [];
+      let saleProducts = getMockList('mock_sale_db') || [];
+      
+      if (products.some(p => p.ProductID === payload.id)) {
+        products = products.filter(p => p.ProductID !== payload.id);
+        saveMockList('mock_products', products);
+        return { success: true };
+      }
+      
+      if (saleProducts.some(p => p.ProductID === payload.id)) {
+        saleProducts = saleProducts.filter(p => p.ProductID !== payload.id);
+        saveMockList('mock_sale_db', saleProducts);
+        return { success: true };
+      }
+      
+      throw new Error("Product not found");
     }
     
     case "getTemperedGlass":

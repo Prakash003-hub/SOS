@@ -363,7 +363,9 @@ export default function AdminPortal() {
     Type: '',
     Price: '',
     TagNumber: '',
-    ImageURL: ''
+    ImageURL: '',
+    Count: '0',
+    Sale: false
   });
   
   // Tempered Glass state & forms
@@ -684,7 +686,9 @@ export default function AdminPortal() {
         Type: '',
         Price: '',
         TagNumber: '',
-        ImageURL: ''
+        ImageURL: '',
+        Count: '0',
+        Sale: false
       });
       setEditingProductId(null);
       handleRefreshProducts();
@@ -706,7 +710,9 @@ export default function AdminPortal() {
       Type: product.Type || '',
       Price: product.Price || '',
       TagNumber: product.TagNumber || '',
-      ImageURL: product.ImageURL || ''
+      ImageURL: product.ImageURL || '',
+      Count: product.Count !== undefined ? String(product.Count) : '0',
+      Sale: product.Sale !== undefined ? (product.Sale === true || String(product.Sale) === 'true') : false
     });
     document.getElementById('product-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -728,7 +734,9 @@ export default function AdminPortal() {
           Type: '',
           Price: '',
           TagNumber: '',
-          ImageURL: ''
+          ImageURL: '',
+          Count: '0',
+          Sale: false
         });
       }
       handleRefreshProducts();
@@ -3186,6 +3194,32 @@ export default function AdminPortal() {
                     </div>
 
                     <div className="premium-input-group">
+                      <label className="premium-label">Stock Count (Quantity) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={productForm.Count || '0'}
+                        onChange={(e) => setProductForm({ ...productForm, Count: e.target.value })}
+                        placeholder="e.g. 10"
+                        className="premium-input"
+                        required
+                      />
+                    </div>
+
+                    <div className="premium-input-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                      <input
+                        type="checkbox"
+                        id="sale-option-checkbox"
+                        checked={!!productForm.Sale}
+                        onChange={(e) => setProductForm({ ...productForm, Sale: e.target.checked })}
+                        style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="sale-option-checkbox" className="premium-label" style={{ margin: 0, cursor: 'pointer', fontWeight: 'bold' }}>
+                        🏷️ Put on Sale (Move to Sale DB)
+                      </label>
+                    </div>
+
+                    <div className="premium-input-group">
                       <label className="premium-label">Product Image (Optional)</label>
                       
                       {productForm.ImageURL && (
@@ -3240,7 +3274,9 @@ export default function AdminPortal() {
                               Type: '',
                               Price: '',
                               TagNumber: '',
-                              ImageURL: ''
+                              ImageURL: '',
+                              Count: '0',
+                              Sale: false
                             });
                           }} 
                           className="premium-btn premium-btn-secondary"
@@ -3325,13 +3361,19 @@ export default function AdminPortal() {
                               )}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <span style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase' }}>{item.Category}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase' }}>{item.Category}</span>
+                                {(item.Sale === true || String(item.Sale) === "true") && (
+                                  <span style={{ fontSize: '0.65rem', color: '#ea580c', background: '#ffedd5', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold' }}>🔥 Sale DB</span>
+                                )}
+                              </div>
                               <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e293b' }}>
                                 {item.ProductName || `${item.Brand} Case`}
                               </h4>
-                              <div style={{ display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#64748b' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.7rem', color: '#64748b' }}>
                                 {item.Price && <span>Price: ₹{item.Price}</span>}
                                 {item.TagNumber && <span style={{ color: '#0284c7', background: '#e0f2fe', padding: '0 4px', borderRadius: '3px', fontWeight: 'bold' }}>Tag: {item.TagNumber}</span>}
+                                <span>Stock: <strong style={{ color: (parseInt(item.Count) || 0) === 0 ? '#ef4444' : '#0f172a' }}>{item.Count !== undefined ? item.Count : '0'}</strong></span>
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: '4px' }}>
