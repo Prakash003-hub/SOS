@@ -195,237 +195,110 @@ const MarqueeRow = ({
   rowItems,
   speedRowIndex,
   setSelectedProductDetails,
-  handleWhatsAppShare
+  handleWhatsAppShare,
+  subIndex
 }) => {
-  const containerRef = useRef(null);
-  const isInteractingRef = useRef(false);
-  const animationFrameRef = useRef(null);
-  const interactionTimeoutRef = useRef(null);
-  const hasInitializedRef = useRef(false);
-  const ignoreScrollRef = useRef(false);
+  const [maxVisible, setMaxVisible] = useState(4);
+  const [visibleItems, setVisibleItems] = useState([]);
+  const [fadingIndex, setFadingIndex] = useState(null);
 
-  // Dragging state
-  const isDownRef = useRef(false);
-  const startXRef = useRef(0);
-  const scrollLeftRef = useRef(0);
-  const draggedRef = useRef(false);
+  // Dynamically calculate maxVisible based on container/viewport width
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width < 450) {
+        setMaxVisible(2);
+      } else if (width < 650) {
+        setMaxVisible(3);
+      } else {
+        setMaxVisible(4);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Initialize visible items
+  useEffect(() => {
+    setVisibleItems(rowItems.slice(0, maxVisible));
+  }, [rowItems, maxVisible]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    if (rowItems.length <= maxVisible) return;
 
-    let lastTime = performance.now();
+    // Stagger the initial delay based on subIndex
+    const initialDelay = 800 + subIndex * 1200;
+    
+    let intervalId;
+    const timeoutId = setTimeout(() => {
+      // Start the periodic swapping interval
+      intervalId = setInterval(() => {
+        // Pick a random index to fade out
+        const randomIndex = Math.floor(Math.random() * Math.min(rowItems.length, maxVisible));
+        
+        // Step 1: Start fade out
+        setFadingIndex(randomIndex);
 
-    const step = (time) => {
-      if (!container) return;
-
-      const deltaTime = time - lastTime;
-      lastTime = time;
-
-      const singleSetWidth = container.scrollWidth / 3;
-
-      // Initialize scrollLeft to the middle copy (copy 1) if not done yet
-      if (!hasInitializedRef.current && singleSetWidth > 0) {
-        const prevScroll = container.scrollLeft;
-        container.scrollLeft = singleSetWidth;
-        if (container.scrollLeft !== prevScroll) {
-          ignoreScrollRef.current = true;
-        }
-        hasInitializedRef.current = true;
-      }
-
-      if (!isInteractingRef.current) {
-        // Map speedRowIndex (1-5) to scrolling speeds (pixels per second)
-        const speedMap = {
-          1: 25,
-          2: 18,
-          3: 32,
-          4: 22,
-          5: 15
-        };
-        const pxPerSec = speedMap[speedRowIndex] || 20;
-        const deltaScroll = (pxPerSec * deltaTime) / 1000;
-
-        const prevScroll = container.scrollLeft;
-        container.scrollLeft += deltaScroll;
-        if (container.scrollLeft !== prevScroll) {
-          ignoreScrollRef.current = true;
-        }
-
-        // Wrap around seamlessly
-        if (singleSetWidth > 0) {
-          if (container.scrollLeft >= singleSetWidth * 2) {
-            const beforeWrap = container.scrollLeft;
-            container.scrollLeft -= singleSetWidth;
-            if (container.scrollLeft !== beforeWrap) {
-              ignoreScrollRef.current = true;
+        // Step 2: Swap content after fade-out transition (500ms)
+        setTimeout(() => {
+          setVisibleItems((prevVisible) => {
+            const currentIds = prevVisible.map(item => item.ProductID);
+            // Reserve pool is items in rowItems that are not currently visible
+            const reservePool = rowItems.filter(item => !currentIds.includes(item.ProductID));
+            
+            if (reservePool.length === 0) {
+              const fallbackItem = rowItems[Math.floor(Math.random() * rowItems.length)];
+              const next = [...prevVisible];
+              next[randomIndex] = fallbackItem;
+              return next;
             }
-          } else if (container.scrollLeft <= 0) {
-            const beforeWrap = container.scrollLeft;
-            container.scrollLeft += singleSetWidth;
-            if (container.scrollLeft !== beforeWrap) {
-              ignoreScrollRef.current = true;
-            }
-          }
-        }
-      }
 
-      animationFrameRef.current = requestAnimationFrame(step);
-    };
+            const newItem = reservePool[Math.floor(Math.random() * reservePool.length)];
+            const next = [...prevVisible];
+            next[randomIndex] = newItem;
+            return next;
+          });
 
-    animationFrameRef.current = requestAnimationFrame(step);
+          // Step 3: Fade back in
+          setFadingIndex(null);
+        }, 500);
+
+      }, 4000 + Math.random() * 2000); // Randomize interval duration slightly (4s to 6s)
+    }, initialDelay);
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      if (interactionTimeoutRef.current) {
-        clearTimeout(interactionTimeoutRef.current);
-      }
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [speedRowIndex, rowItems]);
-
-  const startInteraction = () => {
-    isInteractingRef.current = true;
-    if (interactionTimeoutRef.current) {
-      clearTimeout(interactionTimeoutRef.current);
-    }
-  };
-
-  const endInteraction = () => {
-    if (interactionTimeoutRef.current) {
-      clearTimeout(interactionTimeoutRef.current);
-    }
-    interactionTimeoutRef.current = setTimeout(() => {
-      isInteractingRef.current = false;
-    }, 1000);
-  };
-
-  // Scroll event listener detects all manual scrolls (touch momentum, wheels, drags)
-  const handleScroll = () => {
-    if (ignoreScrollRef.current) {
-      ignoreScrollRef.current = false;
-      return;
-    }
-
-    isInteractingRef.current = true;
-
-    if (interactionTimeoutRef.current) {
-      clearTimeout(interactionTimeoutRef.current);
-    }
-
-    // Resume auto-scroll after 1000ms of inactivity
-    interactionTimeoutRef.current = setTimeout(() => {
-      isInteractingRef.current = false;
-    }, 1000);
-  };
-
-  const handleMouseDown = (e) => {
-    isDownRef.current = true;
-    draggedRef.current = false;
-    startInteraction();
-    startXRef.current = e.pageX - containerRef.current.offsetLeft;
-    scrollLeftRef.current = containerRef.current.scrollLeft;
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDownRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - containerRef.current.offsetLeft;
-    const walk = (x - startXRef.current) * 1.2;
-    if (Math.abs(walk) > 5) {
-      draggedRef.current = true;
-    }
-    containerRef.current.scrollLeft = scrollLeftRef.current - walk;
-
-    // Wrap around while dragging
-    const container = containerRef.current;
-    const singleSetWidth = container.scrollWidth / 3;
-    if (singleSetWidth > 0) {
-      if (container.scrollLeft >= singleSetWidth * 2) {
-        const beforeWrap = container.scrollLeft;
-        container.scrollLeft -= singleSetWidth;
-        if (container.scrollLeft !== beforeWrap) {
-          ignoreScrollRef.current = true;
-        }
-        startXRef.current = x;
-        scrollLeftRef.current = container.scrollLeft;
-      } else if (container.scrollLeft <= 0) {
-        const beforeWrap = container.scrollLeft;
-        container.scrollLeft += singleSetWidth;
-        if (container.scrollLeft !== beforeWrap) {
-          ignoreScrollRef.current = true;
-        }
-        startXRef.current = x;
-        scrollLeftRef.current = container.scrollLeft;
-      }
-    }
-  };
-
-  const handleMouseUpLeave = () => {
-    isDownRef.current = false;
-    endInteraction();
-  };
-
-  const handleTouchStart = () => {
-    startInteraction();
-  };
-
-  const handleTouchEnd = () => {
-    endInteraction();
-  };
-
-  const handleWheel = () => {
-    startInteraction();
-    endInteraction();
-  };
-
-  // Repeat list if too short for a seamless marquee loop
-  let repeatedItems = [...rowItems];
-  while (repeatedItems.length < 8) {
-    repeatedItems = [...repeatedItems, ...rowItems];
-  }
-
-  // Triple items for seamless scroll wrap-around
-  const tripleItems = [...repeatedItems, ...repeatedItems, ...repeatedItems];
+  }, [rowItems, subIndex, maxVisible]);
 
   return (
     <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUpLeave}
-      onMouseLeave={handleMouseUpLeave}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onWheel={handleWheel}
-      className="showcase-marquee-row hide-scrollbar"
+      className="showcase-marquee-row"
       style={{
-        overflowX: 'auto',
+        overflow: 'hidden',
         display: 'flex',
         gap: '12px',
-        cursor: isDownRef.current ? 'grabbing' : 'grab',
-        userSelect: 'none',
-        WebkitOverflowScrolling: 'touch',
-        padding: '6px 0',
         width: '100%',
-        position: 'relative'
+        padding: '6px 0',
+        justifyContent: 'center',
+        flexWrap: 'nowrap',
+        maskImage: 'none',
+        WebkitMaskImage: 'none'
       }}
     >
-      {tripleItems.map((product, idx) => {
+      {visibleItems.map((product, idx) => {
+        const isFading = fadingIndex === idx;
         const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
         const hasPrice = product.Price && product.Price.trim() !== '';
 
         return (
           <div
             key={`${product.ProductID}-${idx}`}
-            onClick={(e) => {
-              if (draggedRef.current) {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-              }
+            onClick={() => {
+              if (isFading) return;
               setSelectedProductDetails(product);
             }}
             className="showcase-product-card"
@@ -436,7 +309,10 @@ const MarqueeRow = ({
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              opacity: isFading ? 0 : 1,
+              transform: isFading ? 'scale(0.95)' : 'scale(1)',
+              transition: 'opacity 0.5s ease, transform 0.5s ease'
             }}
           >
             {/* Image Wrapper */}
@@ -526,7 +402,7 @@ const MarqueeRow = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (draggedRef.current) return;
+                    if (isFading) return;
                     setSelectedProductDetails(product);
                   }}
                   className="premium-btn premium-btn-primary"
@@ -550,7 +426,7 @@ const MarqueeRow = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (draggedRef.current) return;
+                    if (isFading) return;
                     const title = product.Category === 'Phone Cover'
                       ? `${product.Brand === 'Other' ? product.CustomBrand : product.Brand} ${product.ModelName} Cover`
                       : (product.ProductName || `${product.Brand} Case`);
@@ -559,7 +435,8 @@ const MarqueeRow = ({
                   }}
                   className="premium-btn premium-btn-secondary"
                   style={{
-                    padding: '4px 8px',
+                    flex: 1,
+                    padding: '4px 0',
                     fontSize: '0.65rem',
                     fontWeight: 'bold',
                     margin: 0,
@@ -3949,6 +3826,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 speedRowIndex={speedRowIndex}
                                 setSelectedProductDetails={setSelectedProductDetails}
                                 handleWhatsAppShare={handleWhatsAppShare}
+                                subIndex={subIndex}
                               />
                             );
                           })}
