@@ -314,7 +314,7 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
               }}
             >
-              <User size={14} /> Login
+              <User size={14} />
             </button>
           )}
         </div>

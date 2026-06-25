@@ -87,6 +87,17 @@ const safeJsonParse = (str, fallback = []) => {
   }
 };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 const normalizeRequiredDocs = (docs) => {
   if (!Array.isArray(docs)) return [];
   return docs.map(d => {
@@ -365,7 +376,7 @@ export default function AdminPortal() {
     Price: '',
     TagNumber: '',
     ImageURL: '',
-    Count: '0'
+    Count: '1'
   });
   
   // Tempered Glass state & forms
@@ -431,7 +442,7 @@ export default function AdminPortal() {
   
   // Job Editor states
   const [editingJobId, setEditingJobId] = useState(null);
-  const [jobForm, setJobForm] = useState({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false });
+  const [jobForm, setJobForm] = useState({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false, start_date: '', end_date: '' });
   const [uploadingJobImg, setUploadingJobImg] = useState(false);
   
   // Form Builder states
@@ -687,7 +698,7 @@ export default function AdminPortal() {
         Price: '',
         TagNumber: '',
         ImageURL: '',
-        Count: '0'
+        Count: '1'
       });
       setEditingProductId(null);
       handleRefreshProducts();
@@ -752,7 +763,7 @@ export default function AdminPortal() {
           Price: '',
           TagNumber: '',
           ImageURL: '',
-          Count: '0'
+          Count: '1'
         });
       }
       handleRefreshProducts();
@@ -925,7 +936,7 @@ export default function AdminPortal() {
         await createJob(jobForm);
         alert('New job alert published successfully!');
       }
-      setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false });
+      setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false, start_date: '', end_date: '' });
       setEditingJobId(null);
       const jobsData = await getJobs();
       setJobs(jobsData);
@@ -944,7 +955,9 @@ export default function AdminPortal() {
       apply_url: job.apply_url || '',
       details_doc: job.details_doc || '',
       button_name: job.button_name || '',
-      coming_soon: job.coming_soon === true || String(job.coming_soon).toLowerCase() === 'true'
+      coming_soon: job.coming_soon === true || String(job.coming_soon).toLowerCase() === 'true',
+      start_date: job.start_date || '',
+      end_date: job.end_date || ''
     });
     document.getElementById('job-editor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -1387,62 +1400,6 @@ export default function AdminPortal() {
         {/* Tab Navigation */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', margin: '16px 0' }}>
           <button
-            onClick={() => setActiveTab('posts')}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: activeTab === 'posts' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-              background: activeTab === 'posts' ? 'rgba(16,185,129,0.06)' : 'white',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'posts' ? 800 : 600
-            }}
-          >
-            Posts
-          </button>
-
-          <button
-            onClick={() => setActiveTab('forms')}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: activeTab === 'forms' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-              background: activeTab === 'forms' ? 'rgba(16,185,129,0.06)' : 'white',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'forms' ? 800 : 600
-            }}
-          >
-            Form Templates
-          </button>
-
-          <button
-            onClick={() => setActiveTab('users')}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: activeTab === 'users' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-              background: activeTab === 'users' ? 'rgba(16,185,129,0.06)' : 'white',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'users' ? 800 : 600
-            }}
-          >
-            Users ({users.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('jobs')}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: activeTab === 'jobs' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-              background: activeTab === 'jobs' ? 'rgba(16,185,129,0.06)' : 'white',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'jobs' ? 800 : 600
-            }}
-          >
-            Job Alerts
-          </button>
-
-          <button
             onClick={() => setActiveTab('settings')}
             style={{
               padding: '8px 12px',
@@ -1454,20 +1411,6 @@ export default function AdminPortal() {
             }}
           >
             Settings
-          </button>
-
-          <button
-            onClick={() => setActiveTab('products')}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: activeTab === 'products' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-              background: activeTab === 'products' ? 'rgba(16,185,129,0.06)' : 'white',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'products' ? 800 : 600
-            }}
-          >
-            Products
           </button>
         </div>
         {/* --- TAB 1: MANAGE POSTS --- */}
@@ -1655,6 +1598,27 @@ export default function AdminPortal() {
                   />
                 </div>
 
+                <div className="admin-fields-grid" style={{ marginBottom: '16px' }}>
+                  <div className="premium-input-group" style={{ margin: 0 }}>
+                    <label className="premium-label">Start Date (Optional)</label>
+                    <input 
+                      type="date" 
+                      value={jobForm.start_date} 
+                      onChange={(e) => setJobForm({ ...jobForm, start_date: e.target.value })} 
+                      className="premium-input" 
+                    />
+                  </div>
+                  <div className="premium-input-group" style={{ margin: 0 }}>
+                    <label className="premium-label">End Date (Optional)</label>
+                    <input 
+                      type="date" 
+                      value={jobForm.end_date} 
+                      onChange={(e) => setJobForm({ ...jobForm, end_date: e.target.value })} 
+                      className="premium-input" 
+                    />
+                  </div>
+                </div>
+
                  <div className="premium-input-group">
                   <label className="premium-label">Job Banner Image (Optional)</label>
                   
@@ -1755,7 +1719,7 @@ export default function AdminPortal() {
                   {editingJobId && (
                     <button 
                       type="button" 
-                      onClick={() => { setEditingJobId(null); setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false }) }} 
+                      onClick={() => { setEditingJobId(null); setJobForm({ title: '', description: '', img_url: '', apply_url: '', details_doc: '', button_name: '', coming_soon: false, start_date: '', end_date: '' }) }} 
                       className="premium-btn premium-btn-secondary"
                       style={{ flex: 1 }}
                     >
@@ -1780,9 +1744,16 @@ export default function AdminPortal() {
                         <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px' }}>Coming Soon</span>
                       )}
                     </h4>
-                    <p className="text-muted" style={{ fontSize: '0.8rem', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    <p className="text-muted" style={{ fontSize: '0.8rem', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: '4px' }}>
                       {job.description}
                     </p>
+                    {(job.start_date || job.end_date) && (
+                      <div style={{ display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#64748b', marginTop: '4px', alignItems: 'center' }}>
+                        {job.start_date && <span>Start: {formatDate(job.start_date)}</span>}
+                        {job.start_date && job.end_date && <span>|</span>}
+                        {job.end_date && <span style={{ color: '#ef4444', fontWeight: '600' }}>End: {formatDate(job.end_date)}</span>}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button onClick={() => moveItem('job', jobs, idx, 'up')} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Move Up">↑</button>
@@ -2626,84 +2597,118 @@ export default function AdminPortal() {
 
                 {/* OG Image Upload */}
                 <div className="premium-input-group" style={{ margin: 0, borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
-                  <label className="premium-label">Open Graph (OG) Image Upload (Local Dev Only)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '152px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#f1f5f9' }}>
-                      <img 
-                        src={`/income_og_preview.jpg?t=${Date.now()}`} 
-                        alt="Current OG Image" 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        onError={(e) => { e.target.src = '/whatsbro_logo.png' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-light-muted)' }}>Target Aspect Ratio:</span>
-                        <select 
-                          id="og-aspect-ratio-select" 
-                          className="premium-input" 
-                          style={{ padding: '6px 10px', fontSize: '0.8rem', height: '34px', width: 'fit-content' }}
-                        >
-                          <option value="landscape">1.91:1 Landscape (1200x630)</option>
-                          <option value="square">1:1 Square (1024x1024)</option>
-                        </select>
-                      </div>
-                      <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px dashed var(--primary)', width: 'fit-content', margin: 0 }}>
-                        <Upload size={16} style={{ color: 'var(--primary)' }} />
-                        <span>Upload & Process OG Image</span>
-                        <input 
-                          type="file" 
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                                alert("This feature is only available during local development (localhost) because it writes directly to your local 'public/' directory.");
-                                return;
-                              }
-                              
-                              const aspect = document.getElementById('og-aspect-ratio-select').value;
-                              
-                              try {
-                                const reader = new FileReader();
-                                reader.readAsDataURL(file);
-                                reader.onload = async () => {
-                                  try {
-                                    const base64Str = reader.result;
-                                    const response = await fetch('/api/upload-og-image', {
-                                      method: 'POST',
-                                      headers: {
-                                        'Content-Type': 'application/json'
-                                      },
-                                      body: JSON.stringify({ image: base64Str, aspect: aspect })
-                                    });
-                                    const resData = await response.json();
-                                    if (resData.success) {
-                                      alert(aspect === 'landscape' 
-                                        ? "OG Image successfully cropped to 1200x630, compressed, and saved to public/income_og_preview.jpg! Please push your code to GitHub to deploy."
-                                        : "OG Image successfully resized to 1024x1024, compressed, and saved to public/income_og_preview.jpg! Please push your code to GitHub to deploy."
-                                      );
-                                      window.location.reload();
-                                    } else {
-                                      alert("Failed to process image: " + resData.error);
-                                    }
-                                  } catch (err) {
-                                    alert("Error uploading image: " + err.message);
-                                  }
-                                };
-                              } catch (err) {
-                                alert("Failed to read file: " + err.message);
-                              }
-                            }
-                          }}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
-                    Upload any image (square, landscape, or letterboxed). The local development server will automatically crop the boundaries, resize it to exactly **1200 × 630**, compress it, and overwrite `public/income_og_preview.jpg`! Then, simply push the file to GitHub.
+                  <label className="premium-label" style={{ marginBottom: '4px' }}>Open Graph (OG) Image Upload (Local Dev Only)</label>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-light-muted)', display: 'block', marginBottom: '16px' }}>
+                    Upload any image (square, landscape, or letterboxed). The local development server will automatically crop, resize, compress, and save it to the corresponding asset file in your public directory.
                   </span>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-light-muted)' }}>Target Aspect Ratio for all uploads:</span>
+                    <select 
+                      id="og-aspect-ratio-select" 
+                      className="premium-input" 
+                      style={{ padding: '6px 10px', fontSize: '0.8rem', height: '34px', width: 'fit-content' }}
+                    >
+                      <option value="landscape">1.91:1 Landscape (1200x630)</option>
+                      <option value="square">1:1 Square (1024x1024)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {[
+                      { key: 'default', label: 'Default Site Fallback', file: 'income_og_preview.jpg', route: '/' },
+                      { key: 'post', label: 'Service Posts', file: 'post_og_preview.jpg', route: '/post/[slug]' },
+                      { key: 'form', label: 'Application Forms', file: 'form_og_preview.jpg', route: '/form/[slug]' },
+                      { key: 'job', label: 'Job Alerts', file: 'job_og_preview.jpg', route: '/job/[slug]' },
+                      { key: 'product', label: 'Products Catalog', file: 'product_og_preview.jpg', route: '/product/[slug]' }
+                    ].map((ogItem) => (
+                      <div key={ogItem.key} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        padding: '12px',
+                        background: '#f8fafc',
+                        border: '1.5px solid var(--border-light)',
+                        borderRadius: '12px',
+                        flexWrap: 'wrap'
+                      }}>
+                        {/* Thumbnail preview */}
+                        <div style={{ width: '130px', height: '68px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#e2e8f0', flexShrink: 0 }}>
+                          <img 
+                            src={`/${ogItem.file}?t=${Date.now()}`} 
+                            alt={ogItem.label} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            onError={(e) => { e.target.src = '/whatsbro_logo.png' }}
+                          />
+                        </div>
+
+                        {/* Title and details */}
+                        <div style={{ flex: 1, minWidth: '150px' }}>
+                          <h4 style={{ fontSize: '0.85rem', fontWeight: '800', color: '#1e293b', margin: '0 0 2px 0' }}>
+                            {ogItem.label}
+                          </h4>
+                          <span style={{ fontSize: '0.65rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', fontWeight: '700', marginRight: '6px' }}>
+                            {ogItem.route}
+                          </span>
+                          <span style={{ fontSize: '0.65rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            public/{ogItem.file}
+                          </span>
+                        </div>
+
+                        {/* Upload Button */}
+                        <div style={{ flexShrink: 0 }}>
+                          <label className="premium-btn premium-btn-secondary" style={{ padding: '8px 12px', fontSize: '0.75rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1px solid var(--border-light)', margin: 0, width: 'fit-content' }}>
+                            <Upload size={14} style={{ color: 'var(--primary)' }} />
+                            <span>Upload Image</span>
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  const aspect = document.getElementById('og-aspect-ratio-select').value;
+                                  
+                                  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                                    alert("This feature is only available during local development (localhost) because it writes directly to your local 'public/' directory.");
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const reader = new FileReader();
+                                    reader.readAsDataURL(file);
+                                    reader.onload = async () => {
+                                      try {
+                                        const base64Str = reader.result;
+                                        const response = await fetch('/api/upload-og-image', {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json'
+                                          },
+                                          body: JSON.stringify({ image: base64Str, aspect: aspect, routeType: ogItem.key })
+                                        });
+                                        const resData = await response.json();
+                                        if (resData.success) {
+                                          alert(`OG Image for ${ogItem.label} successfully updated and saved locally! Please push your code to GitHub to deploy.`);
+                                          window.location.reload();
+                                        } else {
+                                          alert("Failed to process image: " + resData.error);
+                                        }
+                                      } catch (err) {
+                                        alert("Error uploading image: " + err.message);
+                                      }
+                                    };
+                                  } catch (err) {
+                                    alert("Failed to read file: " + err.message);
+                                  }
+                                }
+                              }}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 
                 {/* Public Announcement / Alert Notification Manager */}
@@ -3278,7 +3283,7 @@ export default function AdminPortal() {
                               Price: '',
                               TagNumber: '',
                               ImageURL: '',
-                              Count: '0'
+                              Count: '1'
                             });
                           }} 
                           className="premium-btn premium-btn-secondary"
@@ -3304,7 +3309,7 @@ export default function AdminPortal() {
                         onChange={(e) => setAccessorySearch(e.target.value)}
                         placeholder="Search by name, brand, model, tag..."
                         className="premium-input"
-                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0 }}
+                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, flex: 1, minWidth: 0 }}
                       />
                       <select
                         value={accessoryCategoryFilter}
@@ -3354,7 +3359,7 @@ export default function AdminPortal() {
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
                         {filtered.map(item => (
-                          <div key={item.ProductID} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div key={item.ProductID} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                             <div style={{ width: '42px', height: '42px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               {item.ImageURL ? (
                                 <img src={getImageUrl(item.ImageURL)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -3383,7 +3388,7 @@ export default function AdminPortal() {
                                 </span>
                               </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: 'auto', flexShrink: 0 }}>
                               <button onClick={() => startEditProduct(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Product">
                                 <Edit size={14} />
                               </button>
@@ -3539,7 +3544,7 @@ export default function AdminPortal() {
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
                         {filtered.map(item => (
-                          <div key={item.BoxNumber} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div key={item.BoxNumber} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                             <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#f0fdf4', border: '1.5px solid #22c55e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <span style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#15803d', textTransform: 'uppercase', lineHeight: '1' }}>BOX</span>
                               <strong style={{ fontSize: '1rem', color: '#166534', fontWeight: '900', marginTop: '2px' }}>{item.BoxNumber}</strong>
@@ -3552,7 +3557,7 @@ export default function AdminPortal() {
                                 {item.ModelList}
                               </p>
                             </div>
-                            <div style={{ display: 'flex', gap: '4px' }}>
+                            <div style={{ display: 'flex', gap: '4px', width: 'auto', flexShrink: 0 }}>
                               <button onClick={() => startEditTg(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Box">
                                 <Edit size={14} />
                               </button>

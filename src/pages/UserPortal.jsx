@@ -99,6 +99,17 @@ const checkIfPdf = (url) => {
   return lowerUrl.endsWith('.pdf') || lowerUrl.includes('.pdf') || lowerUrl.includes('/file/d/');
 };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 const getFileExtension = (url) => {
   if (!url) return '';
   if (checkIfPdf(url) || url.toLowerCase().includes('pdf') || url.toLowerCase().includes('application/pdf')) return 'PDF';
@@ -487,6 +498,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
   // Accessory Details Modal
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
+  const [ogMetadata, setOgMetadata] = useState(null);
 
   const [selectedJobDetails, setSelectedJobDetails] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'all');
@@ -767,11 +779,20 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }).catch(err => console.error('Failed to load announcements', err));
   }, []);
 
+  // Load og.json fallback metadata on mount
+  useEffect(() => {
+    fetch('/data/og.json')
+      .then(res => res.json())
+      .then(data => setOgMetadata(data))
+      .catch(err => console.error('Failed to load og.json metadata:', err));
+  }, []);
+
   // Redirect to correct tab if shared link parameters are present
   useEffect(() => {
     const formIdParam = searchParams.get('formId');
     const jobIdParam = searchParams.get('jobId');
     const postIdParam = searchParams.get('postId');
+    const productIdParam = searchParams.get('productId');
 
     if (formIdParam && activeTab !== 'apply') {
       setSearchParams({ tab: 'apply', formId: formIdParam });
@@ -779,6 +800,8 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       setSearchParams({ tab: 'home', jobId: jobIdParam });
     } else if (postIdParam && activeTab !== 'home') {
       setSearchParams({ tab: 'home', postId: postIdParam });
+    } else if (productIdParam && activeTab !== 'accessories') {
+      setSearchParams({ tab: 'accessories', productId: productIdParam });
     }
   }, [searchParams, activeTab]);
 
@@ -804,6 +827,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     }
   }, [jobs, searchParams, activeTab, selectedJobDetails]);
 
+  // Deep linking: Auto-open Product Detail Modal
+  useEffect(() => {
+    const productIdParam = searchParams.get('productId');
+    if (productIdParam && products.length > 0 && activeTab === 'accessories') {
+      const targetProduct = products.find(p => String(p.ProductID) === String(productIdParam));
+      if (targetProduct && (!selectedProductDetails || selectedProductDetails.ProductID !== targetProduct.ProductID)) {
+        setSelectedProductDetails(targetProduct);
+      }
+    }
+  }, [products, searchParams, activeTab, selectedProductDetails]);
+
   // Deep linking: Auto-scroll to Post
   useEffect(() => {
     const postIdParam = searchParams.get('postId');
@@ -818,6 +852,67 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       }, 500);
     }
   }, [posts, searchParams, activeTab]);
+
+  // Dynamic Document Title and Description Updater
+  useEffect(() => {
+    const formIdParam = searchParams.get('formId');
+    const jobIdParam = searchParams.get('jobId');
+    const postIdParam = searchParams.get('postId');
+    const productIdParam = searchParams.get('productId');
+
+    let currentTitle = 'SUBI Online Service - Portal';
+    let currentDesc = 'Apply for online services, check products, and stay updated.';
+
+    if (formIdParam) {
+      const targetForm = forms.find(f => String(f.id) === String(formIdParam));
+      if (targetForm) {
+        currentTitle = targetForm.title;
+        currentDesc = targetForm.description || currentDesc;
+      } else if (ogMetadata && ogMetadata.form) {
+        currentTitle = ogMetadata.form.title;
+        currentDesc = ogMetadata.form.description;
+      }
+    } else if (jobIdParam) {
+      const targetJob = jobs.find(j => String(j.id) === String(jobIdParam));
+      if (targetJob) {
+        currentTitle = targetJob.title;
+        currentDesc = targetJob.description || currentDesc;
+      } else if (ogMetadata && ogMetadata.job) {
+        currentTitle = ogMetadata.job.title;
+        currentDesc = ogMetadata.job.description;
+      }
+    } else if (postIdParam) {
+      const targetPost = posts.find(p => String(p.id) === String(postIdParam));
+      if (targetPost) {
+        currentTitle = targetPost.title;
+        currentDesc = targetPost.description || currentDesc;
+      } else if (ogMetadata && ogMetadata.post) {
+        currentTitle = ogMetadata.post.title;
+        currentDesc = ogMetadata.post.description;
+      }
+    } else if (productIdParam) {
+      const targetProduct = products.find(p => String(p.ProductID) === String(productIdParam));
+      if (targetProduct) {
+        currentTitle = targetProduct.ProductName || `${targetProduct.Brand} ${targetProduct.ModelName}`;
+        currentDesc = `Price: ₹${targetProduct.Price} | Category: ${targetProduct.Category} | Brand: ${targetProduct.Brand}`;
+      } else if (ogMetadata && ogMetadata.product) {
+        currentTitle = ogMetadata.product.title;
+        currentDesc = ogMetadata.product.description;
+      }
+    }
+
+    // Set document title
+    document.title = currentTitle;
+
+    // Set description meta tag
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.name = 'description';
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', currentDesc);
+  }, [searchParams, forms, jobs, posts, products, ogMetadata]);
 
   // WhatsApp share utility
   const handleWhatsAppShare = (title, text, url) => {
@@ -2266,6 +2361,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-light-main)', margin: '0', lineHeight: '1.3' }}>
                       {selectedJobDetails.title}
                     </h2>
+                    {(selectedJobDetails.start_date || selectedJobDetails.end_date) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.8rem', color: '#475569', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', width: 'fit-content', marginTop: '4px', alignItems: 'center' }}>
+                        {selectedJobDetails.start_date && (
+                          <span><strong>Start Date:</strong> {formatDate(selectedJobDetails.start_date)}</span>
+                        )}
+                        {selectedJobDetails.start_date && selectedJobDetails.end_date && <span style={{ color: '#cbd5e1' }}>|</span>}
+                        {selectedJobDetails.end_date && (
+                          <span style={{ color: '#ef4444' }}><strong>Last Date:</strong> {formatDate(selectedJobDetails.end_date)}</span>
+                        )}
+                      </div>
+                    )}
 
                     {selectedJobDetails.img_url && selectedJobDetails.img_url.trim() !== '' && (
                       <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px 0' }}>
@@ -2346,6 +2452,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                         <span className="badge badge-warning" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Upcoming</span>
                       )}
                     </h3>
+                    {(job.start_date || job.end_date) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.75rem', color: '#475569', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', width: 'fit-content', marginTop: '2px', alignItems: 'center' }}>
+                        {job.start_date && (
+                          <span><strong>Start:</strong> {formatDate(job.start_date)}</span>
+                        )}
+                        {job.start_date && job.end_date && <span style={{ color: '#cbd5e1' }}>|</span>}
+                        {job.end_date && (
+                          <span style={{ color: '#ef4444' }}><strong>Last Date:</strong> {formatDate(job.end_date)}</span>
+                        )}
+                      </div>
+                    )}
 
                     {job.img_url && job.img_url.trim() !== '' && (
                       <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#fafafa', width: '100%', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3496,7 +3613,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       <button
                         onClick={() => sendSubmissionToWhatsApp(submissionResult, selectedForm, lastResponsesPack, lastDocReferencesPack)}
                         className="premium-btn premium-btn-success"
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#22c55e', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)' }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#25D366', color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.2)' }}
                       >
                         <span style={{ fontSize: '1.1rem' }}>💬</span> Send to WhatsApp
                       </button>
@@ -4131,7 +4248,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   padding: '12px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: '#22c55e',
+                  background: '#25D366',
                   color: 'white',
                   fontWeight: 'bold',
                   fontSize: '0.85rem',
@@ -4140,7 +4257,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.25)',
+                  boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)',
                   marginTop: '8px'
                 }}
               >

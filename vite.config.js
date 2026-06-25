@@ -94,9 +94,16 @@ function localOgUploadPlugin() {
                   image.resize({ w: 1200, h: 630 });
                 }
                 
+                // Determine file name based on routeType
+                let baseName = 'income_og_preview';
+                if (json.routeType === 'post') baseName = 'post_og_preview';
+                else if (json.routeType === 'form') baseName = 'form_og_preview';
+                else if (json.routeType === 'job') baseName = 'job_og_preview';
+                else if (json.routeType === 'product') baseName = 'product_og_preview';
+
                 // Save to public directory
-                const publicJpgPath = path.join(process.cwd(), 'public/income_og_preview.jpg');
-                const publicPngPath = path.join(process.cwd(), 'public/income_og_preview.png');
+                const publicJpgPath = path.join(process.cwd(), `public/${baseName}.jpg`);
+                const publicPngPath = path.join(process.cwd(), `public/${baseName}.png`);
                 
                 await image.write(publicJpgPath, { quality: 80 });
                 await image.write(publicPngPath);
@@ -104,15 +111,15 @@ function localOgUploadPlugin() {
                 // Save to dist as well if it exists
                 const distPath = path.join(process.cwd(), 'dist');
                 if (fs.existsSync(distPath)) {
-                  await image.write(path.join(distPath, 'income_og_preview.jpg'), { quality: 80 });
-                  await image.write(path.join(distPath, 'income_og_preview.png'));
+                  await image.write(path.join(distPath, `${baseName}.jpg`), { quality: 80 });
+                  await image.write(path.join(distPath, `${baseName}.png`));
                 }
                 
-                console.log(`[Vite Upload API] Successfully saved OG image to public/income_og_preview.jpg`);
+                console.log(`[Vite Upload API] Successfully saved OG image to public/${baseName}.jpg`);
                 
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true, message: 'OG Image successfully uploaded and updated locally!' }));
+                res.end(JSON.stringify({ success: true, message: `OG Image successfully uploaded and updated locally as ${baseName}.jpg!` }));
               } catch (e) {
                 console.error('[Vite Upload API] Error processing image:', e);
                 res.statusCode = 500;

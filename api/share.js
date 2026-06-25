@@ -33,8 +33,8 @@ const getGoogleDriveId = (url) => {
   return null;
 };
 
-const getImageUrl = (url, baseUrl) => {
-  if (!url) return `${baseUrl}/income_og_preview.jpg`; // Default fallback logo
+const getImageUrl = (url, baseUrl, fallbackImage = '/income_og_preview.jpg') => {
+  if (!url) return `${baseUrl}/${fallbackImage.replace(/^\/+/, '')}`;
   if (url.startsWith('http://') || url.startsWith('https://')) {
     if (url.includes('drive.google.com')) {
       const driveId = getGoogleDriveId(url);
@@ -78,6 +78,80 @@ const defaultMockJobs = [
   }
 ];
 
+// Default mock products list matching db.js
+const defaultMockProducts = [
+  {
+    ProductID: "prod-1",
+    Category: "Phone Cover",
+    CoverType: "Case",
+    Brand: "Samsung",
+    CustomBrand: "",
+    ModelName: "Samsung S24 Ultra",
+    ProductName: "Samsung S24 Ultra Clear Case",
+    Type: "",
+    Price: "299",
+    TagNumber: "TAG-S24U-01",
+    ImageURL: "",
+    Count: "5"
+  },
+  {
+    ProductID: "prod-2",
+    Category: "Phone Cover",
+    CoverType: "Flip Case",
+    Brand: "Apple",
+    CustomBrand: "",
+    ModelName: "iPhone 15 Pro",
+    ProductName: "iPhone 15 Pro Leather Flip Case",
+    Type: "",
+    Price: "499",
+    TagNumber: "TAG-IP15P-02",
+    ImageURL: "",
+    Count: "0"
+  },
+  {
+    ProductID: "prod-3",
+    Category: "Headphone",
+    CoverType: "",
+    Brand: "Sony",
+    CustomBrand: "",
+    ModelName: "",
+    ProductName: "SUBI BassBoost Wireless Headphone",
+    Type: "",
+    Price: "999",
+    TagNumber: "TAG-HP-03",
+    ImageURL: "",
+    Count: "3"
+  },
+  {
+    ProductID: "prod-4",
+    Category: "Speaker",
+    CoverType: "",
+    Brand: "JBL",
+    CustomBrand: "",
+    ModelName: "",
+    ProductName: "SUBI Go Portable Bluetooth Speaker",
+    Type: "",
+    Price: "1499",
+    TagNumber: "TAG-SPK-04",
+    ImageURL: "",
+    Count: "0"
+  },
+  {
+    ProductID: "prod-5",
+    Category: "Charger",
+    CoverType: "",
+    Brand: "Anker",
+    CustomBrand: "",
+    ModelName: "",
+    ProductName: "SUBI SuperCharge Dual Port 33W",
+    Type: "Fast Charger",
+    Price: "350",
+    TagNumber: "TAG-CHG-05",
+    ImageURL: "",
+    Count: "10"
+  }
+];
+
 export default async function handler(req, res) {
   const { type, id } = req.query;
   const userAgent = req.headers['user-agent'] || '';
@@ -86,10 +160,26 @@ export default async function handler(req, res) {
   const baseUrl = `${protocol}://${host}`;
   const sharedUrl = `${baseUrl}/${type}/${id}`;
 
+  // Read config file for fallback values
+  const ogConfigPath = path.join(process.cwd(), 'public/data/og.json');
+  let ogConfig = {};
+  try {
+    ogConfig = JSON.parse(fs.readFileSync(ogConfigPath, 'utf8'));
+  } catch (e) {
+    console.error('Failed to read public/data/og.json:', e);
+  }
+
+  const typeKey = ['post', 'form', 'job', 'product'].includes(type) ? type : 'post';
+  const defaults = ogConfig[typeKey] || {
+    title: 'SUBI Online Service Portal',
+    description: 'Apply for E-Sevai services, view job alerts, and stay updated.',
+    image: '/income_og_preview.jpg'
+  };
+
   let redirectPath = '/user';
-  let title = 'SUBI Online Service Portal';
-  let description = 'Apply for E-Sevai services, view job alerts, and stay updated.';
-  let imageUrl = `${baseUrl}/income_og_preview.jpg`;
+  let title = defaults.title;
+  let description = defaults.description;
+  let imageUrl = `${baseUrl}/${defaults.image.replace(/^\/+/, '')}`;
   let item = null;
 
   try {
@@ -111,10 +201,16 @@ export default async function handler(req, res) {
       localItems = mockData.forms || [];
     } else if (type === 'job') {
       localItems = defaultMockJobs;
+    } else if (type === 'product') {
+      localItems = defaultMockProducts;
     }
 
     // Try to find the item locally first (extremely fast, no network delay)
-    item = localItems.find(x => String(x.id) === String(id));
+    if (type === 'product') {
+      item = localItems.find(x => String(x.ProductID) === String(id));
+    } else {
+      item = localItems.find(x => String(x.id) === String(id));
+    }
 
     // 2. If not found locally, fetch live data from GAS (with reduced timeout of 1.2s to prevent bot timeouts)
     if (!item && scriptUrl) {
@@ -122,6 +218,7 @@ export default async function handler(req, res) {
         let actionName = 'getPosts';
         if (type === 'job') actionName = 'getJobs';
         if (type === 'form') actionName = 'getForms';
+        if (type === 'product') actionName = 'getProducts';
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 1200); // 1.2s timeout
@@ -140,7 +237,11 @@ export default async function handler(req, res) {
         if (response.ok) {
           const json = await response.json();
           if (json.success && Array.isArray(json.data)) {
-            item = json.data.find(x => String(x.id) === String(id));
+            if (type === 'product') {
+              item = json.data.find(x => String(x.ProductID) === String(id));
+            } else {
+              item = json.data.find(x => String(x.id) === String(id));
+            }
           }
         }
       } catch (err) {
@@ -150,13 +251,18 @@ export default async function handler(req, res) {
 
     // Add debug logging
     console.log("Item:", item);
-    console.log("Image URL:", item?.img_url);
 
     // 4. Map tags and redirect paths
     if (item) {
-      title = item.title;
-      description = item.description;
-      imageUrl = getImageUrl(item.img_url, baseUrl);
+      if (type === 'product') {
+        title = item.ProductName || `${item.Brand} ${item.ModelName} (${item.Category})`;
+        description = `Price: ₹${item.Price} | Category: ${item.Category} | Brand: ${item.Brand} ${item.ModelName ? `- ${item.ModelName}` : ''}`;
+        imageUrl = getImageUrl(item.ImageURL || item.img_url, baseUrl, defaults.image);
+      } else {
+        title = item.title;
+        description = item.description;
+        imageUrl = getImageUrl(item.img_url, baseUrl, defaults.image);
+      }
     }
 
     if (type === 'post') {
@@ -165,6 +271,8 @@ export default async function handler(req, res) {
       redirectPath = `/user?tab=home&jobId=${id}`;
     } else if (type === 'form') {
       redirectPath = `/user?tab=apply&formId=${id}`;
+    } else if (type === 'product') {
+      redirectPath = `/user?tab=accessories&productId=${id}`;
     }
 
   } catch (err) {

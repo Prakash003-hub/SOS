@@ -13,6 +13,10 @@
       "destination": "/api/share?type=form&id=:id"
     },
     {
+      "source": "/product/:id",
+      "destination": "/api/share?type=product&id=:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

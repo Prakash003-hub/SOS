@@ -377,6 +377,8 @@ function createJobAction(jobData) {
     button_name: jobData.button_name || "",
     order_index: parseInt(jobData.order_index) || 0,
     coming_soon: jobData.coming_soon !== undefined ? String(jobData.coming_soon) : "false",
+    start_date: jobData.start_date || "",
+    end_date: jobData.end_date || "",
     created_at: new Date().toISOString()
   };
   
@@ -398,6 +400,8 @@ function updateJobAction(id, jobData) {
   existingRow.button_name = jobData.button_name !== undefined ? jobData.button_name : existingRow.button_name;
   if (jobData.order_index !== undefined) existingRow.order_index = parseInt(jobData.order_index) || 0;
   existingRow.coming_soon = jobData.coming_soon !== undefined ? String(jobData.coming_soon) : existingRow.coming_soon;
+  existingRow.start_date = jobData.start_date !== undefined ? jobData.start_date : existingRow.start_date;
+  existingRow.end_date = jobData.end_date !== undefined ? jobData.end_date : existingRow.end_date;
   
   updateRowObject(sheet, rowIndex, existingRow);
   return existingRow;
@@ -1501,6 +1505,8 @@ function initSpreadsheet() {
   ensureColumnExists(jobsSheet, "button_name");
   ensureColumnExists(jobsSheet, "order_index");
   ensureColumnExists(jobsSheet, "coming_soon");
+  ensureColumnExists(jobsSheet, "start_date");
+  ensureColumnExists(jobsSheet, "end_date");
   
   // 5B. FEEDBACK SHEET
   ensureSheetExists("Feedback", [
