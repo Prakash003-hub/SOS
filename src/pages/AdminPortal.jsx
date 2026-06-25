@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import defaultCoverImg from '../assets/default-cover.jpg';
 import { useSearchParams } from 'react-router-dom';
 import { 
@@ -362,8 +362,36 @@ export default function AdminPortal() {
   // Accessories state & forms
   const [accessorySearch, setAccessorySearch] = useState('');
   const [accessoryCategoryFilter, setAccessoryCategoryFilter] = useState('All');
+  const [accessoryTagFilter, setAccessoryTagFilter] = useState('All');
   const [editingProductId, setEditingProductId] = useState(null);
   const [uploadingProductImg, setUploadingProductImg] = useState(false);
+  const [selectedProductDetails, setSelectedProductDetails] = useState(null);
+  
+  // Derive unique tags based on products and selected category
+  const uniqueTags = useMemo(() => {
+    return Array.from(
+      new Set(
+        products
+          .filter(p => {
+            if (accessoryCategoryFilter === 'All') return true;
+            const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
+            if (accessoryCategoryFilter === 'Other') {
+              return !standardCats.includes(p.Category);
+            }
+            return p.Category === accessoryCategoryFilter;
+          })
+          .map(p => p.TagNumber)
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [products, accessoryCategoryFilter]);
+
+  // Reset tag filter if selected tag is no longer valid for the selected category
+  useEffect(() => {
+    if (accessoryTagFilter !== 'All' && !uniqueTags.includes(accessoryTagFilter)) {
+      setAccessoryTagFilter('All');
+    }
+  }, [accessoryCategoryFilter, uniqueTags, accessoryTagFilter]);
   
   const [productForm, setProductForm] = useState({
     Category: 'Phone Cover',
@@ -3216,19 +3244,8 @@ export default function AdminPortal() {
                       />
                     </div>
 
-                    <div className="premium-input-group">
-                      <label className="premium-label">Tag Number (Internal Shop ID, Optional)</label>
-                      <input
-                        type="text"
-                        value={productForm.TagNumber}
-                        onChange={(e) => setProductForm({ ...productForm, TagNumber: e.target.value })}
-                        placeholder="e.g. TAG-COVER-12"
-                        className="premium-input"
-                      />
-                    </div>
-
-                    <div className="premium-input-group">
-                      <label className="premium-label">Product Image (Optional)</label>
+                     <div className="premium-input-group">
+                      <label className="premium-label">Product Image & Tag Number</label>
                       
                       {productForm.ImageURL && (
                         <div style={{ marginBottom: '10px', position: 'relative', width: '120px', height: '120px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
@@ -3248,16 +3265,29 @@ export default function AdminPortal() {
                         </div>
                       )}
 
-                      <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1.5px dashed var(--primary)' }}>
-                        <Upload size={14} style={{ color: 'var(--primary)' }} /> 
-                        {uploadingProductImg ? 'Uploading to Drive...' : productForm.ImageURL ? 'Change Image' : 'Select Image File'}
-                        <input 
-                          type="file" 
-                          disabled={uploadingProductImg}
-                          style={{ display: 'none' }}
-                          onChange={(e) => handleProductImageUpload(e.target.files[0])}
-                        />
-                      </label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <label className="premium-btn premium-btn-secondary" style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', gap: '6px', cursor: 'pointer', background: 'white', border: '1.5px dashed var(--primary)', margin: 0, flex: 1 }}>
+                          <Upload size={14} style={{ color: 'var(--primary)' }} /> 
+                          {uploadingProductImg ? 'Uploading...' : productForm.ImageURL ? 'Change Image' : 'Select Image'}
+                          <input 
+                            type="file" 
+                            disabled={uploadingProductImg}
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleProductImageUpload(e.target.files[0])}
+                          />
+                        </label>
+                        
+                        <div style={{ flex: 1 }}>
+                          <input
+                            type="text"
+                            value={productForm.TagNumber}
+                            onChange={(e) => setProductForm({ ...productForm, TagNumber: e.target.value })}
+                            placeholder="Tag Number (Optional)"
+                            className="premium-input"
+                            style={{ padding: '9px 10px', fontSize: '0.8rem', margin: 0 }}
+                          />
+                        </div>
+                      </div>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-light-muted)', display: 'block', marginTop: '4px' }}>
                         Images are stored inside WhatsBroTNService_Uploads / Accessories_Images folder in Google Drive.
                       </span>
@@ -3302,26 +3332,37 @@ export default function AdminPortal() {
                   
                   <div className="premium-card" style={{ margin: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <h4 style={{ fontSize: '0.9rem', margin: 0 }}>View & Search Products ({products.length})</h4>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <input 
                         type="text" 
                         value={accessorySearch}
                         onChange={(e) => setAccessorySearch(e.target.value)}
                         placeholder="Search by name, brand, model, tag..."
                         className="premium-input"
-                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, flex: 1, minWidth: 0 }}
+                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, flex: '1 1 200px', minWidth: 0 }}
                       />
                       <select
                         value={accessoryCategoryFilter}
                         onChange={(e) => setAccessoryCategoryFilter(e.target.value)}
                         className="premium-input"
-                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, width: '130px' }}
+                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, width: '130px', flex: '1 1 100px' }}
                       >
                         <option value="All">All Categories</option>
                         {['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'].map(c => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                         <option value="Other">Other Accessories</option>
+                      </select>
+                      <select
+                        value={accessoryTagFilter}
+                        onChange={(e) => setAccessoryTagFilter(e.target.value)}
+                        className="premium-input"
+                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, width: '110px', flex: '1 1 90px' }}
+                      >
+                        <option value="All">All Tags</option>
+                        {uniqueTags.map(tag => (
+                          <option key={tag} value={tag}>{tag}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -3338,16 +3379,28 @@ export default function AdminPortal() {
                           if (p.Category !== accessoryCategoryFilter) return false;
                         }
                       }
+                      if (accessoryTagFilter !== 'All') {
+                        if (p.TagNumber !== accessoryTagFilter) return false;
+                      }
                       if (accessorySearch.trim() !== '') {
-                        const q = accessorySearch.toLowerCase();
-                        const name = (p.ProductName || '').toLowerCase();
-                        const brand = (p.Brand || '').toLowerCase();
-                        const customBrand = (p.CustomBrand || '').toLowerCase();
-                        const model = (p.ModelName || '').toLowerCase();
-                        const tag = (p.TagNumber || '').toLowerCase();
-                        const cat = (p.Category || '').toLowerCase();
+                        const searchOptions = accessorySearch.split(',').map(s => s.trim().toLowerCase().replace(/\s+/g, '')).filter(Boolean);
+                        if (searchOptions.length === 0) return true;
+
+                        const name = (p.ProductName || '').toLowerCase().replace(/\s+/g, '');
+                        const brand = (p.Brand || '').toLowerCase().replace(/\s+/g, '');
+                        const customBrand = (p.CustomBrand || '').toLowerCase().replace(/\s+/g, '');
+                        const model = (p.ModelName || '').toLowerCase().replace(/\s+/g, '');
+                        const tag = (p.TagNumber || '').toLowerCase().replace(/\s+/g, '');
+                        const cat = (p.Category || '').toLowerCase().replace(/\s+/g, '');
                         
-                        return name.includes(q) || brand.includes(q) || customBrand.includes(q) || model.includes(q) || tag.includes(q) || cat.includes(q);
+                        return searchOptions.some(q => 
+                          name.includes(q) || 
+                          brand.includes(q) || 
+                          customBrand.includes(q) || 
+                          model.includes(q) || 
+                          tag.includes(q) || 
+                          cat.includes(q)
+                        );
                       }
                       return true;
                     });
@@ -3389,6 +3442,14 @@ export default function AdminPortal() {
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: 'auto', flexShrink: 0 }}>
+                              <button 
+                                onClick={() => setSelectedProductDetails(item)} 
+                                className="premium-btn premium-btn-secondary" 
+                                style={{ width: '32px', height: '32px', padding: 0 }} 
+                                title="View Details"
+                              >
+                                <Eye size={14} style={{ color: '#0f172a' }} />
+                              </button>
                               <button onClick={() => startEditProduct(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Product">
                                 <Edit size={14} />
                               </button>
@@ -4559,6 +4620,179 @@ export default function AdminPortal() {
           </div>
         </div>
       )}
+
+      {/* Product Details Modal (Admin View) */}
+      {selectedProductDetails && (() => {
+        const product = selectedProductDetails;
+        const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
+        const hasPrice = product.Price && product.Price.trim() !== '';
+
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}>
+            <div style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              padding: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              width: '100%', maxWidth: '360px',
+              display: 'flex', flexDirection: 'column', gap: '16px',
+              position: 'relative'
+            }}>
+              <button
+                onClick={() => setSelectedProductDetails(null)}
+                style={{
+                  position: 'absolute',
+                  top: '16px', right: '16px',
+                  background: '#f1f5f9', border: 'none',
+                  color: '#64748b', cursor: 'pointer',
+                  width: '28px', height: '28px',
+                  borderRadius: '50%', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                <X size={16} />
+              </button>
+
+              <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#1e293b', margin: '0 0 8px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                Product Details
+              </h3>
+
+              {hasImage ? (
+                <div style={{
+                  width: '100%', height: '200px',
+                  borderRadius: '12px', overflow: 'hidden',
+                  border: '1px solid #e2e8f0', background: '#f8fafc',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <img
+                    src={getImageUrl(product.ImageURL)}
+                    alt={product.ProductName}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              ) : product.Category === 'Phone Cover' ? (
+                <div style={{
+                  width: '100%', height: '200px',
+                  borderRadius: '12px', overflow: 'hidden',
+                  border: '1px solid #e2e8f0', background: '#f8fafc',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <img
+                    src={defaultCoverImg}
+                    alt="Default Cover"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              ) : (
+                <div style={{
+                  width: '100%', height: '140px',
+                  borderRadius: '12px', border: '1px dashed #cbd5e1',
+                  background: '#f8fafc', display: 'flex',
+                  flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', color: '#94a3b8', gap: '6px'
+                }}>
+                  <span style={{ fontSize: '2.5rem' }}>📦</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>No Image Available</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <span style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                    {product.Category}
+                  </span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', margin: 0, lineHeight: '1.3' }}>
+                    {product.ProductName || `${product.Brand} Case`}
+                  </h4>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Product ID:</td>
+                        <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b', fontFamily: 'monospace' }}>{product.ProductID}</td>
+                      </tr>
+                      {product.TagNumber && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Tag Number:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#0284c7' }}>{product.TagNumber}</td>
+                        </tr>
+                      )}
+                      {product.Brand && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Brand:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>
+                            {product.Brand === 'Other' ? product.CustomBrand : product.Brand}
+                          </td>
+                        </tr>
+                      )}
+                      {product.ModelName && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Model Name:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.ModelName}</td>
+                        </tr>
+                      )}
+                      {product.Category === 'Phone Cover' && product.CoverType && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Case Type:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.CoverType}</td>
+                        </tr>
+                      )}
+                      {product.Type && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Type / Spec:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>{product.Type}</td>
+                        </tr>
+                      )}
+                      {hasPrice && (
+                        <tr>
+                          <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Price:</td>
+                          <td style={{ textAlign: 'right', fontWeight: '900', color: '#0f172a', fontSize: '0.9rem' }}>₹{product.Price}</td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td style={{ color: '#64748b', padding: '4px 0', fontWeight: '600' }}>Stock Count:</td>
+                        <td style={{ textAlign: 'right', fontWeight: '700', color: Number(product.Count || 0) > 0 ? '#16a34a' : '#dc2626' }}>
+                          {product.Count || 0}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <button
+                  onClick={() => {
+                    setSelectedProductDetails(null);
+                    startEditProduct(product);
+                  }}
+                  className="premium-btn premium-btn-primary"
+                  style={{ flex: 1, padding: '8px', fontSize: '0.8rem' }}
+                >
+                  Edit Product
+                </button>
+                <button
+                  onClick={() => setSelectedProductDetails(null)}
+                  className="premium-btn premium-btn-secondary"
+                  style={{ flex: 1, padding: '8px', fontSize: '0.8rem' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {loading && (
         <div style={{

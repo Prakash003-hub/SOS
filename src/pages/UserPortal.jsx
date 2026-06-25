@@ -3832,22 +3832,28 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 }
 
                 if (accessorySearchKeyword.trim() !== '') {
-                  const query = accessorySearchKeyword.toLowerCase();
-                  const name = (item.ProductName || '').toLowerCase();
-                  const brand = (item.Brand || '').toLowerCase();
-                  const customBrand = (item.CustomBrand || '').toLowerCase();
-                  const model = (item.ModelName || '').toLowerCase();
-                  const type = (item.Type || '').toLowerCase();
-                  const category = (item.Category || '').toLowerCase();
+                  const searchOptions = accessorySearchKeyword.split(',').map(s => s.trim().toLowerCase().replace(/\s+/g, '')).filter(Boolean);
+                  if (searchOptions.length > 0) {
+                    const name = (item.ProductName || '').toLowerCase().replace(/\s+/g, '');
+                    const brand = (item.Brand || '').toLowerCase().replace(/\s+/g, '');
+                    const customBrand = (item.CustomBrand || '').toLowerCase().replace(/\s+/g, '');
+                    const model = (item.ModelName || '').toLowerCase().replace(/\s+/g, '');
+                    const type = (item.Type || '').toLowerCase().replace(/\s+/g, '');
+                    const category = (item.Category || '').toLowerCase().replace(/\s+/g, '');
+                    const tag = (item.TagNumber || '').toLowerCase().replace(/\s+/g, '');
 
-                  const match = name.includes(query) ||
-                    brand.includes(query) ||
-                    customBrand.includes(query) ||
-                    model.includes(query) ||
-                    type.includes(query) ||
-                    category.includes(query);
+                    const match = searchOptions.some(q =>
+                      name.includes(q) ||
+                      brand.includes(q) ||
+                      customBrand.includes(q) ||
+                      model.includes(q) ||
+                      type.includes(q) ||
+                      category.includes(q) ||
+                      tag.includes(q)
+                    );
 
-                  if (!match) return false;
+                    if (!match) return false;
+                  }
                 }
 
                 return true;
