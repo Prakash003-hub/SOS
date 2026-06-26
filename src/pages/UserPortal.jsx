@@ -131,6 +131,20 @@ const getFileExtension = (url) => {
   return 'FILE';
 };
 
+const parseLimit = (limitStr) => {
+  if (!limitStr) return { min: 1, max: 8 };
+  const trimmed = String(limitStr).trim();
+  if (trimmed.includes('-')) {
+    const parts = trimmed.split('-');
+    const min = parseInt(parts[0]) || 1;
+    const max = parseInt(parts[1]) || 8;
+    return { min, max };
+  } else {
+    const max = parseInt(trimmed) || 8;
+    return { min: 1, max };
+  }
+};
+
 const getImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -1760,10 +1774,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         if (f.type === 'repeated') {
           const count = parseInt(formData[f.id]) || 0;
           responsesPack[f.label || 'Count'] = count;
-          for (let i = 1; i <= count; i++) {
+          const { min } = parseLimit(f.limit);
+          for (let i = min; i <= count; i++) {
             (f.subFields || []).forEach(sub => {
               const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
-              const subLabel = `${f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} #${i} - ${sub.label}`;
+              const subLabel = `#${i} - ${sub.label}`;
               responsesPack[subLabel] = formData[subFieldKey] || '';
             });
           }
@@ -3064,13 +3079,26 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                       {/* Render custom input fields added by Admin */}
                       {safeJsonParse(selectedForm.fields, []).map(f => {
                         if (f.type === 'repeated') {
+                          const { min, max } = parseLimit(f.limit);
                           const countValue = parseInt(formData[f.id]) || 0;
+
+                          const optionsList = [];
+                          for (let val = min; val <= max; val++) {
+                            optionsList.push(val);
+                          }
+
+                          const loopIndices = [];
+                          if (countValue >= min && countValue <= max) {
+                            for (let i = min; i <= countValue; i++) {
+                              loopIndices.push(i);
+                            }
+                          }
 
                           return (
                             <div key={f.id} style={{ padding: '16px', background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '12px', marginBottom: '16px' }}>
                               <div className="premium-input-group" style={{ marginBottom: '12px' }}>
                                 <label className="premium-label" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
-                                  {f.label || 'Family Members Count'} (0-8) {f.required && <span style={{ color: 'var(--error)' }}>*</span>}
+                                  {f.label || 'Family Members Count'} ({min}-{max}) {f.required && <span style={{ color: 'var(--error)' }}>*</span>}
                                 </label>
                                 <select
                                   value={formData[f.id] || ''}
@@ -3081,19 +3109,18 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                   className="premium-input"
                                   required={f.required}
                                 >
-                                  <option value="">-- Select Count (0-8) --</option>
-                                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                                  <option value="">-- Select Count ({min}-{max}) --</option>
+                                  {optionsList.map(num => (
                                     <option key={num} value={num}>{num}</option>
                                   ))}
                                 </select>
                               </div>
 
-                              {countValue > 0 && Array.from({ length: countValue }, (_, index) => {
-                                const i = index + 1;
+                              {loopIndices.map(i => {
                                 return (
                                   <div key={i} style={{ marginTop: '14px', padding: '12px', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '8px' }}>
                                     <div style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary)', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
-                                      #{i} {f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} Details
+                                      #{i}
                                     </div>
 
                                     {(f.subFields || []).map(sub => {
@@ -3255,10 +3282,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                                 label: f.label || 'Count',
                                 value: count
                               });
-                              for (let i = 1; i <= count; i++) {
+                               const { min } = parseLimit(f.limit);
+                               for (let i = min; i <= count; i++) {
                                 (f.subFields || []).forEach(sub => {
                                   const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
-                                  const subLabel = `${f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} #${i} - ${sub.label}`;
+                                  const subLabel = `#${i} - ${sub.label}`;
                                   previewItems.push({
                                     key: subFieldKey,
                                     label: subLabel,
@@ -3314,10 +3342,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                               if (f.type === 'repeated') {
                                 const count = parseInt(formData[f.id]) || 0;
                                 responsesPack[f.label || 'Count'] = count;
-                                for (let i = 1; i <= count; i++) {
+                                const { min } = parseLimit(f.limit);
+                                for (let i = min; i <= count; i++) {
                                   (f.subFields || []).forEach(sub => {
                                     const subFieldKey = `${f.id}_member_${i}_${sub.id}`;
-                                    const subLabel = `${f.label ? f.label.replace('count', '').replace('Count', '').replace(':', '').trim() : 'Item'} #${i} - ${sub.label}`;
+                                    const subLabel = `#${i} - ${sub.label}`;
                                     responsesPack[subLabel] = formData[subFieldKey] || '';
                                   });
                                 }
@@ -3895,68 +3924,257 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                     const items = grouped[cat.key] || [];
                     if (items.length === 0) return null;
 
-                    // Partition items into up to 5 rows
-                    const numRows = Math.min(items.length, 5);
-                    const partitionedRows = Array.from({ length: numRows }, () => []);
-                    items.forEach((item, idx) => {
-                      partitionedRows[idx % numRows].push(item);
-                    });
+                    if (cat.key === 'Phone Cover') {
+                      // Partition items into exactly 5 rows (mandatory)
+                      const numRows = 5;
+                      const partitionedRows = Array.from({ length: numRows }, () => []);
+                      items.forEach((item, idx) => {
+                        partitionedRows[idx % numRows].push(item);
+                      });
+                      const activeRows = partitionedRows.filter(row => row.length > 0);
 
-                    return (
-                      <div key={cat.key} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-                        {/* Category Section Header */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          paddingBottom: '8px',
-                          borderBottom: '2px solid #f1f5f9',
-                          margin: '8px 4px 0 4px'
-                        }}>
-                          <span style={{ fontSize: '1.25rem' }}>{cat.emoji}</span>
-                          <h4 style={{
-                            fontSize: '0.95rem',
-                            color: '#1e293b',
-                            fontWeight: '800',
-                            margin: 0,
-                            flex: 1
+                      return (
+                        <div key={cat.key} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {/* Category Section Header */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            paddingBottom: '8px',
+                            borderBottom: '2px solid #f1f5f9',
+                            margin: '8px 4px 0 4px'
                           }}>
-                            {cat.label}
-                          </h4>
-                          <span style={{
-                            fontSize: '0.7rem',
-                            color: 'var(--primary)',
-                            background: 'rgba(16,185,129,0.08)',
-                            padding: '2px 8px',
-                            borderRadius: '20px',
-                            fontWeight: '700'
+                            <span style={{ fontSize: '1.25rem' }}>{cat.emoji}</span>
+                            <h4 style={{
+                              fontSize: '0.95rem',
+                              color: '#1e293b',
+                              fontWeight: '800',
+                              margin: 0,
+                              flex: 1
+                            }}>
+                              {cat.label}
+                            </h4>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              color: 'var(--primary)',
+                              background: 'rgba(16,185,129,0.08)',
+                              padding: '2px 8px',
+                              borderRadius: '20px',
+                              fontWeight: '700'
+                            }}>
+                              {items.length} {items.length === 1 ? 'item' : 'items'}
+                            </span>
+                          </div>
+
+                          {/* Sub-rows marquee waterfall tracks */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {activeRows.map((rowItems, subIndex) => {
+                              // Cycle speeds 1 to 5, staggered with subIndex
+                              const speedRowIndex = ((index + subIndex) % 5) + 1;
+
+                              return (
+                                <MarqueeRow
+                                  key={subIndex}
+                                  rowItems={rowItems}
+                                  speedRowIndex={speedRowIndex}
+                                  setSelectedProductDetails={setSelectedProductDetails}
+                                  handleWhatsAppShare={handleWhatsAppShare}
+                                  subIndex={subIndex}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      // 2 Column grid layout
+                      return (
+                        <div key={cat.key} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {/* Category Section Header */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            paddingBottom: '8px',
+                            borderBottom: '2px solid #f1f5f9',
+                            margin: '8px 4px 0 4px'
                           }}>
-                            {items.length} {items.length === 1 ? 'item' : 'items'}
-                          </span>
+                            <span style={{ fontSize: '1.25rem' }}>{cat.emoji}</span>
+                            <h4 style={{
+                              fontSize: '0.95rem',
+                              color: '#1e293b',
+                              fontWeight: '800',
+                              margin: 0,
+                              flex: 1
+                            }}>
+                              {cat.label}
+                            </h4>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              color: 'var(--primary)',
+                              background: 'rgba(16,185,129,0.08)',
+                              padding: '2px 8px',
+                              borderRadius: '20px',
+                              fontWeight: '700'
+                            }}>
+                              {items.length} {items.length === 1 ? 'item' : 'items'}
+                            </span>
+                          </div>
+
+                          {/* 2 Column Grid */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, 1fr)',
+                            gap: '12px',
+                            padding: '4px'
+                          }}>
+                            {items.map((product) => {
+                              const hasImage = product.ImageURL && product.ImageURL.trim() !== '';
+                              const hasPrice = product.Price && product.Price.trim() !== '';
+
+                              return (
+                                <div
+                                  key={product.ProductID}
+                                  onClick={() => setSelectedProductDetails(product)}
+                                  className="showcase-product-card"
+                                  style={{
+                                    width: '100%',
+                                    minHeight: '210px',
+                                    height: 'auto',
+                                    padding: '10px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '8px',
+                                    cursor: 'pointer',
+                                    boxSizing: 'border-box'
+                                  }}
+                                >
+                                  {/* Image Wrapper */}
+                                  <div className="showcase-image-wrapper" style={{ height: '90px', width: '100%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '6px' }}>
+                                    {hasImage ? (
+                                      <img
+                                        src={getImageUrl(product.ImageURL)}
+                                        alt={product.ProductName || 'Accessory'}
+                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      />
+                                    ) : (
+                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '4px' }}>
+                                        <span style={{ fontSize: '1.4rem' }}>📦</span>
+                                        <span style={{ fontSize: '0.6rem', fontWeight: 'bold', textTransform: 'uppercase' }}>No Image</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Card Info */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }}>
+                                    <span style={{
+                                      fontSize: '0.6rem',
+                                      fontWeight: '800',
+                                      color: 'var(--primary)',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.02em',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}>
+                                      {product.Category}
+                                    </span>
+
+                                    <h5 style={{
+                                      fontSize: '0.72rem',
+                                      fontWeight: '700',
+                                      color: '#1e293b',
+                                      margin: 0,
+                                      lineHeight: '1.25',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}>
+                                      {product.ProductName || `${product.Brand} Case`}
+                                    </h5>
+
+                                    {(product.Brand || product.ModelName) && (
+                                      <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {product.Brand === 'Other' ? product.CustomBrand : product.Brand} {product.ModelName}
+                                      </span>
+                                    )}
+
+                                    {hasPrice && (
+                                      <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <strong style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: '800' }}>
+                                          ₹{product.Price}
+                                        </strong>
+                                        <span style={{ fontSize: '0.55rem', color: '#22c55e', background: '#f0fdf4', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold' }}>In Stock</span>
+                                      </div>
+                                    )}
+
+                                    {/* Buy & Share Buttons */}
+                                    <div
+                                      style={{
+                                        marginTop: hasPrice ? '6px' : 'auto',
+                                        display: 'flex',
+                                        gap: '4px',
+                                        width: '100%'
+                                      }}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedProductDetails(product);
+                                        }}
+                                        className="premium-btn premium-btn-primary"
+                                        style={{
+                                          flex: 1,
+                                          padding: '4px 0',
+                                          fontSize: '0.65rem',
+                                          fontWeight: 'bold',
+                                          margin: 0,
+                                          borderRadius: '6px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          border: 'none',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        Buy
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const title = product.ProductName || `${product.Brand} Case`;
+                                          const text = `Category: ${product.Category}${product.Price ? `\nPrice: ₹${product.Price}` : ''}\nBuy high-quality mobile accessories at SUBI Online Service.`;
+                                          handleWhatsAppShare(title, text, '/user?tab=accessories');
+                                        }}
+                                        className="premium-btn premium-btn-secondary"
+                                        style={{
+                                          flex: 1,
+                                          padding: '4px 0',
+                                          fontSize: '0.65rem',
+                                          fontWeight: 'bold',
+                                          margin: 0,
+                                          borderRadius: '6px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          border: 'none',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        Share
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-
-                        {/* Sub-rows marquee waterfall tracks */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {partitionedRows.map((rowItems, subIndex) => {
-                            // Cycle speeds 1 to 5, staggered with subIndex
-                            const speedRowIndex = ((index + subIndex) % 5) + 1;
-
-                            return (
-                              <MarqueeRow
-                                key={subIndex}
-                                rowItems={rowItems}
-                                speedRowIndex={speedRowIndex}
-                                setSelectedProductDetails={setSelectedProductDetails}
-                                handleWhatsAppShare={handleWhatsAppShare}
-                                subIndex={subIndex}
-                              />
-                            );
-                          })}
-                        </div>
-
-                      </div>
-                    );
+                      );
+                    }
                   })}
                 </div>
               );

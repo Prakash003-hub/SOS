@@ -157,6 +157,16 @@ const getFileExtension = (url) => {
   return 'FILE';
 };
 
+const getLimitLabel = (limitStr) => {
+  if (!limitStr) return "1 to 8";
+  const trimmed = String(limitStr).trim();
+  if (trimmed.includes('-')) {
+    const parts = trimmed.split('-');
+    return `${parts[0].trim()} to ${parts[1].trim()}`;
+  }
+  return `1 to ${trimmed}`;
+};
+
 const getImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -2242,8 +2252,19 @@ export default function AdminPortal() {
 
                       {field.type === 'repeated' && (
                         <div style={{ marginTop: '10px', padding: '12px', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                          <div className="premium-input-group" style={{ marginBottom: '10px' }}>
+                            <label className="premium-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Limit Range (e.g. "8" or "5-9")</label>
+                            <input 
+                              type="text"
+                              value={field.limit || ''}
+                              onChange={(e) => updateFieldInBuilder(idx, 'limit', e.target.value)}
+                              placeholder="e.g. 8 (standard 1-8) or 5-9"
+                              className="premium-input"
+                              style={{ padding: '6px', fontSize: '0.75rem', background: '#ffffff' }}
+                            />
+                          </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Configure Sub-Fields (0-8 Loop)</span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155' }}>Configure Sub-Fields ({getLimitLabel(field.limit)} Loop)</span>
                             <button
                               type="button"
                               onClick={() => {
