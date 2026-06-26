@@ -926,7 +926,73 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       document.head.appendChild(metaDesc);
     }
     metaDesc.setAttribute('content', currentDesc);
-  }, [searchParams, forms, jobs, posts, products, ogMetadata]);
+
+    // Determine OG Image
+    let currentImg = '/income_og_preview.jpg';
+
+    if (formIdParam) {
+      const targetForm = forms.find(f => String(f.id) === String(formIdParam));
+      if (targetForm && targetForm.img_url) {
+        currentImg = getImageUrl(targetForm.img_url);
+      } else {
+        currentImg = '/form_og_preview.jpg';
+      }
+    } else if (jobIdParam) {
+      const targetJob = jobs.find(j => String(j.id) === String(jobIdParam));
+      if (targetJob && targetJob.img_url) {
+        currentImg = getImageUrl(targetJob.img_url);
+      } else {
+        currentImg = '/job_og_preview.jpg';
+      }
+    } else if (postIdParam) {
+      const targetPost = posts.find(p => String(p.id) === String(postIdParam));
+      if (targetPost && targetPost.img_url) {
+        currentImg = getImageUrl(targetPost.img_url);
+      } else {
+        currentImg = '/post_og_preview.jpg';
+      }
+    } else if (productIdParam) {
+      const targetProduct = products.find(p => String(p.ProductID) === String(productIdParam));
+      if (targetProduct && targetProduct.ImageURL) {
+        currentImg = getImageUrl(targetProduct.ImageURL);
+      } else {
+        currentImg = '/product_og_preview.jpg';
+      }
+    } else {
+      // Fallback based on activeTab
+      if (activeTab === 'accessories') {
+        currentImg = '/product_og_preview.jpg';
+      } else if (activeTab === 'jobs') {
+        currentImg = '/job_og_preview.jpg';
+      } else if (activeTab === 'apply') {
+        currentImg = '/form_og_preview.jpg';
+      } else {
+        currentImg = '/income_og_preview.jpg';
+      }
+    }
+
+    const absoluteImgUrl = currentImg.startsWith('http')
+      ? currentImg
+      : `${window.location.protocol}//${window.location.host}${currentImg}`;
+
+    // Set Open Graph image
+    let metaOgImg = document.querySelector('meta[property="og:image"]');
+    if (!metaOgImg) {
+      metaOgImg = document.createElement('meta');
+      metaOgImg.setAttribute('property', 'og:image');
+      document.head.appendChild(metaOgImg);
+    }
+    metaOgImg.setAttribute('content', absoluteImgUrl);
+
+    // Set Twitter image
+    let metaTwitterImg = document.querySelector('meta[name="twitter:image"]');
+    if (!metaTwitterImg) {
+      metaTwitterImg = document.createElement('meta');
+      metaTwitterImg.name = 'twitter:image';
+      document.head.appendChild(metaTwitterImg);
+    }
+    metaTwitterImg.setAttribute('content', absoluteImgUrl);
+  }, [searchParams, activeTab, forms, jobs, posts, products, ogMetadata]);
 
   // WhatsApp share utility
   const handleWhatsAppShare = (title, text, url) => {
