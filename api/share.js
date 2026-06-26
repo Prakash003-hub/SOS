@@ -158,7 +158,6 @@ export default async function handler(req, res) {
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const host = req.headers['x-forwarded-host'] || req.headers.host || 'tnsevai.vercel.app';
   const baseUrl = `${protocol}://${host}`;
-  const sharedUrl = `${baseUrl}/${type}/${id}`;
 
   // Read config file for fallback values
   const ogConfigPath = path.join(process.cwd(), 'public/data/og.json');
@@ -169,14 +168,42 @@ export default async function handler(req, res) {
     console.error('Failed to read public/data/og.json:', e);
   }
 
-  const typeKey = ['post', 'form', 'job', 'product'].includes(type) ? type : 'post';
+  // Determine typeKey (mapping user tabs if type === 'user')
+  let typeKey = ['post', 'form', 'job', 'product'].includes(type) ? type : 'post';
+  if (type === 'user') {
+    const tab = req.query.tab;
+    if (tab === 'accessories') {
+      typeKey = 'product';
+    } else if (tab === 'apply') {
+      typeKey = 'form';
+    } else if (tab === 'home') {
+      typeKey = 'post';
+    }
+  }
+
   const defaults = ogConfig[typeKey] || {
     title: 'SUBI Online Service Portal',
     description: 'Apply for E-Sevai services, view job alerts, and stay updated.',
     image: '/income_og_preview.jpg'
   };
 
+  // Determine redirectPath
   let redirectPath = '/user';
+  if (type === 'user') {
+    // Reconstruct /user with its query parameters except 'type'
+    const queryParams = new URLSearchParams(req.query);
+    queryParams.delete('type');
+    const queryString = queryParams.toString();
+    redirectPath = `/user${queryString ? '?' + queryString : ''}`;
+  } else if (type === 'home') {
+    redirectPath = '/';
+  }
+
+  // Determine sharedUrl
+  const sharedUrl = type === 'home'
+    ? baseUrl
+    : (type === 'user' ? `${baseUrl}${redirectPath}` : `${baseUrl}/${type}/${id}`);
+
   let title = defaults.title;
   let description = defaults.description;
   let imageUrl = `${baseUrl}/${defaults.image.replace(/^\/+/, '')}`;

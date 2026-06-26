@@ -1,6 +1,32 @@
 {
   "rewrites": [
     {
+      "source": "/user",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": {
+            "re": ".*([fF]acebook|[tT]witter|[wW]hats[aA]pp|[lL]inked[iI]n|[tT]elegram|[sS]lack|[dD]iscord|[gG]oogle|[bB]ing|[yY]andex|[pP]interest).*"
+          }
+        }
+      ],
+      "destination": "/api/share?type=user"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": {
+            "re": ".*([fF]acebook|[tT]witter|[wW]hats[aA]pp|[lL]inked[iI]n|[tT]elegram|[sS]lack|[dD]iscord|[gG]oogle|[bB]ing|[yY]andex|[pP]interest).*"
+          }
+        }
+      ],
+      "destination": "/api/share?type=home"
+    },
+    {
       "source": "/post/:id",
       "destination": "/api/share?type=post&id=:id"
     },
