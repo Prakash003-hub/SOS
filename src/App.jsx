@@ -4,7 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import UserPortal from './pages/UserPortal';
 import AdminPortal from './pages/AdminPortal';
-import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase, MessageSquare, ShoppingBag, Package } from 'lucide-react';
+import { Home, FileText, CheckCircle, Plus, Users, X, Briefcase, MessageSquare, ShoppingBag, Package, Megaphone } from 'lucide-react';
 import { registerUser, loginUser, sendOtp, verifyOtp, getSettings } from './services/db';
 
 function TrollPage() {
@@ -152,7 +152,7 @@ function PortalLayout() {
   // Read active tab, default based on portal type with automatic bounds verification
   const rawTab = searchParams.get('tab');
   const activeTab = isAdmin
-    ? (['posts', 'forms', 'users', 'jobs', 'products'].includes(rawTab) ? rawTab : 'posts')
+    ? (['posts', 'forms', 'users', 'jobs', 'products', 'announcements', 'settings'].includes(rawTab) ? rawTab : 'posts')
     : (['home', 'apply', 'jobs', 'accessories'].includes(rawTab) ? rawTab : 'home');
 
   const handleTabChange = (tabName) => {
@@ -347,6 +347,13 @@ function PortalLayout() {
             >
               <Package className="bottom-nav-icon" size={20} />
               <span>Products</span>
+            </button>
+            <button 
+              onClick={() => handleTabChange('announcements')}
+              className={`bottom-nav-item ${activeTab === 'announcements' ? 'active' : ''}`}
+            >
+              <Megaphone className="bottom-nav-icon" size={20} />
+              <span>Ads</span>
             </button>
           </div>
         ) : (

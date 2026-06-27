@@ -4669,6 +4669,17 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 </button>
               </div>
 
+              {/* Banner Image Preview */}
+              {activeAnn.img_url && (
+                <div style={{ width: '100%', maxHeight: '180px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <img 
+                    src={getImageUrl(activeAnn.img_url)} 
+                    alt="Advertisement Banner" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+                  />
+                </div>
+              )}
+
               {/* Body */}
               <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
                 {activeAnn.content || activeAnn.description || 'No details provided.'}
@@ -4731,7 +4742,14 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
                   {hasButton && (
                     <button
-                      onClick={() => window.open(activeAnn.button_url, '_blank')}
+                      onClick={() => {
+                        setShowAnnouncementModal(false);
+                        if (activeAnn.button_url.startsWith('http://') || activeAnn.button_url.startsWith('https://')) {
+                          window.open(activeAnn.button_url, '_blank');
+                        } else {
+                          window.location.href = activeAnn.button_url;
+                        }
+                      }}
                       className="premium-btn-primary"
                       style={{ flex: 1.5, padding: '12px', border: 'none', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                     >

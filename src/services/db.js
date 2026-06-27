@@ -592,6 +592,11 @@ export const deleteAnnouncement = async (id) => {
   return await callApi("deleteAnnouncement", { id });
 };
 
+export const uploadAnnouncementImage = async (file) => {
+  const url = await uploadFileToDrive(file, ["WhatsBroTNService_Uploads", "Announcement_Banners"]);
+  return { img_url: url };
+};
+
 // --- PRODUCTS SERVICE ---
 export const getProducts = async () => {
   try {
@@ -1034,6 +1039,7 @@ const callMockFallback = (action, payload) => {
         title: payload.payload.title || "",
         description: payload.payload.description || "",
         content: payload.payload.content || "",
+        img_url: payload.payload.img_url || "",
         button_name: payload.payload.button_name || "",
         button_url: payload.payload.button_url || "",
         enabled: payload.payload.enabled !== undefined ? String(payload.payload.enabled) : "true",

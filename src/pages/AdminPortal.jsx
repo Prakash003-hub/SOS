@@ -37,6 +37,7 @@ import {
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  uploadAnnouncementImage,
   getProducts,
   createProduct,
   updateProduct,
@@ -373,10 +374,12 @@ export default function AdminPortal() {
     title: '',
     description: '',
     content: '',
+    img_url: '',
     button_name: '',
     button_url: '',
     enabled: 'true'
   });
+  const [uploadingAnnImg, setUploadingAnnImg] = useState(false);
 
   // Accessories & Tempered Glass States
   const [products, setProducts] = useState([]);
@@ -954,6 +957,104 @@ export default function AdminPortal() {
     }
   };
 
+  // --- ANNOUNCEMENTS / ADVERTISEMENTS OPERATIONS ---
+  const handleAnnImageUpload = async (file) => {
+    if (!file) return;
+    setUploadingAnnImg(true);
+    try {
+      const croppedFile = await cropToSquareImage(file, 600);
+      const res = await uploadAnnouncementImage(croppedFile);
+      setAnnForm(prev => ({ ...prev, img_url: res.img_url }));
+      alert('Advertisement banner image uploaded successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploadingAnnImg(false);
+    }
+  };
+
+  const handleAnnSubmit = async (e) => {
+    e.preventDefault();
+    if (!annForm.title.trim()) {
+      alert('Please enter an advertisement title / name.');
+      return;
+    }
+    try {
+      if (editingAnnId) {
+        await updateAnnouncement(editingAnnId, annForm);
+        alert('Advertisement updated successfully!');
+      } else {
+        await createAnnouncement(annForm);
+        alert('New advertisement created successfully!');
+      }
+      setAnnForm({
+        title: '',
+        description: '',
+        content: '',
+        img_url: '',
+        button_name: '',
+        button_url: '',
+        enabled: 'true'
+      });
+      setEditingAnnId(null);
+      const annData = await getAnnouncements();
+      setAnnouncements(annData || []);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save advertisement entry.');
+    }
+  };
+
+  const startEditAnn = (ann) => {
+    setEditingAnnId(ann.id);
+    setAnnForm({
+      title: ann.title || '',
+      description: ann.description || '',
+      content: ann.content || '',
+      img_url: ann.img_url || '',
+      button_name: ann.button_name || '',
+      button_url: ann.button_url || '',
+      enabled: ann.enabled !== undefined ? String(ann.enabled) : 'true'
+    });
+    document.getElementById('ann-editor-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleDeleteAnn = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this advertisement entry?')) return;
+    try {
+      await deleteAnnouncement(id);
+      setAnnouncements(announcements.filter(a => a.id !== id));
+      if (editingAnnId === id) {
+        setEditingAnnId(null);
+        setAnnForm({
+          title: '',
+          description: '',
+          content: '',
+          img_url: '',
+          button_name: '',
+          button_url: '',
+          enabled: 'true'
+        });
+      }
+      alert('Advertisement deleted.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete advertisement.');
+    }
+  };
+
+  const handleToggleAnnStatus = async (ann) => {
+    const nextStatus = String(ann.enabled).toLowerCase() === 'true' ? 'false' : 'true';
+    try {
+      await updateAnnouncement(ann.id, { enabled: nextStatus });
+      setAnnouncements(prev => prev.map(a => a.id === ann.id ? { ...a, enabled: nextStatus } : a));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update status.');
+    }
+  };
+
   // --- POSTS OPERATIONS ---
   const handlePostSubmit = async (e) => {
     e.preventDefault();
@@ -1488,7 +1589,23 @@ export default function AdminPortal() {
       <div style={{ flex: 1, padding: '0 16px' }}>
 
         {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', margin: '16px 0' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', margin: '16px 0', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setActiveTab('announcements')}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: activeTab === 'announcements' ? '2px solid var(--primary)' : '1px solid var(--border-light)',
+              background: activeTab === 'announcements' ? 'rgba(16,185,129,0.06)' : 'white',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'announcements' ? 800 : 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Megaphone size={16} /> Ads / Popups ({announcements.length})
+          </button>
           <button
             onClick={() => setActiveTab('settings')}
             style={{
@@ -1857,6 +1974,198 @@ export default function AdminPortal() {
                   </div>
                 </div>
               ))}
+            </div>
+
+          </div>
+        )}
+
+        {/* --- TAB: MANAGE ADVERTISEMENTS & POPUPS --- */}
+        {activeTab === 'announcements' && (
+          <div className="desktop-grid-2">
+            
+            {/* Announcement / Ad Add & Edit Form */}
+            <div className="premium-card" id="ann-editor-form" style={{ borderTop: '6px solid var(--primary)', alignSelf: 'flex-start' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '6px' }}>
+                {editingAnnId ? 'Edit Advertisement Popup' : 'Add New Advertisement Popup'}
+              </h3>
+              <p className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '16px' }}>
+                Configured advertisements will automatically show up in a front popup when users open the application.
+              </p>
+
+              <form onSubmit={handleAnnSubmit}>
+                <div className="premium-input-group">
+                  <label className="premium-label">Advertisement Title (Manual Name) *</label>
+                  <input 
+                    type="text" 
+                    value={annForm.title} 
+                    onChange={(e) => setAnnForm({ ...annForm, title: e.target.value })} 
+                    placeholder="e.g. Special Offer / New Service Available"
+                    className="premium-input" 
+                    required 
+                  />
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Message / Content Description</label>
+                  <textarea 
+                    rows={4}
+                    value={annForm.content} 
+                    onChange={(e) => setAnnForm({ ...annForm, content: e.target.value })} 
+                    placeholder="Describe the promotion or announcement details..."
+                    className="premium-input" 
+                  />
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Banner Image (Optional)</label>
+                  {annForm.img_url && (
+                    <div style={{ marginBottom: '10px', position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+                      <img 
+                        src={getImageUrl(annForm.img_url)} 
+                        alt="Uploaded preview" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f8fafc' }} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setAnnForm(prev => ({ ...prev, img_url: '' }))} 
+                        className="premium-btn premium-btn-danger"
+                        style={{ position: 'absolute', right: '6px', bottom: '6px', width: 'auto', padding: '4px 8px', fontSize: '0.7rem' }}
+                      >
+                        Remove Image
+                      </button>
+                    </div>
+                  )}
+
+                  <label className="premium-btn premium-btn-secondary" style={{ padding: '12px', fontSize: '0.85rem', display: 'flex', gap: '8px', cursor: 'pointer', background: 'white', border: '1.5px dashed var(--primary)' }}>
+                    <Upload size={16} style={{ color: 'var(--primary)' }} /> 
+                    {uploadingAnnImg ? 'Uploading image...' : annForm.img_url ? 'Change Uploaded Banner' : 'Upload Banner Image File'}
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      disabled={uploadingAnnImg}
+                      onChange={(e) => handleAnnImageUpload(e.target.files[0])}
+                    />
+                  </label>
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Action Button Name (Manual Button Label)</label>
+                  <input 
+                    type="text" 
+                    value={annForm.button_name} 
+                    onChange={(e) => setAnnForm({ ...annForm, button_name: e.target.value })} 
+                    placeholder="e.g. Apply Now, Visit Offer, WhatsApp Us"
+                    className="premium-input" 
+                  />
+                </div>
+
+                <div className="premium-input-group">
+                  <label className="premium-label">Action Button Target Link / URL</label>
+                  <input 
+                    type="text" 
+                    value={annForm.button_url} 
+                    onChange={(e) => setAnnForm({ ...annForm, button_url: e.target.value })} 
+                    placeholder="e.g. /user?tab=apply or web URL link"
+                    className="premium-input" 
+                  />
+                </div>
+
+                <div className="premium-input-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', marginTop: '10px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="ann-enabled-check"
+                    checked={String(annForm.enabled).toLowerCase() === 'true'} 
+                    onChange={(e) => setAnnForm({ ...annForm, enabled: e.target.checked ? 'true' : 'false' })} 
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                  />
+                  <label htmlFor="ann-enabled-check" className="premium-label" style={{ margin: 0, cursor: 'pointer', fontWeight: 'bold' }}>
+                    Enable & Show Front Popup on App Open
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" className="premium-btn premium-btn-primary" style={{ flex: 2 }}>
+                    {editingAnnId ? 'Update Advertisement' : 'Create Advertisement'}
+                  </button>
+                  {editingAnnId && (
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setEditingAnnId(null);
+                        setAnnForm({ title: '', description: '', content: '', img_url: '', button_name: '', button_url: '', enabled: 'true' });
+                      }} 
+                      className="premium-btn premium-btn-secondary"
+                      style={{ flex: 1 }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* List of existing Advertisements */}
+            <div>
+              <h4 style={{ fontSize: '0.95rem', margin: '0 0 12px 16px', color: 'var(--text-light-muted)' }}>
+                Active Advertisements ({announcements.length} Entries)
+              </h4>
+              {announcements.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px', background: 'white', borderRadius: '12px', color: '#94a3b8' }}>
+                  No advertisements created yet. Fill out the form on the left to add your first advertisement popup!
+                </div>
+              ) : (
+                announcements.map((ann) => {
+                  const isEnabled = String(ann.enabled).toLowerCase() === 'true';
+                  return (
+                    <div key={ann.id} className="premium-card admin-item-card" style={{ alignItems: 'flex-start', padding: '14px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                          <h4 style={{ fontSize: '0.95rem', margin: 0, color: '#1e293b', fontWeight: '800' }}>
+                            {ann.title || 'Untitled Ad'}
+                          </h4>
+                          <span 
+                            onClick={() => handleToggleAnnStatus(ann)}
+                            style={{ 
+                              cursor: 'pointer',
+                              fontSize: '0.65rem', 
+                              fontWeight: 'bold', 
+                              padding: '2px 8px', 
+                              borderRadius: '12px',
+                              background: isEnabled ? '#dcfce7' : '#fee2e2',
+                              color: isEnabled ? '#15803d' : '#ef4444',
+                              border: isEnabled ? '1px solid #86efac' : '1px solid #fca5a5'
+                            }}
+                          >
+                            {isEnabled ? '● Active (Front Popup)' : '○ Disabled'}
+                          </span>
+                        </div>
+                        {ann.img_url && (
+                          <div style={{ width: '100px', height: '60px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '8px', background: '#f8fafc' }}>
+                            <img src={getImageUrl(ann.img_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        )}
+                        <p className="text-muted" style={{ fontSize: '0.8rem', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: '6px' }}>
+                          {ann.content || ann.description || 'No content message provided.'}
+                        </p>
+                        {ann.button_name && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 'bold' }}>
+                            Button: "{ann.button_name}" {ann.button_url ? `(${ann.button_url})` : ''}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignSelf: 'center' }}>
+                        <button onClick={() => startEditAnn(ann)} className="premium-btn premium-btn-secondary" style={{ width: '36px', height: '36px', padding: 0 }} title="Edit Advertisement">
+                          <Edit size={16} />
+                        </button>
+                        <button onClick={() => handleDeleteAnn(ann.id)} className="premium-btn premium-btn-danger" style={{ width: '36px', height: '36px', padding: 0 }} title="Delete Advertisement">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
           </div>

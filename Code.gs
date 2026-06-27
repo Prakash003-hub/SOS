@@ -74,6 +74,10 @@ function formatNumberString(val) {
   return str;
 }
 
+function generateUniqueId() {
+  return "ann-" + Date.now() + Math.random().toString(36).substring(2, 6);
+}
+
 // --- API ENTRY POINTS ---
 
 /**
@@ -1534,9 +1538,10 @@ function initSpreadsheet() {
   ]);
 
   // 8. ANNOUNCEMENTS SHEET
-  ensureSheetExists("Announcements", [
-    "id", "title", "description", "content", "button_name", "button_url", "enabled", "created_at"
+  var annSheet = ensureSheetExists("Announcements", [
+    "id", "title", "description", "content", "button_name", "button_url", "enabled", "created_at", "img_url"
   ]);
+  ensureColumnExists(annSheet, "img_url");
   
   // 9. PRODUCTS SHEET
   var productsSheet = ensureSheetExists("Products", [
@@ -1733,6 +1738,7 @@ function createAnnouncementAction(annData) {
     title: annData.title || "",
     description: annData.description || "",
     content: annData.content || "",
+    img_url: annData.img_url || "",
     button_name: annData.button_name || "",
     button_url: annData.button_url || "",
     enabled: annData.enabled !== undefined ? String(annData.enabled) : "true",
@@ -1752,6 +1758,7 @@ function updateAnnouncementAction(id, annData) {
   if (annData.title !== undefined) existingRow.title = annData.title;
   if (annData.description !== undefined) existingRow.description = annData.description;
   if (annData.content !== undefined) existingRow.content = annData.content;
+  if (annData.img_url !== undefined) existingRow.img_url = annData.img_url;
   if (annData.button_name !== undefined) existingRow.button_name = annData.button_name;
   if (annData.button_url !== undefined) existingRow.button_url = annData.button_url;
   if (annData.enabled !== undefined) existingRow.enabled = String(annData.enabled);
