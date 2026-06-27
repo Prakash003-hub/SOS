@@ -39,6 +39,10 @@
       "destination": "/api/share?type=form&id=:id"
     },
     {
+      "source": "/accessories/:id",
+      "destination": "/api/share?type=accessories&id=:id"
+    },
+    {
       "source": "/product/:id",
       "destination": "/api/share?type=product&id=:id"
     },

@@ -227,16 +227,16 @@ const MarqueeRow = ({
   const [visibleItems, setVisibleItems] = useState([]);
   const [fadingIndex, setFadingIndex] = useState(null);
 
-  // Dynamically calculate maxVisible based on container/viewport width
+  // Dynamically calculate maxVisible based on container/viewport width for responsive web apps (phones, tablets, laptops, desktop monitors)
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-      if (width < 450) {
-        setMaxVisible(2);
-      } else if (width < 650) {
-        setMaxVisible(3);
+      if (width < 680) {
+        setMaxVisible(3); // Mobile Phones (< 450px) & Large Phones / Phablets (450px - 680px): 3 columns
+      } else if (width < 960) {
+        setMaxVisible(4); // Tablets & Small Laptops (680px - 960px): 4 columns
       } else {
-        setMaxVisible(4);
+        setMaxVisible(5); // Desktop Monitors & Wide Displays (≥ 960px): 5 columns
       }
     };
 
@@ -305,7 +305,7 @@ const MarqueeRow = ({
       style={{
         overflow: 'hidden',
         display: 'flex',
-        gap: '12px',
+        gap: '8px',
         width: '100%',
         padding: '6px 0',
         justifyContent: 'center',
@@ -328,9 +328,11 @@ const MarqueeRow = ({
             }}
             className="showcase-product-card"
             style={{
-              width: '130px',
+              flex: '1 1 0px',
+              maxWidth: '130px',
+              minWidth: '95px',
               height: '210px',
-              padding: '10px',
+              padding: '8px',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
@@ -4087,10 +4089,10 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                             </span>
                           </div>
 
-                          {/* 2 Column Grid */}
+                          {/* Responsive Responsive Grid across Phones, Tablets, Laptops & Desktop Monitors */}
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(2, 1fr)',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
                             gap: '12px',
                             padding: '4px'
                           }}>

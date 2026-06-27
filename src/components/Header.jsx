@@ -188,10 +188,6 @@ export default function Header({ currentUser, onLogout, onLoginTrigger, isAdmin 
                     onError={(e) => { e.target.onerror = null; e.target.src = '/default_avatar.png'; }}
                   />
                 </div>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', whiteSpace: 'nowrap' }}>
-                  Hi, {currentUser.name.split(' ')[0]}
-                </span>
-                <ChevronDown size={14} style={{ color: '#64748b' }} />
               </button>
 
               {/* Profile Popover Overlay Dropdown */}

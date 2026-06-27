@@ -187,6 +187,24 @@ const getImageUrl = (url) => {
   return url;
 };
 
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+const highlightText = (text, search) => {
+  if (!search || !search.trim()) return text;
+  const cleanSearch = search.trim();
+  const regex = new RegExp(`(${escapeRegExp(cleanSearch)})`, 'gi');
+  const parts = text.split(regex);
+  return parts.map((part, i) => 
+    regex.test(part) ? (
+      <mark key={i} style={{ backgroundColor: '#fef08a', color: '#854d0e', padding: '0 2px', borderRadius: '2px', fontWeight: 'bold' }}>
+        {part}
+      </mark>
+    ) : part
+  );
+};
+
 const resizeQRImage = (file) => {
   return new Promise((resolve) => {
     if (!file || !file.type.startsWith('image/')) {
@@ -372,13 +390,14 @@ export default function AdminPortal() {
   // Accessories state & forms
   const [accessorySearch, setAccessorySearch] = useState('');
   const [accessoryCategoryFilter, setAccessoryCategoryFilter] = useState('All');
+  const [accessoryBrandFilter, setAccessoryBrandFilter] = useState('All');
   const [accessoryTagFilter, setAccessoryTagFilter] = useState('All');
   const [editingProductId, setEditingProductId] = useState(null);
   const [uploadingProductImg, setUploadingProductImg] = useState(false);
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
   
-  // Derive unique tags based on products and selected category
-  const uniqueTags = useMemo(() => {
+  // Derive unique brands based on products and selected category
+  const uniqueBrands = useMemo(() => {
     return Array.from(
       new Set(
         products
@@ -390,18 +409,50 @@ export default function AdminPortal() {
             }
             return p.Category === accessoryCategoryFilter;
           })
+          .map(p => (p.Brand === 'Other' ? p.CustomBrand : p.Brand))
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [products, accessoryCategoryFilter]);
+
+  // Derive unique tags based on products, selected category, and selected brand
+  const uniqueTags = useMemo(() => {
+    return Array.from(
+      new Set(
+        products
+          .filter(p => {
+            if (accessoryCategoryFilter !== 'All') {
+              const standardCats = ['Phone Cover', 'Headphone', 'Speaker', 'Charger', 'Charger Cable'];
+              if (accessoryCategoryFilter === 'Other') {
+                if (standardCats.includes(p.Category)) return false;
+              } else if (p.Category !== accessoryCategoryFilter) {
+                return false;
+              }
+            }
+            if (accessoryBrandFilter !== 'All') {
+              const pBrand = p.Brand === 'Other' ? p.CustomBrand : p.Brand;
+              if (pBrand !== accessoryBrandFilter && p.Brand !== accessoryBrandFilter) return false;
+            }
+            return true;
+          })
           .map(p => p.TagNumber)
           .filter(Boolean)
       )
     ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  }, [products, accessoryCategoryFilter]);
+  }, [products, accessoryCategoryFilter, accessoryBrandFilter]);
 
-  // Reset tag filter if selected tag is no longer valid for the selected category
+  // Reset brand and tag filters if selected option is no longer valid
+  useEffect(() => {
+    if (accessoryBrandFilter !== 'All' && !uniqueBrands.includes(accessoryBrandFilter)) {
+      setAccessoryBrandFilter('All');
+    }
+  }, [accessoryCategoryFilter, uniqueBrands, accessoryBrandFilter]);
+
   useEffect(() => {
     if (accessoryTagFilter !== 'All' && !uniqueTags.includes(accessoryTagFilter)) {
       setAccessoryTagFilter('All');
     }
-  }, [accessoryCategoryFilter, uniqueTags, accessoryTagFilter]);
+  }, [accessoryCategoryFilter, accessoryBrandFilter, uniqueTags, accessoryTagFilter]);
   
   const [productForm, setProductForm] = useState({
     Category: 'Phone Cover',
@@ -419,6 +470,7 @@ export default function AdminPortal() {
   
   // Tempered Glass state & forms
   const [tgSearch, setTgSearch] = useState('');
+  const [expandedTgBoxes, setExpandedTgBoxes] = useState({});
   const [editingTgBoxNumber, setEditingTgBoxNumber] = useState(null);
   const [tgForm, setTgForm] = useState({
     BoxNumber: '',
@@ -2669,7 +2721,7 @@ export default function AdminPortal() {
                       { key: 'post', label: 'Service Posts', file: 'post_og_preview.jpg', route: '/post/[slug]' },
                       { key: 'form', label: 'Application Forms', file: 'form_og_preview.jpg', route: '/form/[slug]' },
                       { key: 'job', label: 'Job Alerts', file: 'job_og_preview.jpg', route: '/job/[slug]' },
-                      { key: 'product', label: 'Products Catalog', file: 'product_og_preview.jpg', route: '/product/[slug]' }
+                      { key: 'product', label: 'Products Catalog', file: 'product_og_preview.jpg', route: '/accessories/[slug]' }
                     ].map((ogItem) => (
                       <div key={ogItem.key} style={{
                         display: 'flex',
@@ -3375,6 +3427,17 @@ export default function AdminPortal() {
                         <option value="Other">Other Accessories</option>
                       </select>
                       <select
+                        value={accessoryBrandFilter}
+                        onChange={(e) => setAccessoryBrandFilter(e.target.value)}
+                        className="premium-input"
+                        style={{ padding: '8px 10px', fontSize: '0.8rem', margin: 0, width: '110px', flex: '1 1 90px' }}
+                      >
+                        <option value="All">All Brands</option>
+                        {uniqueBrands.map(brand => (
+                          <option key={brand} value={brand}>{brand}</option>
+                        ))}
+                      </select>
+                      <select
                         value={accessoryTagFilter}
                         onChange={(e) => setAccessoryTagFilter(e.target.value)}
                         className="premium-input"
@@ -3399,6 +3462,10 @@ export default function AdminPortal() {
                         } else {
                           if (p.Category !== accessoryCategoryFilter) return false;
                         }
+                      }
+                      if (accessoryBrandFilter !== 'All') {
+                        const pBrand = p.Brand === 'Other' ? p.CustomBrand : p.Brand;
+                        if (pBrand !== accessoryBrandFilter && p.Brand !== accessoryBrandFilter) return false;
                       }
                       if (accessoryTagFilter !== 'All') {
                         if (p.TagNumber !== accessoryTagFilter) return false;
@@ -3625,30 +3692,97 @@ export default function AdminPortal() {
 
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
-                        {filtered.map(item => (
-                          <div key={item.BoxNumber} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#f0fdf4', border: '1.5px solid #22c55e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <span style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#15803d', textTransform: 'uppercase', lineHeight: '1' }}>BOX</span>
-                              <strong style={{ fontSize: '1rem', color: '#166534', fontWeight: '900', marginTop: '2px' }}>{item.BoxNumber}</strong>
+                        {filtered.map(item => {
+                          const models = (item.ModelList || '').split(',').map(m => m.trim()).filter(Boolean);
+                          const q = tgSearch.trim().toLowerCase();
+                          const isSearching = q.length > 0;
+                          const matchedIndices = [];
+                          models.forEach((m, idx) => {
+                            if (isSearching && m.toLowerCase().includes(q)) {
+                              matchedIndices.push(idx);
+                            }
+                          });
+                          const hasMatchingModels = matchedIndices.length > 0;
+                          const isExpanded = !!expandedTgBoxes[item.BoxNumber] || (isSearching && hasMatchingModels);
+                          const maxCollapsedVisible = 6;
+                          const visibleModels = isExpanded ? models : models.slice(0, maxCollapsedVisible);
+                          const hasMore = models.length > maxCollapsedVisible;
+
+                          const toggleBox = (boxNumber) => {
+                            setExpandedTgBoxes(prev => ({
+                              ...prev,
+                              [boxNumber]: !prev[boxNumber]
+                            }));
+                          };
+
+                          return (
+                            <div key={item.BoxNumber} className="premium-card admin-item-card" style={{ padding: '12px', margin: 0, display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '12px', flexShrink: 0 }}>
+                              <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#f0fdf4', border: '1.5px solid #22c55e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, alignSelf: 'center' }}>
+                                <span style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#15803d', textTransform: 'uppercase', lineHeight: '1' }}>BOX</span>
+                                <strong style={{ fontSize: '1rem', color: '#166534', fontWeight: '900', marginTop: '2px' }}>{item.BoxNumber}</strong>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <h4 style={{ fontSize: '0.85rem', margin: '0 0 6px 0', color: '#1e293b', fontWeight: '800' }}>
+                                  Models ({ models.length })
+                                </h4>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                                  {visibleModels.map((model, idx) => {
+                                    const isMatched = isSearching && model.toLowerCase().includes(q);
+                                    return (
+                                      <span
+                                        key={idx}
+                                        style={{
+                                          display: 'inline-block',
+                                          padding: '3px 8px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.7rem',
+                                          fontWeight: '500',
+                                          background: isMatched ? '#fef08a' : '#f1f5f9',
+                                          color: isMatched ? '#854d0e' : '#334155',
+                                          border: isMatched ? '1px solid #eab308' : '1px solid #e2e8f0',
+                                          transition: 'all 0.2s ease',
+                                        }}
+                                      >
+                                        {highlightText(model, tgSearch)}
+                                      </span>
+                                    );
+                                  })}
+                                  {hasMore && !isSearching && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleBox(item.BoxNumber)}
+                                      style={{
+                                        background: 'rgba(30, 168, 103, 0.08)',
+                                        border: 'none',
+                                        color: 'var(--primary)',
+                                        fontSize: '0.7rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        padding: '3px 8px',
+                                        borderRadius: '6px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '2px',
+                                        outline: 'none',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      {isExpanded ? 'Show less' : `+${models.length - maxCollapsedVisible} more`}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '4px', width: 'auto', flexShrink: 0, alignSelf: 'center' }}>
+                                <button onClick={() => startEditTg(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Box">
+                                  <Edit size={14} />
+                                </button>
+                                <button onClick={() => handleDeleteTg(item.BoxNumber)} className="premium-btn premium-btn-danger" style={{ width: '32px', height: '32px', padding: 0 }} title="Delete Box">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0', color: '#1e293b', fontWeight: '800' }}>
-                                Models ({ (item.ModelList || '').split(',').filter(Boolean).length })
-                              </h4>
-                              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {item.ModelList}
-                              </p>
-                            </div>
-                            <div style={{ display: 'flex', gap: '4px', width: 'auto', flexShrink: 0 }}>
-                              <button onClick={() => startEditTg(item)} className="premium-btn premium-btn-secondary" style={{ width: '32px', height: '32px', padding: 0 }} title="Edit Box">
-                                <Edit size={14} />
-                              </button>
-                              <button onClick={() => handleDeleteTg(item.BoxNumber)} className="premium-btn premium-btn-danger" style={{ width: '32px', height: '32px', padding: 0 }} title="Delete Box">
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })()}

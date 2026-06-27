@@ -169,7 +169,7 @@ export default async function handler(req, res) {
   }
 
   // Determine typeKey (mapping user tabs if type === 'user')
-  let typeKey = ['post', 'form', 'job', 'product'].includes(type) ? type : 'post';
+  let typeKey = ['post', 'form', 'job', 'product', 'accessories'].includes(type) ? type : 'post';
   if (type === 'user') {
     const tab = req.query.tab;
     if (tab === 'accessories') {
@@ -179,6 +179,8 @@ export default async function handler(req, res) {
     } else if (tab === 'home') {
       typeKey = 'post';
     }
+  } else if (type === 'accessories') {
+    typeKey = 'product';
   }
 
   const defaults = ogConfig[typeKey] || {
@@ -228,12 +230,12 @@ export default async function handler(req, res) {
       localItems = mockData.forms || [];
     } else if (type === 'job') {
       localItems = defaultMockJobs;
-    } else if (type === 'product') {
+    } else if (type === 'product' || type === 'accessories') {
       localItems = defaultMockProducts;
     }
 
     // Try to find the item locally first (extremely fast, no network delay)
-    if (type === 'product') {
+    if (type === 'product' || type === 'accessories') {
       item = localItems.find(x => String(x.ProductID) === String(id));
     } else {
       item = localItems.find(x => String(x.id) === String(id));
@@ -245,7 +247,7 @@ export default async function handler(req, res) {
         let actionName = 'getPosts';
         if (type === 'job') actionName = 'getJobs';
         if (type === 'form') actionName = 'getForms';
-        if (type === 'product') actionName = 'getProducts';
+        if (type === 'product' || type === 'accessories') actionName = 'getProducts';
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 1200); // 1.2s timeout
@@ -264,7 +266,7 @@ export default async function handler(req, res) {
         if (response.ok) {
           const json = await response.json();
           if (json.success && Array.isArray(json.data)) {
-            if (type === 'product') {
+            if (type === 'product' || type === 'accessories') {
               item = json.data.find(x => String(x.ProductID) === String(id));
             } else {
               item = json.data.find(x => String(x.id) === String(id));
@@ -281,7 +283,7 @@ export default async function handler(req, res) {
 
     // 4. Map tags and redirect paths
     if (item) {
-      if (type === 'product') {
+      if (type === 'product' || type === 'accessories') {
         title = item.ProductName || `${item.Brand} ${item.ModelName} (${item.Category})`;
         description = `Price: ₹${item.Price} | Category: ${item.Category} | Brand: ${item.Brand} ${item.ModelName ? `- ${item.ModelName}` : ''}`;
         imageUrl = getImageUrl(item.ImageURL || item.img_url, baseUrl, defaults.image);
@@ -298,7 +300,7 @@ export default async function handler(req, res) {
       redirectPath = `/user?tab=home&jobId=${id}`;
     } else if (type === 'form') {
       redirectPath = `/user?tab=apply&formId=${id}`;
-    } else if (type === 'product') {
+    } else if (type === 'product' || type === 'accessories') {
       redirectPath = `/user?tab=accessories&productId=${id}`;
     }
 
