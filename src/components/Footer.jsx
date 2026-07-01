@@ -33,7 +33,7 @@ export default function Footer({ systemSettings }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '0.7rem', color: 'white', fontWeight: 'bold' }}>Support:</span>
             <a 
-              href="https://wa.me/9787973615" 
+              href="https://wa.me/919787973615" 
               target="_blank" 
               rel="noopener noreferrer"
               style={{
