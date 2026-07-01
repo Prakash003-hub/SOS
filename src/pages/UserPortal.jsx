@@ -47,7 +47,8 @@ import {
   Trash2,
   Clock,
   Megaphone,
-  Share2
+  Share2,
+  ExternalLink
 } from 'lucide-react';
 
 const safeJsonParse = (str, fallback = []) => {
@@ -4671,11 +4672,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
               {/* Banner Image Preview */}
               {activeAnn.img_url && (
-                <div style={{ width: '100%', maxHeight: '180px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                <div style={{ width: '100%', maxHeight: '250px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                   <img 
                     src={getImageUrl(activeAnn.img_url)} 
                     alt="Advertisement Banner" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+                    style={{ width: '100%', height: 'auto', maxHeight: '250px', objectFit: 'contain', display: 'block' }} 
                   />
                 </div>
               )}

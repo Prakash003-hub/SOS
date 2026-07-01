@@ -1542,6 +1542,8 @@ function initSpreadsheet() {
     "id", "title", "description", "content", "button_name", "button_url", "enabled", "created_at", "img_url"
   ]);
   ensureColumnExists(annSheet, "img_url");
+  ensureColumnExists(annSheet, "button_name");
+  ensureColumnExists(annSheet, "button_url");
   
   // 9. PRODUCTS SHEET
   var productsSheet = ensureSheetExists("Products", [
