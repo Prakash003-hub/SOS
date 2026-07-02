@@ -155,7 +155,7 @@ const getImageUrl = (url) => {
       }
       const driveId = getGoogleDriveId(url);
       if (driveId) {
-        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+        return `https://drive.google.com/uc?export=view&id=${driveId}`;
       }
     }
     return url;
@@ -4682,13 +4682,19 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, paddingRight: '4px' }}>
                 {/* Banner Image Preview */}
                 {activeAnn.img_url && (
-                  <div style={{ width: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', flexShrink: 0 }}>
-                    <img 
-                      src={getImageUrl(activeAnn.img_url)} 
-                      alt="Advertisement Banner" 
-                      style={{ width: '100%', height: 'auto', display: 'block' }} 
-                    />
-                  </div>
+                  <img 
+                    src={getImageUrl(activeAnn.img_url)} 
+                    alt="Advertisement Banner" 
+                    style={{ 
+                      maxWidth: '100%', 
+                      height: 'auto', 
+                      display: 'block', 
+                      borderRadius: '10px', 
+                      border: '1px solid #e2e8f0',
+                      margin: '0 auto',
+                      flexShrink: 0 
+                    }} 
+                  />
                 )}
 
                 {/* Body */}
