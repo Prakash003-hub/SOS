@@ -155,7 +155,7 @@ const getImageUrl = (url) => {
       }
       const driveId = getGoogleDriveId(url);
       if (driveId) {
-        return `https://drive.google.com/uc?export=view&id=${driveId}`;
+        return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
       }
     }
     return url;
