@@ -4653,11 +4653,12 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               padding: '24px',
               boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
               width: '100%', maxWidth: '380px',
+              maxHeight: '85vh',
               display: 'flex', flexDirection: 'column', gap: '16px',
               animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
             }}>
               {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', flexShrink: 0 }}>
                 <div style={{ textAlign: 'left' }}>
                   <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#1e293b', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Megaphone size={16} style={{ color: '#d97706', flexShrink: 0 }} />
@@ -4677,24 +4678,27 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 </button>
               </div>
 
-              {/* Banner Image Preview */}
-              {activeAnn.img_url && (
-                <div style={{ width: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                  <img 
-                    src={getImageUrl(activeAnn.img_url)} 
-                    alt="Advertisement Banner" 
-                    style={{ width: '100%', height: 'auto', display: 'block' }} 
-                  />
-                </div>
-              )}
+              {/* Scrollable Content wrapper */}
+              <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, paddingRight: '4px' }}>
+                {/* Banner Image Preview */}
+                {activeAnn.img_url && (
+                  <div style={{ width: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                    <img 
+                      src={getImageUrl(activeAnn.img_url)} 
+                      alt="Advertisement Banner" 
+                      style={{ width: '100%', height: 'auto', display: 'block' }} 
+                    />
+                  </div>
+                )}
 
-              {/* Body */}
-              <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
-                {activeAnn.content || activeAnn.description || 'No details provided.'}
+                {/* Body */}
+                <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.6', textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+                  {activeAnn.content || activeAnn.description || 'No details provided.'}
+                </div>
               </div>
 
               {/* Action Buttons Block */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px', flexShrink: 0 }}>
 
                 {/* Close and Admin Action Buttons side-by-side */}
                 <div style={{ display: 'flex', gap: '8px' }}>
