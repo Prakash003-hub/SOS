@@ -541,6 +541,15 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   const [announcements, setAnnouncements] = useState([]);
   const [activeAnnIndex, setActiveAnnIndex] = useState(0);
 
+  const handleCloseAnnouncement = () => {
+    if (activeAnnIndex < announcements.length - 1) {
+      setActiveAnnIndex(prev => prev + 1);
+    } else {
+      setShowAnnouncementModal(false);
+      setActiveAnnIndex(0);
+    }
+  };
+
   // Wizard States
   const [selectedForm, setSelectedForm] = useState(null);
   const [wizardStep, setWizardStep] = useState(1);
@@ -4627,8 +4636,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         const activeAnn = announcements[activeAnnIndex];
         if (!activeAnn) return null;
 
-        const hasNext = activeAnnIndex < announcements.length - 1;
-        const hasPrev = activeAnnIndex > 0;
         const hasButton = activeAnn.button_name && activeAnn.button_name.trim() !== '' && activeAnn.button_url && activeAnn.button_url.trim() !== '';
 
         return (
@@ -4663,7 +4670,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   )}
                 </div>
                 <button
-                  onClick={() => setShowAnnouncementModal(false)}
+                  onClick={handleCloseAnnouncement}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 0 }}
                 >
                   <X size={18} />
@@ -4672,11 +4679,11 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
 
               {/* Banner Image Preview */}
               {activeAnn.img_url && (
-                <div style={{ width: '100%', maxHeight: '250px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <div style={{ width: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
                   <img 
                     src={getImageUrl(activeAnn.img_url)} 
                     alt="Advertisement Banner" 
-                    style={{ width: '100%', height: 'auto', maxHeight: '250px', objectFit: 'contain', display: 'block' }} 
+                    style={{ width: '100%', height: 'auto', display: 'block' }} 
                   />
                 </div>
               )}
@@ -4686,55 +4693,13 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 {activeAnn.content || activeAnn.description || 'No details provided.'}
               </div>
 
-              {/* Navigation Indicators / Dots */}
-              {announcements.length > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', margin: '4px 0' }}>
-                  {announcements.map((_, idx) => (
-                    <span
-                      key={idx}
-                      onClick={() => setActiveAnnIndex(idx)}
-                      style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        background: idx === activeAnnIndex ? 'var(--primary)' : '#cbd5e1',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-
               {/* Action Buttons Block */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-
-                {/* Navigation (Prev/Next) */}
-                {announcements.length > 1 && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => setActiveAnnIndex(prev => Math.max(0, prev - 1))}
-                      disabled={!hasPrev}
-                      className="premium-btn premium-btn-secondary"
-                      style={{ flex: 1, padding: '10px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 'bold', cursor: hasPrev ? 'pointer' : 'not-allowed', opacity: hasPrev ? 1 : 0.4 }}
-                    >
-                      Prev
-                    </button>
-                    <button
-                      onClick={() => setActiveAnnIndex(prev => Math.min(announcements.length - 1, prev + 1))}
-                      disabled={!hasNext}
-                      className="premium-btn premium-btn-secondary"
-                      style={{ flex: 1, padding: '10px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 'bold', cursor: hasNext ? 'pointer' : 'not-allowed', opacity: hasNext ? 1 : 0.4 }}
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
 
                 {/* Close and Admin Action Buttons side-by-side */}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
-                    onClick={() => setShowAnnouncementModal(false)}
+                    onClick={handleCloseAnnouncement}
                     className="premium-btn premium-btn-secondary"
                     style={{ flex: 1, padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', background: '#f1f5f9', color: '#334155' }}
                   >
@@ -4744,7 +4709,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                   {hasButton && (
                     <button
                       onClick={() => {
-                        setShowAnnouncementModal(false);
+                        handleCloseAnnouncement();
                         if (activeAnn.button_url.startsWith('http://') || activeAnn.button_url.startsWith('https://')) {
                           window.open(activeAnn.button_url, '_blank');
                         } else {
