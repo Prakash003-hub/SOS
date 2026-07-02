@@ -89,6 +89,8 @@ const getGoogleDriveId = (url) => {
   if (!url) return null;
   const fileDMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (fileDMatch && fileDMatch[1]) return fileDMatch[1];
+  const dMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch && dMatch[1]) return dMatch[1];
   const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (idMatch && idMatch[1]) return idMatch[1];
   return null;
@@ -149,7 +151,7 @@ const parseLimit = (limitStr) => {
 const getImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) {
-    if (url.includes('drive.google.com')) {
+    if (url.includes('drive.google.com') || url.includes('googleusercontent.com') || url.includes('drive.usercontent.google.com')) {
       if (checkIfPdf(url)) {
         return url;
       }
@@ -1506,6 +1508,20 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
   };
 
   const renderDocumentUploadZone = (docKeyOrLabel, isCustom) => {
+    // Determine max files (1, 2, or 3) from selectedForm config
+    let maxFiles = 1;
+    if (isCustom) {
+      const custDocs = normalizeCustomDocs(safeJsonParse(selectedForm.custom_docs, []));
+      const docConfig = custDocs.find(x => x.label === docKeyOrLabel);
+      if (docConfig) maxFiles = docConfig.val || 1;
+    } else {
+      const reqDocs = normalizeRequiredDocs(safeJsonParse(selectedForm.required_docs, []));
+      const docConfig = reqDocs.find(x => x.id === docKeyOrLabel);
+      if (docConfig) maxFiles = docConfig.val || 1;
+      // photo and signature are always 1
+      if (['photo', 'signature'].includes(docKeyOrLabel)) maxFiles = 1;
+    }
+
     // Get saved profile URL (only for required standard fields)
     const getSavedDocUrl = () => {
       if (isCustom || !currentUser) return null;
@@ -1515,6 +1531,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
     };
 
     const savedUrl = getSavedDocUrl();
+    const savedUrl2 = !isCustom && currentUser ? currentUser[`${docKeyOrLabel}_url_2`] : null;
     const hasSavedDoc = !!savedUrl && !deletedSavedDocs[docKeyOrLabel];
 
     if (hasSavedDoc) {
@@ -1522,7 +1539,7 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
       return (
         <div key={docKeyOrLabel} className="document-upload-zone" style={{ padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #10b981', background: '#f0fdf4', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Small Display Thumbnail */}
+            {/* Small Display Thumbnail (Front) */}
             {checkIfPdf(savedUrl) ? (
               <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
                 <FileText size={22} />
@@ -1531,24 +1548,53 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
               <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
                   src={getImageUrl(savedUrl)}
-                  alt="Preview"
+                  alt="Preview Front"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
+            )}
+
+            {/* Small Display Thumbnail (Back) - if maxFiles >= 2 and exists */}
+            {maxFiles >= 2 && savedUrl2 && (
+              checkIfPdf(savedUrl2) ? (
+                <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                  <FileText size={22} />
+                </div>
+              ) : (
+                <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img
+                    src={getImageUrl(savedUrl2)}
+                    alt="Preview Back"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+              )
             )}
 
             <div>
               <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', textTransform: 'capitalize', display: 'block' }}>
                 {STANDARD_FIELDS[docKeyOrLabel]?.label || docKeyOrLabel} <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: 'bold' }}>[Saved]</span>
               </span>
-              <a
-                href={getImageUrl(savedUrl)}
-                target="_blank"
-                rel="noreferrer"
-                style={{ fontSize: '0.75rem', color: '#047857', textDecoration: 'underline', fontWeight: '700' }}
-              >
-                View File
-              </a>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '2px' }}>
+                <a
+                  href={getImageUrl(savedUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: '0.75rem', color: '#047857', textDecoration: 'underline', fontWeight: '700' }}
+                >
+                  {maxFiles >= 2 ? 'View Front' : 'View File'}
+                </a>
+                {maxFiles >= 2 && savedUrl2 && (
+                  <a
+                    href={getImageUrl(savedUrl2)}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: '0.75rem', color: '#047857', textDecoration: 'underline', fontWeight: '700' }}
+                  >
+                    View Back
+                  </a>
+                )}
+              </div>
             </div>
           </div>
           {/* Delete/Replace button */}
@@ -1562,20 +1608,6 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
           </button>
         </div>
       );
-    }
-
-    // Determine max files (1, 2, or 3) from selectedForm config
-    let maxFiles = 1;
-    if (isCustom) {
-      const custDocs = normalizeCustomDocs(safeJsonParse(selectedForm.custom_docs, []));
-      const docConfig = custDocs.find(x => x.label === docKeyOrLabel);
-      if (docConfig) maxFiles = docConfig.val || 1;
-    } else {
-      const reqDocs = normalizeRequiredDocs(safeJsonParse(selectedForm.required_docs, []));
-      const docConfig = reqDocs.find(x => x.id === docKeyOrLabel);
-      if (docConfig) maxFiles = docConfig.val || 1;
-      // photo and signature are always 1
-      if (['photo', 'signature'].includes(docKeyOrLabel)) maxFiles = 1;
     }
 
     const uploadStatus = uploadStatuses[docKeyOrLabel];
@@ -2182,6 +2214,36 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
         }
       }
     });
+
+    // 3. Map uploaded docs
+    if (app.uploaded_docs) {
+      try {
+        const parsedDocs = typeof app.uploaded_docs === 'string' ? JSON.parse(app.uploaded_docs) : app.uploaded_docs;
+        const newUploadedUrls = {};
+        const newUploadStatuses = {};
+        
+        Object.keys(parsedDocs).forEach(docKey => {
+          const urls = parsedDocs[docKey];
+          if (urls && urls.length > 0) {
+            const nextUrls = { maxFiles: urls.length };
+            urls.forEach((url, idx) => {
+              nextUrls[`url${idx + 1}`] = url;
+              nextUrls[`name${idx + 1}`] = url.split('/').pop().split('?').shift() || `file_${idx + 1}`;
+            });
+            newUploadedUrls[docKey] = nextUrls;
+            newUploadStatuses[docKey] = 'uploaded';
+          }
+        });
+        
+        setUploadedUrls(newUploadedUrls);
+        setUploadStatuses(newUploadStatuses);
+      } catch (e) {
+        console.error("Failed to parse uploaded_docs on draft resume:", e);
+      }
+    } else {
+      setUploadedUrls({});
+      setUploadStatuses({});
+    }
 
     // Load into wizard
     setSelectedForm(targetForm);
@@ -4276,12 +4338,16 @@ export default function UserPortal({ currentUser, onUpdateProfile, onLoginTrigge
                 return;
               }
 
+              // Remove spaces for comparison
+              const queryClean = query.replace(/\s+/g, '');
+
               // Search in temperedGlassList
               const results = [];
               for (const item of temperedGlassList) {
                 const models = (item.ModelList || "").split(',').map(m => m.trim());
                 for (const m of models) {
-                  if (m.toLowerCase().includes(query)) {
+                  const mClean = m.toLowerCase().replace(/\s+/g, '');
+                  if (mClean.includes(queryClean)) {
                     results.push({
                       modelName: m,
                       boxNumber: item.BoxNumber

@@ -126,6 +126,8 @@ const getGoogleDriveId = (url) => {
   if (!url) return null;
   const fileDMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (fileDMatch && fileDMatch[1]) return fileDMatch[1];
+  const dMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch && dMatch[1]) return dMatch[1];
   const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (idMatch && idMatch[1]) return idMatch[1];
   return null;
@@ -171,7 +173,7 @@ const getLimitLabel = (limitStr) => {
 const getImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) {
-    if (url.includes('drive.google.com')) {
+    if (url.includes('drive.google.com') || url.includes('googleusercontent.com') || url.includes('drive.usercontent.google.com')) {
       if (checkIfPdf(url)) {
         return url;
       }
@@ -3987,10 +3989,10 @@ export default function AdminPortal() {
                   ) : (() => {
                     const filtered = temperedGlassList.filter(t => {
                       if (tgSearch.trim() !== '') {
-                        const q = tgSearch.toLowerCase();
-                        const box = t.BoxNumber.toLowerCase();
-                        const models = (t.ModelList || '').toLowerCase();
-                        return box.includes(q) || models.includes(q);
+                        const qClean = tgSearch.toLowerCase().replace(/\s+/g, '');
+                        const boxClean = t.BoxNumber.toLowerCase().replace(/\s+/g, '');
+                        const modelsClean = (t.ModelList || '').toLowerCase().replace(/\s+/g, '');
+                        return boxClean.includes(qClean) || modelsClean.includes(qClean);
                       }
                       return true;
                     });
@@ -4003,11 +4005,12 @@ export default function AdminPortal() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
                         {filtered.map(item => {
                           const models = (item.ModelList || '').split(',').map(m => m.trim()).filter(Boolean);
-                          const q = tgSearch.trim().toLowerCase();
-                          const isSearching = q.length > 0;
+                          const qClean = tgSearch.trim().toLowerCase().replace(/\s+/g, '');
+                          const isSearching = qClean.length > 0;
                           const matchedIndices = [];
                           models.forEach((m, idx) => {
-                            if (isSearching && m.toLowerCase().includes(q)) {
+                            const mClean = m.toLowerCase().replace(/\s+/g, '');
+                            if (isSearching && mClean.includes(qClean)) {
                               matchedIndices.push(idx);
                             }
                           });
@@ -4036,7 +4039,8 @@ export default function AdminPortal() {
                                 </h4>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                                   {visibleModels.map((model, idx) => {
-                                    const isMatched = isSearching && model.toLowerCase().includes(q);
+                                    const mClean = model.toLowerCase().replace(/\s+/g, '');
+                                    const isMatched = isSearching && mClean.includes(qClean);
                                     return (
                                       <span
                                         key={idx}

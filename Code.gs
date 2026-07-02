@@ -600,12 +600,14 @@ function registerUserAction(userData) {
     throw new Error("This Aadhaar number and email is already registered. Please login with your Phone number and Aadhaar first 4 digits.");
   }
   
+  var dobClean = userData.dob ? formatDateString(userData.dob) : "";
+  
   var userId = "usr-" + Math.random().toString(36).substring(2, 10);
   var newUser = {
     id: userId,
     name: userData.name || "",
     name_tamil: userData.name_tamil || "",
-    dob: "",
+    dob: dobClean ? "'" + dobClean : "",
     phone: "'" + phoneClean,
     aadhar: "'" + aadharClean,
     email: emailClean,
@@ -938,6 +940,68 @@ function submitFormResponseAction(payload) {
       if (newSubmission[k] !== undefined) existingSub[k] = newSubmission[k];
     });
     updateRowObject(sheet, rowIndex, existingSub);
+  }
+
+  // Update user's profile with these uploaded documents so they are saved to the user profile
+  if (userId) {
+    try {
+      var usersSheet = getSheet("Users");
+      var userRowIndex = findRowIndexById(usersSheet, userId);
+      if (userRowIndex !== -1) {
+        var userObj = getRowObject(usersSheet, userRowIndex);
+        var userUpdated = false;
+        
+        var uploadedDocsObj = {};
+        if (payload.uploaded_docs) {
+          uploadedDocsObj = typeof payload.uploaded_docs === "string" ? JSON.parse(payload.uploaded_docs) : payload.uploaded_docs;
+        }
+        
+        if (uploadedDocsObj.photo && uploadedDocsObj.photo.length > 0) {
+          userObj.photo_url = uploadedDocsObj.photo[0];
+          userUpdated = true;
+        }
+        if (uploadedDocsObj.signature && uploadedDocsObj.signature.length > 0) {
+          userObj.signature_url_1 = uploadedDocsObj.signature[0];
+          userUpdated = true;
+        }
+        if (uploadedDocsObj.aadhar) {
+          if (uploadedDocsObj.aadhar.length > 0) {
+            userObj.aadhar_url_1 = uploadedDocsObj.aadhar[0];
+            userUpdated = true;
+          }
+          if (uploadedDocsObj.aadhar.length > 1) {
+            userObj.aadhar_url_2 = uploadedDocsObj.aadhar[1];
+            userUpdated = true;
+          }
+        }
+        if (uploadedDocsObj.smart_card) {
+          if (uploadedDocsObj.smart_card.length > 0) {
+            userObj.smart_card_url_1 = uploadedDocsObj.smart_card[0];
+            userUpdated = true;
+          }
+          if (uploadedDocsObj.smart_card.length > 1) {
+            userObj.smart_card_url_2 = uploadedDocsObj.smart_card[1];
+            userUpdated = true;
+          }
+        }
+        if (uploadedDocsObj.voter_id) {
+          if (uploadedDocsObj.voter_id.length > 0) {
+            userObj.voter_id_url_1 = uploadedDocsObj.voter_id[0];
+            userUpdated = true;
+          }
+          if (uploadedDocsObj.voter_id.length > 1) {
+            userObj.voter_id_url_2 = uploadedDocsObj.voter_id[1];
+            userUpdated = true;
+          }
+        }
+        
+        if (userUpdated) {
+          updateRowObject(usersSheet, userRowIndex, userObj);
+        }
+      }
+    } catch (userDocErr) {
+      logError("submitFormResponse_updateUserDocs", userDocErr);
+    }
   }
   
   // Send receipt email to user if email available and not a draft
